@@ -3,12 +3,12 @@
 _Last updated: 2026-11-13 by planning (no code yet)_
 
 ## Current milestone
-**M0 — Environment & architecture** · state: **Not started** · entry criteria: ✅ planning pack present
+**M0 — Environment & architecture** · state: **Planning** · entry criteria: ✅ planning pack present, environment verified
 
 ## Milestones
 | Milestone | State | Started | Completed | Tag | Report |
 |-----------|-------|---------|-----------|-----|--------|
-| M0 Environment & architecture | Not started | | | | |
+| M0 Environment & architecture | Planning | 2026-11-13 | | | |
 | M1 Database & authentication | Not started | | | | |
 | M2 Task management (+ mobile shell) | Not started | | | | |
 | M3 Dashboard & analytics | Not started | | | | |
