@@ -20,7 +20,7 @@ $PSNativeCommandUseErrorActionPreference = $true
 
 # Allow environment overrides for Node 22 and Java 17, with defaults
 $nodeDir = if ($env:ALIBI_NODE_DIR) { $env:ALIBI_NODE_DIR } else { "D:\dev\Node22" }
-$javaDir = if ($env:ALIBI_JAVA_HOME) { $env:ALIBI_JAVA_HOME } elseif ($env:JAVA_HOME) { $env:JAVA_HOME } else { "D:\dev\jdk" }
+$javaDir = if ($env:ALIBI_JAVA_HOME) { $env:ALIBI_JAVA_HOME } else { "D:\dev\jdk" }
 $env:JAVA_HOME = $javaDir
 
 if (-not $env:ANDROID_HOME -or -not (Test-Path $env:ANDROID_HOME)) {

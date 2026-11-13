@@ -198,10 +198,15 @@ if ($ollamaCmd) {
 
 # Docker / Compose (Required for local stack & M0 verification: FAIL if missing)
 $dockerCmd = Get-Command docker -ErrorAction SilentlyContinue
-$composeCmd = & docker compose version 2>&1 | Out-String
-if ($dockerCmd -and $composeCmd -match "Docker Compose version") {
+if ($dockerCmd) {
     $docVer = & docker --version 2>&1 | Out-String
-    Write-Host "[OK]   Docker: $($docVer.Trim()) | $($composeCmd.Trim())" -ForegroundColor Green
+    $composeCmd = & docker compose version 2>&1 | Out-String
+    if ($composeCmd -match "Docker Compose version") {
+        Write-Host "[OK]   Docker: $($docVer.Trim()) | $($composeCmd.Trim())" -ForegroundColor Green
+    } else {
+        Write-Host "[FAIL] Docker: 'docker' found, but 'docker compose' failed or missing" -ForegroundColor Red
+        $allPassed = $false
+    }
 } else {
     Write-Host "[FAIL] Docker: 'docker' / 'docker compose' not found on PATH" -ForegroundColor Red
     Write-Host "       Hint: Install Docker Desktop to D:\dev\DockerDesktop with --wsl-default-data-root=D:\DockerData." -ForegroundColor Yellow
