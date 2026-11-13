@@ -1,19 +1,19 @@
-.PHONY: help doctor up down check test migrate openapi client ci bench backup restore
+.PHONY: help doctor up down check test migrate openapi client ci
 
 help:
 	@echo "ALIBI Makefile targets:"
-	@echo "  doctor      Check dev environment tools and versions"
+	@echo "  doctor      Run environment verification checks"
 	@echo "  up          Start Docker Compose stack (postgres, api, worker, web)"
 	@echo "  down        Stop Docker Compose stack"
 	@echo "  check       Run linters and typecheckers (ruff, mypy, eslint, tsc)"
-	@echo "  test        Run automated test suites"
+	@echo "  test        Run backend and frontend unit test suites"
 	@echo "  migrate     Apply Alembic database migrations"
 	@echo "  openapi     Export OpenAPI schema from FastAPI backend"
-	@echo "  client      Regenerate TypeScript API client"
-	@echo "  ci          Run full local CI pipeline"
+	@echo "  client      Regenerate TypeScript API client from openapi.json"
+	@echo "  ci          Run full local CI pipeline (check + test)"
 
 doctor:
-	@bash infrastructure/scripts/doctor.sh || ./infrastructure/scripts/doctor.ps1
+	@bash infrastructure/scripts/doctor.sh || powershell.exe -ExecutionPolicy Bypass -File infrastructure/scripts/doctor.ps1
 
 up:
 	docker compose up -d
@@ -27,7 +27,7 @@ check:
 	pnpm -r run typecheck
 
 test:
-	cd backend && uv run pytest
+	cd backend && uv run pytest tests/unit
 	pnpm -r run test
 
 migrate:

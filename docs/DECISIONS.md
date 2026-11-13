@@ -25,6 +25,7 @@ Status: Proposed · Accepted · Superseded · Rejected.
 | 018 | Free-cloud provider: Render free (api+worker, one container) + Neon free (Postgres+pgvector) + Vercel Hobby (web) + GitHub Actions (nightly jobs, backups) | **Accepted (owner, 2026-11-13)** — limits re-verified at M2b and M11 |
 | 019 | Provider endpoints/models/free-tier limits as of implementation date | **Pending — M4** |
 | 020 | Hosted-mode feature reductions (opt-in cloud AI, on-device STT, keyword-first search, web = dashboard, early deploy after M2) | **Accepted (owner, 2026-11-13)** |
+| 021 | Pin Expo SDK 58 and Approved Dependencies Justifications (R11) | **Accepted (M0, 2026-11-13)** |
 
 ---
 
@@ -101,3 +102,22 @@ Each serves a stated requirement: auth security (devices, refresh_tokens, audit_
 7. **Heavy jobs** (model training, bulk re-embedding) may run in the nightly GitHub Actions workflow instead of the 512 MB server, if M5/M7 measurements require it. The server does inference only.
 8. **Early deployment:** new milestone **M2b — Early hosted deployment**, right after M2, so the owner uses the app daily from M2 on. M11 becomes hardening of that deployment.
 **Consequences:** Lower AI quality when AI is off (rules only); semantic search may be absent in hosted mode; web is no longer feature-equal to Android. In exchange: ₹0, private by default, and usable daily from M2. NFR-PERF-003/006/008 targets are measured against the cloud providers when enabled, or documented as N/A when AI is off.
+
+## ADR-021 — Pin Expo SDK 58 and Dependency Justifications (R11)
+**Date:** 2026-11-13 · **Status:** Accepted (M0)
+
+### 1. Expo SDK Pin
+Current verified stable release is **Expo SDK 58** (`expo@~58.0.25`). Mobile packages in `apps/mobile` pin SDK 58 native modules (`expo-router`, `expo-sqlite`, `expo-secure-store`, `expo-notifications`, `expo-audio`).
+
+### 2. Dependency Justifications (Rule R11)
+Each new dependency introduced for M0 and beyond is recorded with license and rationale:
+- **`structlog`** (Apache-2.0): High-performance structured JSON logging, redaction processor pipeline, and contextvars correlation. Stdlib `logging` lacks composable filter pipelines and JSON serialization without error-prone custom formatters.
+- **`pydantic-settings`** (MIT): Validated configuration and dotenv management. Stdlib `os.environ` lacks type safety, coercion, and schema validation.
+- **`import-linter`** (BSD-2-Clause): Enforces architectural layering contracts in CI (specifically AGENTS §7 rule: domain modules import each other only via `service.py`).
+- **`openapi-typescript`** (MIT): Generates compile-time TypeScript types directly from FastAPI's OpenAPI JSON schema.
+- **`openapi-fetch`** (MIT): Ultra-lightweight (<2 KB), type-safe client wrapping native `fetch` using generated schema types.
+- **`pre-commit`** (MIT): Multi-language git hook framework running ruff, eslint, prettier, and gitleaks before commits.
+- **`gitleaks`** (MIT): Dedicated, high-speed static secret scanner running in pre-commit and CI.
+- **`psutil`** (BSD-3-Clause): Cross-platform process introspection used to measure and verify container idle RSS memory.
+- **`vitest`** (MIT) / **`jest`** (MIT): Unit test frameworks for TypeScript packages/web and React Native mobile.
+- **`uuidv7`** (MIT): Generates RFC 9562 UUIDv7 identifiers in TypeScript for client-side offline entity creation.
