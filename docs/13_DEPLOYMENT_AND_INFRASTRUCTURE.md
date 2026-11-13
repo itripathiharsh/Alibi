@@ -1,7 +1,23 @@
 # 13 — Deployment & Infrastructure
 
 ## 1. Configurations
-**A. Local (primary, always supported)**
+> **Owner decision 2026-11-13 (ADR-018/020):** the owner can't keep a PC running and has no budget. **Config B (hosted, ₹0) is the primary runtime**, and config A is the development/test environment (plus an optional self-hosted mode). See §1.1.
+
+### 1.1 Hosted (primary runtime)
+```
+Android app (full client; offline-first from M10; on-device STT + reminders)
+     │ HTTPS
+     ▼
+Render free web service ── one container, ALIBI_MODE=hosted: FastAPI + in-process worker/scheduler
+     │                        512 MB RAM · sleeps after 15 min idle · ~1 min cold start · ephemeral disk
+     ├──► Neon free Postgres 16 + pgvector + pg_trgm (1 GB, scale-to-zero after 5 min)
+     └──► (opt-in only) Groq / Gemini / NVIDIA free tiers via the AI gateway
+Vercel Hobby ── Next.js web dashboard, rewrite /api/* → Render (same-origin cookies)
+GitHub Actions ── nightly.yml (periodic jobs) · backup.yml (pg_dump → age → artifact)
+```
+Rules: no feature may assume the server is awake. Reminders are on-device. Files are stored in Postgres (ephemeral disk) within the quotas in ADR-020. The hosted image excludes faster-whisper and Ollama, and includes fastembed only if M7 shows it fits.
+
+**A. Local (development/test; optional self-hosting)**
 ```
 PC: docker compose → postgres(pgvector) · api · worker · web     Ollama on host (GPU access simpler)
 Android ──(Tailscale or same Wi-Fi)──► http(s)://<pc>:8000
@@ -64,8 +80,18 @@ If CI minutes become a constraint, the same commands run locally via `make ci`.
 Output: `docs/milestones/HARDWARE_BENCHMARK.md` + ADR in `DECISIONS.md`. Exact model names are chosen at benchmark time (the landscape changes); the doc records what was installed and why.
 Minimum supported host: 8 GB RAM, 4 cores (LLM features may then be cloud-only or slow); recommended 16 GB+ or a GPU with ≥ 6 GB VRAM.
 
-## 7. Free-cloud provider selection (M11)
-Do not assume any free tier is permanent. Evaluate at M11 against criteria, record in ADR:
+## 7. Free-cloud provider selection — decided in ADR-018 (2026-11-13), first deployed in M2b
+### 7.1 Accounts the owner creates (agents never create accounts or handle credentials)
+| Service | Plan | Needed by | Notes |
+|---|---|---|---|
+| GitHub | Free, **private** repo | M0 (CI) | CI + nightly jobs + backup artifacts. Keep the repo private: workflow logs of public repos are public |
+| Render | Free (sign in with GitHub) | M2b | One web service from the repo's Dockerfile; region nearest India offered |
+| Neon | Free | M2b | One project; region nearest India offered; copy the connection string straight into Render's env settings |
+| Vercel | Hobby | M2b | Imports the repo; web app root `apps/web` |
+| Groq / Google AI Studio | Free API keys | M4 (optional) | Only if the owner turns AI on; keys entered in ALIBI's AI settings (stored encrypted) |
+| `age` key pair | Local tool, generated on the owner's PC | M2b | Public key → GitHub secret; **private key kept offline** (losing it = backups unreadable) |
+
+Do not assume any free tier is permanent. Re-verify at M2b and M11 against these criteria and record in ADR-018:
 | Criterion | Requirement |
 |-----------|-------------|
 | Cost | ₹0 for expected load (1 user) |
@@ -75,7 +101,7 @@ Do not assume any free tier is permanent. Evaluate at M11 against criteria, reco
 | Background worker | supported (second process) |
 | Region latency to India | acceptable |
 | Exit path | standard Docker + pg_dump, no proprietary APIs |
-Candidate types to evaluate: always-free VM tiers from major clouds, container PaaS free tiers, managed Postgres free tiers with pgvector. Fallback if none viable: stay local (A) with Tailscale for remote access.
+Fallbacks (in order): DB → Supabase free (500 MB, pauses after 7 idle days). Compute → any Docker host the owner can access later (e.g., an always-free VM if a card becomes available). Last resort → local (A) with Tailscale while the PC is on.
 
 ## 8. Operations
 - Migrations run on startup in `local` only after automatic pre-migration backup; in `cloud` via explicit `make migrate`.

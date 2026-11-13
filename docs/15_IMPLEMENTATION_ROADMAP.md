@@ -9,10 +9,17 @@ Format per milestone: Goal · Read first · Entry · Tasks · Acceptance criteri
 - **Voice capture lands in M4** with the AI gateway (STT lives there); text capture with rules parser lands in M2.
 - **Minimal calendar (fixed events + work blocks) lands in M6** because scheduling needs it; M8 completes calendar UI, recurrence editing, reminders.
 
+## Hosting & scope adjustments (ADR-018, ADR-020 — owner, 2026-11-13)
+- **Runtime:** the live app runs for ₹0 on Render free (api+worker in one container, `ALIBI_MODE=hosted`) + Neon free Postgres + Vercel Hobby (web) + GitHub Actions (nightly jobs, encrypted backups). The owner's PC is a **development machine only**, not a server. Docker compose remains the local dev/test stack.
+- **Hard constraints for every milestone:** hosted image idle RSS measured from M0; after M2b, RSS after smoke test < 400 MB (512 MB instance). Nothing may assume an always-on server: reminders are on-device, and periodic work tolerates the server being asleep.
+- **AI:** opt-in cloud providers (off by default). Ollama is dev/local only. STT is on-device first.
+- **Web scope = dashboard:** analytics, reports & sharing, task lists with simple edits, vault search (read-only), settings. Voice capture, timers, full calendar editing, document upload and web offline are **Android-only or deferred**. Each milestone's web tasks below are read through this filter.
+- **New milestone M2b** (early hosted deployment) after M2. M11 becomes hardening of that deployment.
+
 ```
-M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M3 Dashboard ─ M4 AI gateway(+voice) ─ M5 Learning
-   ─ M6 Scheduling(+min calendar) ─ M7 RAG/Vault ─ M8 Calendar/Reminders ─ M9 Reports/Sharing
-   ─ M10 Offline/Sync ─ M11 Free-cloud ─ M12 Integration/Hardening → v1.0
+M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M2b Early hosted deploy ─ M3 Dashboard ─ M4 AI gateway(+voice)
+   ─ M5 Learning ─ M6 Scheduling(+min calendar) ─ M7 RAG/Vault ─ M8 Calendar/Reminders ─ M9 Reports/Sharing
+   ─ M10 Offline/Sync ─ M11 Hosted hardening ─ M12 Integration/Hardening → v1.0
 ```
 
 ---
@@ -42,6 +49,8 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M3 Dashboard ─ M4 AI gat
 - AC-M0-4 CI green on main; gitleaks active (a committed fake secret in a test branch is caught).
 - AC-M0-5 Generated TS client compiles; CI fails when backend schema changes without regeneration (demonstrated).
 - AC-M0-6 Logs redact `Authorization` header (unit test).
+
+**Hosted-mode additions (ADR-018):** settings support `ALIBI_MODE=local|hosted`; in `hosted` the API process also starts the worker loop + scheduler (no separate worker). Record the backend container's idle RSS in `M0_REPORT.md`. `doctor` treats Ollama as optional (WARN, not FAIL).
 
 **QA scope:** build reproducibility on a second environment (WSL or VM) following README.
 **Exit gate:** all AC + `M0_REPORT.md` + tag `m0-complete`.
@@ -107,8 +116,38 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M3 Dashboard ─ M4 AI gat
 - AC-M2-11 Capture flow ≤ 3 interactions (AC-UI-1).
 - AC-M2-12 Task create API p95 < 200 ms (NFR-PERF-001) with 5k tasks in DB.
 
+**Hosted-mode changes (ADR-020):** evidence files go through the storage interface (filesystem locally, Postgres when hosted). Hosted limits: ≤ 2 MB per file (larger → 413), 250 MB total quota (→ 413 with problem code `storage_quota_exceeded`). Web: task lists + simple edits only (status, reschedule, title/notes); capture, timer and evidence upload are Android. AC-M2-10's web E2E covers list → edit → complete only.
+
 **QA:** charter 1 (text only), charter 2. **Exit gate:** AC + report + tag.
 **Risks:** dateparser edge cases with DMY — expand golden set with owner's real phrasing.
+
+---
+
+## M2b — Early hosted deployment (ADR-018/020)
+**Goal:** the owner uses ALIBI daily on their phone from a ₹0 hosted backend, with backups that are proven to restore.
+**Read first:** 13 §1–2 and §7, DECISIONS ADR-018/020, 12 §3.
+**Entry:** M2 exit gate passed. Owner has created the accounts listed in doc 13 §7.1 (an agent never creates accounts or enters credentials).
+**Tasks**
+1. Re-verify Render/Neon/Vercel/GitHub Actions free limits on the providers' own pages; update the ADR-018 table with date + links.
+2. Production backend Dockerfile (python:3.12-slim, uv, non-root, pinned digest), `ALIBI_MODE=hosted`, migrations run on deploy with pre-migration backup.
+3. `render.yaml` (or documented dashboard settings), env template `infrastructure/hosted/.env.hosted.example` (names only, no values).
+4. Neon database: pgvector + pg_trgm extensions via migration; connection pooling settings suitable for scale-to-zero.
+5. Web on Vercel with a rewrite proxy `/api/*` → Render URL (same-origin cookies).
+6. GitHub Actions: `nightly.yml` (purge, recurrence generation, learning stubs) and `backup.yml` (`pg_dump` → `age` encrypt → artifact). Restore script + drill into local compose Postgres.
+7. Android build points at the hosted URL (server URL screen from M1); APK installed on the owner's phone.
+8. Optional keep-warm pinger on `/health/live` during waking hours (owner decides after reading Render's terms).
+9. `docs/RUNBOOK.md` v0: deploy, rollback (previous image + restore), rotate secrets, restore drill.
+
+**AC**
+- AC-M2b-1 `https://<render-url>/health/ready` returns 200 with DB reachable; cold-start time measured and recorded.
+- AC-M2b-2 M2 E2E smoke (capture → confirm → timer → complete) passes on the phone against the hosted backend.
+- AC-M2b-3 Container RSS after the smoke test < 400 MB (logged from inside the container).
+- AC-M2b-4 Backup → restore into local Postgres → row counts and checksums of tasks/time entries identical.
+- AC-M2b-5 gitleaks clean; no secret values in repo, Render config committed without values; with `AI_EXTERNAL_ENABLED=false` no outbound request to any AI host.
+- AC-M2b-6 Nightly workflow runs green 3 nights in a row; GitHub Actions minutes used per month estimated in the report.
+
+**Exit gate:** AC + `M2b_REPORT.md` + tag `m2b-complete`.
+**Risks:** free-tier change (RISK-011), memory (RISK-012), cold start before M10 (RISK-013), Actions minutes (RISK-014).
 
 ---
 
@@ -155,6 +194,13 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M3 Dashboard ─ M4 AI gat
 - AC-M4-4 NFR-PERF-003 and NFR-PERF-008 met on owner hardware or documented in KNOWN_ISSUES with chosen mitigation (smaller model / cloud route).
 - AC-M4-5 With every provider disabled: capture still works (rules path), UI shows "AI unavailable — saved as typed".
 
+**Hosted-mode changes (ADR-020):**
+- Task 1 becomes: verify current free-tier models/limits for Groq, Gemini and NVIDIA → ADR-019. The Ollama benchmark is optional (dev only).
+- Task 7: Android on-device speech recognition is primary (library choice + R11 justification in DECISIONS). `/voice/transcribe` forwards to Groq Whisper only when external AI is enabled; audio is never stored. faster-whisper is local mode only and is excluded from the hosted image.
+- Task 8: web gets the AI settings page only (no web voice capture).
+- Task 10: fastembed ships in the local image only; the hosted decision moves to M7.
+- AC-M4-3: voice E2E on Android only. AC-M4-4: measured against cloud providers when enabled; documented N/A when AI is off.
+
 **QA:** charter 1 (voice), charter 6. **Exit gate:** AC + benchmark report + report + tag.
 **Risks:** free-tier limits change (cooldown logic + local default); CPU-only hosts slow (route extraction to rules-only + async LLM).
 
@@ -178,6 +224,8 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M3 Dashboard ─ M4 AI gat
 - AC-M5-2 Persona metrics meet targets in doc 07 §12; results table in M5 report.
 - AC-M5-3 Learning jobs complete within 60 s for 10k tasks on owner hardware.
 - AC-M5-4 Predictions endpoint returns maturity level & confidence for every prediction.
+
+**Hosted-mode changes (ADR-020):** AC-M5-3 is measured on the hosted instance (time + RSS). If training exceeds the memory budget, it runs in the nightly GitHub Actions job and stores artefacts in `ml_models`; the server does inference only.
 
 **QA:** review patterns on owner's real data (from M2–M4 usage) for nonsense/over-claiming. **Exit gate:** AC + report + tag.
 **Risks:** too little real data → rely on persona eval for gating; real-data validation continues in M12 dogfooding.
@@ -223,6 +271,8 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M3 Dashboard ─ M4 AI gat
 - AC-M7-2 All 7 spec example questions answered on owner's real data with correct sources (manual check recorded).
 - AC-M7-3 Prompt-injection fixture document cannot cause the assistant to output content outside context or alter data.
 
+**Hosted-mode changes (ADR-020):** hosted search is keyword (full-text + trigram) by default. First task: measure the RSS of fastembed bge-small inside the hosted image. Semantic/hybrid is enabled in hosted mode only if RSS after smoke stays < 400 MB; otherwise it's local mode only, with a KNOWN_ISSUES entry. Document upload is Android-only; only extracted text is stored. AC-RAG-6 (semantic part) and AC-RAG-7 (Ollama) apply in local mode; the deterministic no-LLM path applies everywhere.
+
 **QA:** 20 real questions; mark each correct/partially/incorrect; any fabricated fact = S1. **Exit gate:** AC + tag.
 
 ---
@@ -243,6 +293,8 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M3 Dashboard ─ M4 AI gat
 - AC-M8-3 Reminder fires on Android within ±1 min of fire_at with app killed (manual + Maestro where possible); cancelled when task completed.
 - AC-M8-4 Conflicts detected for crafted overlap/over-capacity cases.
 - AC-M8-5 Quiet hours suppress non-critical notifications.
+
+**Hosted-mode changes (ADR-020):** reminders are computed and scheduled on the device from synced data; the server never pushes and its sleep must not affect reminders (test: server stopped → reminders still fire). Web shows an in-app notification list only (no browser notifications). Calendar editing (move/resize, recurring edits) is Android-only; web calendar is view-only.
 
 **QA:** a week of reminders on device; record misses. **Exit gate:** AC + tag.
 **Risks:** Android battery optimisation delaying notifications → use exact alarms permission where allowed; document behaviour.
@@ -267,6 +319,8 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M3 Dashboard ─ M4 AI gat
 - AC-M9-4 PDF opens in 3 viewers; XLSX in LibreOffice/Excel; CSV injection neutralised.
 - AC-M9-5 Expired link 410; access log entries correct.
 
+**Hosted-mode changes (ADR-020):** reports are generated on demand and streamed, not stored (Task 3 "storage" dropped in hosted mode). Share snapshots store the fact JSON, not rendered files. The share viewer must tolerate cold start (show a loading page, not an error).
+
 **QA:** charter 5. **Exit gate:** AC + tag.
 
 ---
@@ -288,20 +342,21 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M3 Dashboard ─ M4 AI gat
 - AC-M10-3 App cold start offline to Today < 2.5 s (NFR-PERF-007).
 - AC-M10-4 Upgrading app with pending outbox preserves ops (local DB migration test).
 
+**Hosted-mode changes (ADR-020):** Task 5 (web Dexie offline) is deferred with FR-SYNC-002 (now C); web stays online-only. Android sync must tolerate a ~1 min server cold start (timeouts/backoff tuned; no user-visible error for a sleeping server).
+
 **Exit gate:** AC + tag. **Risks:** complexity — build server conflict engine with exhaustive unit tables first; UI last.
 
 ---
 
-## M11 — Free-cloud deployment
-**Goal:** optional hosted deployment, portable, ₹0.
-**Read first:** 13 §7, 12 §3.
+## M11 — Hosted hardening (was: Free-cloud deployment; provider chosen in ADR-018, first deployed in M2b)
+**Goal:** the ₹0 hosted deployment from M2b is secure, documented, portable and proven against the full feature set.
+**Read first:** 13 §7, 12 §3, DECISIONS ADR-018/020.
 **Tasks**
-1. Evaluate candidates per criteria table; ADR with evidence (limits checked on provider pages at that date).
-2. Production Docker images (non-root, pinned digests), Caddy TLS config, env templates.
-3. Deploy; run full E2E against cloud; configure backups off-host (encrypted with age).
-4. Migration drill local→cloud→local.
-5. Document runbook (`docs/RUNBOOK.md`): deploy, upgrade, rollback, restore, rotate keys.
-If no viable free option: ADR stating local+Tailscale as the deployment; milestone passes with AC-DEP-3 and runbook.
+1. Re-verify free-tier limits on provider pages; update ADR-018. If a provider changed terms, execute the documented fallback (e.g., Supabase for DB) via backup/restore.
+2. Production images final pass (non-root, pinned digests, minimal layers); memory profile of the full feature set within budget.
+3. Run full E2E against hosted; backup/restore drill; migration drill hosted→local→hosted (row counts + file hashes).
+4. `docs/RUNBOOK.md` final: deploy, upgrade, rollback, restore, rotate keys, provider-exit procedure.
+5. Caddy config kept only for the optional self-hosted VM path (documented, not deployed).
 
 **AC:** AC-DEP-1..4, AC-DEP-6; TLS A-grade (testssl.sh or SSL Labs) if public; cold start documented.
 **Exit gate:** AC + tag.

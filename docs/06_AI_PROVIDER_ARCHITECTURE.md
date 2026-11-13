@@ -117,6 +117,16 @@ Cost is an **estimate** and labelled as such.
   With LLM (run manually/nightly against local Ollama, not in CI): title acceptability ≥ 90% (rubric), category accuracy ≥ 85%.
 - **STT:** 20 recorded clips (owner's voice, quiet + noisy) → WER reported; target WER ≤ 15% on quiet clips with chosen model.
 
+## 11a. Hosting modes (ADR-018/020, owner 2026-11-13)
+| Aspect | `ALIBI_MODE=hosted` (primary runtime) | `ALIBI_MODE=local` (dev / self-host) |
+|---|---|---|
+| Chat/JSON providers | Groq → Gemini → NVIDIA, **only when `ai_external_enabled=true`** (default false) | Same chains + Ollama |
+| No provider eligible | `ai_unavailable` → rules/ML/deterministic path (FR-AI-009) | same |
+| EMBEDDINGS | none in v1 (keyword search) unless M7 shows fastembed fits the 512 MB budget | fastembed in-process |
+| STT | on-device Android recognition (client side); `/voice/transcribe` → Groq Whisper only if external enabled; audio never stored | faster-whisper → Groq |
+| Golden/eval runs | recorded fake provider in CI (AGENTS §6); live cloud evals manual only | + local Ollama nightly/manual |
+The routing table in §4 lists `ollama` in every chain; in hosted mode the adapter is simply not registered, so chains skip it. Privacy gating (§6) is unchanged and applies to every external call.
+
 ## 12. Acceptance criteria
 - AC-AI-1 With `AI_EXTERNAL_ENABLED=false` no outbound request to any non-local host (network-deny test in CI).
 - AC-AI-2 Provider down/timeout/429 → next provider used; all providers down → `degraded=true` and feature still completes via fallback path.

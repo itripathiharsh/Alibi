@@ -63,12 +63,13 @@ Never start a milestone without reading its "Entry criteria", "Tasks", "Acceptan
 | DB | PostgreSQL 16 + pgvector (≥0.7) |
 | Background work | In-process APScheduler for periodic jobs + Postgres `jobs` table worker (no Redis) |
 | ML | scikit-learn, numpy, pandas (training/eval only), Google OR-Tools (CP-SAT) |
-| Embeddings | `fastembed` with `BAAI/bge-small-en-v1.5` (384-dim, CPU, ONNX) — swappable |
-| Speech-to-text | `faster-whisper` (local) primary; Groq Whisper optional provider; device STT optional |
-| Local LLM | Ollama (OpenAI-compatible endpoint) |
-| Cloud LLM (optional) | NVIDIA NIM, Gemini, Groq — via the AI Gateway only |
+| Embeddings | `fastembed` with `BAAI/bge-small-en-v1.5` (384-dim, CPU, ONNX) — swappable; local mode, hosted only if memory budget allows (ADR-020) |
+| Speech-to-text | Hosted: on-device Android STT primary, Groq Whisper optional. Local mode: `faster-whisper` (ADR-020) |
+| Local LLM | Ollama (OpenAI-compatible endpoint) — local/dev mode only (ADR-020) |
+| Cloud LLM (optional, opt-in, off by default) | NVIDIA NIM, Gemini, Groq — via the AI Gateway only |
+| Hosting (₹0) | Render free (api+worker in one container, `ALIBI_MODE=hosted`), Neon free Postgres+pgvector, Vercel Hobby (web), GitHub Actions (nightly jobs, encrypted backups) — ADR-018 |
 | Reports | ReportLab (PDF), openpyxl (XLSX), stdlib csv |
-| Web | Next.js (App Router) + TypeScript strict, TanStack Query, Tailwind CSS, Radix primitives, Recharts, Dexie (IndexedDB) |
+| Web | Next.js (App Router) + TypeScript strict, TanStack Query, Tailwind CSS, Radix primitives, Recharts. Dashboard scope, online-only in v1 (ADR-020); Dexie deferred with FR-SYNC-002 |
 | Mobile | React Native + Expo (dev build, not Expo Go), expo-sqlite + Drizzle, expo-secure-store, expo-notifications, expo-audio |
 | Shared TS | pnpm workspaces: `packages/api-client` (generated), `packages/sync-core`, `packages/domain-types` |
 | E2E | Playwright (web), Maestro (Android) |

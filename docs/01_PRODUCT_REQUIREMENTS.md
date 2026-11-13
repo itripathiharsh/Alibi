@@ -12,6 +12,8 @@ own history (RAG), and produces factual reports that can be safely shared.
 
 Core loop: Capture → Organize → Schedule → Execute → Learn → Analyze → Report.
 
+**Owner amendments 2026-11-13 (ADR-018/020):** runs for ₹0 on free hosted services (no always-on PC). Android is the full client; **web is a dashboard** (analytics, reports/sharing, task lists with simple edits, vault search, settings). AI is opt-in cloud (off by default); Ollama is dev/local only. Requirements changed by this are marked "(ADR-020)".
+
 ### Users
 - **Owner** (exactly one in v1): full access.
 - **Share recipient** (unauthenticated, link-based): read-only access to one report snapshot, professional scope by default.
@@ -47,7 +49,7 @@ email/Slack integrations; payments; push notifications via a paid service; psych
 | FR-TASK-010 | Fields: priority, deadline, estimate (user/AI/final), actual time, started/completed timestamps, notes, project, origin | M |
 | FR-TASK-011 | Reschedule (change deadline or planned block) with reason; increments reschedule count; logged as event | M |
 | FR-TASK-012 | Subtasks: add, reorder, complete; parent progress shown | M |
-| FR-TASK-013 | Attachments/evidence: file upload, link, text; completion evidence optional on complete | M |
+| FR-TASK-013 | Attachments/evidence: file upload, link, text; completion evidence optional on complete. Hosted: files ≤ 2 MB, 250 MB quota, uploads from Android (ADR-020) | M |
 | FR-TASK-014 | Task origin recorded: manual, voice, ai_recommendation, meeting, external_assignment, recurring | M |
 | FR-TASK-015 | Activity history: every state change is an append-only `task_events` row, viewable per task | M |
 | FR-TASK-016 | Time tracking: start/stop timer and manual time entries; actual time = sum of entries | M |
@@ -62,7 +64,7 @@ email/Slack integrations; payments; push notifications via a paid service; psych
 | FR-CAL-001 | Internal calendar: day and week views | M |
 | FR-CAL-002 | Event kinds visually distinct: deadline marker, work block, fixed event, actual time (logged) | M |
 | FR-CAL-003 | Fixed events incl. recurring (RRULE + exceptions) | M |
-| FR-CAL-004 | Reminders (local notifications on Android, in-app + browser notifications on web) | M |
+| FR-CAL-004 | Reminders: local notifications scheduled on the Android device (no server push); in-app list on web (ADR-020) | M |
 | FR-CAL-005 | Conflict detection: overlapping blocks/events, over-capacity days, deadline before planned completion | M |
 | FR-CAL-006 | Availability computation from working hours − fixed events − accepted blocks | M |
 | FR-CAL-007 | Drag/move work blocks manually (owner action, never AI) | S |
@@ -116,8 +118,8 @@ email/Slack integrations; payments; push notifications via a paid service; psych
 | FR-AI-007 | Keys encrypted at rest, never returned by API, never logged | M |
 | FR-AI-008 | Quota exhaustion detection (HTTP 429/quota errors) → cooldown + fallback | M |
 | FR-AI-009 | Core features work with all AI disabled | M |
-| FR-AI-010 | Speech-to-text via local faster-whisper; optional Groq Whisper | M |
-| FR-AI-011 | Local embeddings (no external call) | M |
+| FR-AI-010 | Speech-to-text: on-device Android recognition primary; optional Groq Whisper (opt-in); faster-whisper in local mode (ADR-020) | M |
+| FR-AI-011 | Embeddings never use an external call; computed in-process where the memory budget allows (local mode always; hosted per M7 measurement) (ADR-020) | M |
 
 ### 2.8 RAG assistant & Knowledge Vault (RAG / KNOW)
 | ID | Req | P |
@@ -130,7 +132,7 @@ email/Slack integrations; payments; push notifications via a paid service; psych
 | FR-RAG-006 | Conversation history kept per thread; deletable | S |
 | FR-KNOW-001 | Vault auto-ingests task descriptions, completion notes, work logs, project notes, meeting notes, uploads, decisions, deliverables | M |
 | FR-KNOW-002 | Metadata: date, category, project, task ref, source, privacy class | M |
-| FR-KNOW-003 | Simple search UI (keyword + semantic) with filters | M |
+| FR-KNOW-003 | Simple search UI with filters: keyword everywhere; semantic where embeddings are available (ADR-020) | M |
 | FR-KNOW-004 | Manual note creation (plain text/markdown, no rich editor) | M |
 | FR-KNOW-005 | Upload documents: PDF, DOCX, TXT, MD text extraction | S |
 
@@ -153,7 +155,7 @@ email/Slack integrations; payments; push notifications via a paid service; psych
 | ID | Req | P |
 |----|-----|---|
 | FR-SYNC-001 | Android offline: create tasks, view synced tasks, change status, completion notes, time entries, cached calendar | M |
-| FR-SYNC-002 | Web offline: read cached data + queue task creates/status changes (IndexedDB) | S |
+| FR-SYNC-002 | Web offline: read cached data + queue task creates/status changes (IndexedDB) — deferred, web is online-only in v1 (ADR-020) | C |
 | FR-SYNC-003 | Pending operation queue with idempotent replay | M |
 | FR-SYNC-004 | Pull by server sequence cursor; push by operation batch | M |
 | FR-SYNC-005 | Explicit conflict rules (doc 11 §6); no silent overwrite of newer data | M |

@@ -25,7 +25,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-TASK-010 | Fields: priority, deadline, estimate (user/AI/final), actual time, started/completed ti… | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☐ |
 | FR-TASK-011 | Reschedule (change deadline or planned block) with reason; increments reschedule count;… | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☐ |
 | FR-TASK-012 | Subtasks: add, reorder, complete; parent progress shown | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☐ |
-| FR-TASK-013 | Attachments/evidence: file upload, link, text; completion evidence optional on complete | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☐ |
+| FR-TASK-013 | Attachments/evidence: file upload, link, text; hosted limits 2 MB / 250 MB (ADR-020) | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☐ |
 | FR-TASK-014 | Task origin recorded: manual, voice, ai_recommendation, meeting, external_assignment, r… | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☐ |
 | FR-TASK-015 | Activity history: every state change is an append-only `task_events` row, viewable per … | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☐ |
 | FR-TASK-016 | Time tracking: start/stop timer and manual time entries; actual time = sum of entries | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☐ |
@@ -36,7 +36,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-CAL-001 | Internal calendar: day and week views | M | M8 | 09, 04§4.8 | backend/tests/integration/calendar/ + e2e | ☐ |
 | FR-CAL-002 | Event kinds visually distinct: deadline marker, work block, fixed event, actual time (l… | M | M8 | 09, 04§4.8 | backend/tests/integration/calendar/ + e2e | ☐ |
 | FR-CAL-003 | Fixed events incl. recurring (RRULE + exceptions) | M | M6 (model) / M8 (UI) | 09, 04§4.8 | backend/tests/integration/calendar/ + e2e | ☐ |
-| FR-CAL-004 | Reminders (local notifications on Android, in-app + browser notifications on web) | M | M8 | 09, 04§4.8 | backend/tests/integration/calendar/ + e2e | ☐ |
+| FR-CAL-004 | Reminders scheduled on-device (Android); in-app list on web (ADR-020) | M | M8 | 09, 04§4.8 | backend/tests/integration/calendar/ + e2e | ☐ |
 | FR-CAL-005 | Conflict detection: overlapping blocks/events, over-capacity days, deadline before plan… | M | M6/M8 | 09, 04§4.8 | backend/tests/integration/calendar/ + e2e | ☐ |
 | FR-CAL-006 | Availability computation from working hours − fixed events − accepted blocks | M | M6 | 09, 04§4.8 | backend/tests/integration/calendar/ + e2e | ☐ |
 | FR-CAL-007 | Drag/move work blocks manually (owner action, never AI) | S | M8 | 09, 04§4.8 | backend/tests/integration/calendar/ + e2e | ☐ |
@@ -74,8 +74,8 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-AI-007 | Keys encrypted at rest, never returned by API, never logged | M | M4 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☐ |
 | FR-AI-008 | Quota exhaustion detection (HTTP 429/quota errors) → cooldown + fallback | M | M4 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☐ |
 | FR-AI-009 | Core features work with all AI disabled | M | M4 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☐ |
-| FR-AI-010 | Speech-to-text via local faster-whisper; optional Groq Whisper | M | M4 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☐ |
-| FR-AI-011 | Local embeddings (no external call) | M | M4 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☐ |
+| FR-AI-010 | STT: on-device Android primary; Groq Whisper opt-in; faster-whisper local mode (ADR-020) | M | M4 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☐ |
+| FR-AI-011 | Embeddings in-process, never external; hosted per M7 memory check (ADR-020) | M | M4/M7 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☐ |
 | FR-RAG-001 | Chat assistant in AI Intelligence section | M | M7 | 08 | backend/tests/rag_eval/ + integration/rag/ | ☐ |
 | FR-RAG-002 | Hybrid retrieval: SQL (structured intents) + pgvector + metadata filters (date/category… | M | M7 | 08 | backend/tests/rag_eval/ + integration/rag/ | ☐ |
 | FR-RAG-003 | Answers cite sources (task/note/log IDs, clickable) | M | M7 | 08 | backend/tests/rag_eval/ + integration/rag/ | ☐ |
@@ -84,7 +84,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-RAG-006 | Conversation history kept per thread; deletable | S | M7 | 08 | backend/tests/rag_eval/ + integration/rag/ | ☐ |
 | FR-KNOW-001 | Vault auto-ingests task descriptions, completion notes, work logs, project notes, meeti… | M | M7 | 08 | backend/tests/integration/knowledge/ | ☐ |
 | FR-KNOW-002 | Metadata: date, category, project, task ref, source, privacy class | M | M7 | 08 | backend/tests/integration/knowledge/ | ☐ |
-| FR-KNOW-003 | Simple search UI (keyword + semantic) with filters | M | M7 | 08 | backend/tests/integration/knowledge/ | ☐ |
+| FR-KNOW-003 | Search UI: keyword everywhere; semantic where embeddings available (ADR-020) | M | M7 | 08 | backend/tests/integration/knowledge/ | ☐ |
 | FR-KNOW-004 | Manual note creation (plain text/markdown, no rich editor) | M | M7 | 08 | backend/tests/integration/knowledge/ | ☐ |
 | FR-KNOW-005 | Upload documents: PDF, DOCX, TXT, MD text extraction | S | M7 | 08 | backend/tests/integration/knowledge/ | ☐ |
 | FR-REP-001 | Report types EOD, weekly, monthly, custom | M | M9 | 10 | backend/tests/integration/reports/ | ☐ |
@@ -99,7 +99,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-SHARE-005 | Scope enforced in backend when building the shared snapshot | M | M9 | 10, 12 | backend/tests/security/sharing/ | ☐ |
 | FR-SHARE-006 | In-app share (Android share sheet / Web Share API / copy link) | M | M9 | 10, 12 | backend/tests/security/sharing/ | ☐ |
 | FR-SYNC-001 | Android offline: create tasks, view synced tasks, change status, completion notes, time… | M | M10 | 11 | tests/sync/ + packages/sync-core/test | ☐ |
-| FR-SYNC-002 | Web offline: read cached data + queue task creates/status changes (IndexedDB) | S | M10 | 11 | tests/sync/ + packages/sync-core/test | ☐ |
+| FR-SYNC-002 | Web offline (IndexedDB) — deferred, web online-only in v1 (ADR-020) | C | later | 11 | tests/sync/ + packages/sync-core/test | ☐ |
 | FR-SYNC-003 | Pending operation queue with idempotent replay | M | M10 | 11 | tests/sync/ + packages/sync-core/test | ☐ |
 | FR-SYNC-004 | Pull by server sequence cursor; push by operation batch | M | M10 | 11 | tests/sync/ + packages/sync-core/test | ☐ |
 | FR-SYNC-005 | Explicit conflict rules (doc 11 §6); no silent overwrite of newer data | M | M10 | 11 | tests/sync/ + packages/sync-core/test | ☐ |
@@ -128,7 +128,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | NFR-SEC-001 | No high/critical findings from bandit, pip-audit, pnpm audit, gitleaks | 0 | M9/M12 | 12 | backend/tests/security/ | ☐ |
 | NFR-A11Y-001 | WCAG 2.2 AA on web; TalkBack labels on Android | M | M12 | 05§6 | tests/e2e/web/a11y + manual | ☐ |
 | NFR-COST-001 | Running cost | M | M11 | 13 | ADR review | ☐ |
-| NFR-PORT-001 | Runs on Windows/macOS/Linux via Docker; backend also runs without Docker | M | M0/M11 | 13 | tests/ops/fresh_install | ☐ |
+| NFR-PORT-001 | Runs on Windows/macOS/Linux via Docker; backend also runs without Docker | M | M0/M2b/M11 | 13 | tests/ops/fresh_install | ☐ |
 | NFR-MAINT-001 | Backend test coverage | M | all | 14§3 | CI coverage | ☐ |
 | NFR-I18N-001 | Date parsing supports Indian conventions (DD/MM), "kal/parso" optional | M | M2 | 06§7 | backend/tests/ai_eval/extraction_golden | ☐ |
 

@@ -11,6 +11,7 @@ _Last updated: 2026-11-13 by planning (no code yet)_
 | M0 Environment & architecture | Planning | 2026-11-13 | | | |
 | M1 Database & authentication | Not started | | | | |
 | M2 Task management (+ mobile shell) | Not started | | | | |
+| M2b Early hosted deployment (ADR-018/020) | Not started | | | | |
 | M3 Dashboard & analytics | Not started | | | | |
 | M4 AI gateway (+ voice) | Not started | | | | |
 | M5 Personal Learning Engine | Not started | | | | |
@@ -19,7 +20,7 @@ _Last updated: 2026-11-13 by planning (no code yet)_
 | M8 Calendar & reminders | Not started | | | | |
 | M9 Reports & sharing | Not started | | | | |
 | M10 Offline & sync | Not started | | | | |
-| M11 Free-cloud deployment | Not started | | | | |
+| M11 Hosted hardening | Not started | | | | |
 | M12 Integration & hardening | Not started | | | | |
 
 States: Not started · Planning · In progress · Blocked · In QA · Complete.

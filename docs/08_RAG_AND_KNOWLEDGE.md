@@ -65,6 +65,11 @@ No LLM available → deterministic fallback for SQL intents; semantic-only quest
 - External LLM allowed only if every included source's category permits it (doc 06 §6); otherwise local LLM or deterministic answer.
 - Chat history stored in `chat_messages`; deletable per thread; excluded from vault ingestion.
 
+## 4a. Hosted mode (ADR-020)
+- Retrieval = SQL tools + keyword (full-text + trigram). The pgvector leg and RRF fusion are active only when an embedding model is configured: always in local mode, in hosted mode only if M7's memory measurement allows.
+- Documents: only extracted text is stored (original file discarded). Uploads are Android-only.
+- With AI off (default), answers use the deterministic fallback (§3) — still useful for SQL intents.
+
 ## 5. Vault UI search (FR-KNOW-003)
 Modes: keyword (pg_trgm + `websearch_to_tsquery`), semantic (pgvector), hybrid (RRF, default). Filters: date range, category, project, source type. Results: title, snippet with highlight, date, source chip, open-original link.
 
