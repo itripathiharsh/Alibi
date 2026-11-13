@@ -1,3 +1,4 @@
+#Requires -Version 7.3
 <#
 .SYNOPSIS
   ALIBI PowerShell task runner (Windows equivalent of Makefile)
@@ -17,15 +18,21 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $true
 
-# Ensure environment overrides for Node 22, Java 17, and Android SDK take precedence
-$env:JAVA_HOME = "D:\dev\jdk"
+# Allow environment overrides for Node 22 and Java 17, with defaults
+$nodeDir = if ($env:ALIBI_NODE_DIR) { $env:ALIBI_NODE_DIR } else { "D:\dev\Node22" }
+$javaDir = if ($env:ALIBI_JAVA_HOME) { $env:ALIBI_JAVA_HOME } elseif ($env:JAVA_HOME) { $env:JAVA_HOME } else { "D:\dev\jdk" }
+$env:JAVA_HOME = $javaDir
+
 if (-not $env:ANDROID_HOME -or -not (Test-Path $env:ANDROID_HOME)) {
     $env:ANDROID_HOME = "D:\dev\android-sdk"
 }
-$node22Dir = "D:\dev\Node22"
+
 $javaBinDir = Join-Path $env:JAVA_HOME "bin"
 $androidToolsDir = Join-Path $env:ANDROID_HOME "platform-tools"
-$env:PATH = "$node22Dir;$javaBinDir;$androidToolsDir;$env:PATH"
+$cliToolsDir = "D:\dev\Tools\CLI"
+
+# Prepend our controlled runtimes before any ambient paths
+$env:PATH = "$nodeDir;$javaBinDir;$androidToolsDir;$cliToolsDir;$env:PATH"
 
 function Show-Help {
     Write-Host "ALIBI Task Runner (PowerShell)" -ForegroundColor Cyan

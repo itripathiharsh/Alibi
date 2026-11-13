@@ -57,12 +57,12 @@ if ($dDrive) {
     $allPassed = $false
 }
 
-# 4. Port Availability (8000, 3000, 5432, 11434)
+# 4. Port Availability (8000, 3000, 5433 for ALIBI compose, 5432 host check, 11434)
 Write-Host "`n--- Network Ports ---" -ForegroundColor Cyan
 $portsToCheck = @(
     @{ Port = 8000; Service = "FastAPI Backend" },
     @{ Port = 3000; Service = "Web Dashboard" },
-    @{ Port = 5432; Service = "PostgreSQL" },
+    @{ Port = 5433; Service = "ALIBI PostgreSQL (Compose)" },
     @{ Port = 11434; Service = "Ollama (Dev)" }
 )
 
@@ -75,19 +75,30 @@ foreach ($p in $portsToCheck) {
     }
 }
 
+# Host port 5432 check
+$pg5432 = Get-NetTCPConnection -LocalPort 5432 -State Listen -ErrorAction SilentlyContinue
+if ($pg5432) {
+    $proc = Get-Process -Id $pg5432.OwningProcess[0] -ErrorAction SilentlyContinue
+    $procName = if ($proc) { $proc.ProcessName } else { "PID $($pg5432.OwningProcess[0])" }
+    Write-Host "[WARN] Port 5432 in use by host service ($procName)." -ForegroundColor Yellow
+    Write-Host "       Hint: Compose maps ALIBI PostgreSQL to host port 5433 (POSTGRES_HOST_PORT=5433 in .env)." -ForegroundColor Gray
+}
+
 # 5. Core Development Tooling
 Write-Host "`n--- Development Tooling ---" -ForegroundColor Cyan
 
 # Python 3.12 via uv
-try {
+$uvCmd = Get-Command uv -ErrorAction SilentlyContinue
+if ($uvCmd) {
     $uvVer = & uv --version 2>&1 | Out-String
-    if ($LASTEXITCODE -eq 0 -and $uvVer.Trim()) {
-        Write-Host "[OK]   uv: $($uvVer.Trim())" -ForegroundColor Green
-    } else {
-        throw "uv exit code $LASTEXITCODE"
+    $uvVer = $uvVer.Trim()
+    Write-Host "[OK]   uv: $uvVer ($($uvCmd.Source))" -ForegroundColor Green
+    if ($uvVer -notmatch "0\.(1[3-9]|[2-9][0-9])") {
+        Write-Host "[WARN] uv: Found $uvVer, recommended >= 0.13" -ForegroundColor Yellow
+        Write-Host "       Hint: Update or prioritize D:\dev\Tools\CLI\uv.exe" -ForegroundColor Yellow
     }
-} catch {
-    Write-Host "[FAIL] uv: Not found or failed to execute. Install via https://docs.astral.sh/uv/" -ForegroundColor Red
+} else {
+    Write-Host "[FAIL] uv: Not found on PATH. Install via https://docs.astral.sh/uv/" -ForegroundColor Red
     $allPassed = $false
 }
 
@@ -185,15 +196,17 @@ if ($ollamaCmd) {
     Write-Host "[WARN] Ollama (Dev-only): Binary not found on PATH (optional for hosted mode)" -ForegroundColor Yellow
 }
 
-# Docker / Compose
+# Docker / Compose (Required for local stack & M0 verification: FAIL if missing)
 $dockerCmd = Get-Command docker -ErrorAction SilentlyContinue
-if ($dockerCmd) {
+$composeCmd = & docker compose version 2>&1 | Out-String
+if ($dockerCmd -and $composeCmd -match "Docker Compose version") {
     $docVer = & docker --version 2>&1 | Out-String
-    $cmpVer = & docker compose version 2>&1 | Out-String
-    Write-Host "[OK]   Docker: $($docVer.Trim()) | $($cmpVer.Trim())" -ForegroundColor Green
+    Write-Host "[OK]   Docker: $($docVer.Trim()) | $($composeCmd.Trim())" -ForegroundColor Green
 } else {
-    Write-Host "[WARN] Docker: 'docker' CLI not found on PATH" -ForegroundColor Yellow
-    Write-Host "       Hint: Install Docker Desktop to D:\dev\DockerDesktop with --wsl-default-data-root=D:\DockerData" -ForegroundColor Gray
+    Write-Host "[FAIL] Docker: 'docker' / 'docker compose' not found on PATH" -ForegroundColor Red
+    Write-Host "       Hint: Install Docker Desktop to D:\dev\DockerDesktop with --wsl-default-data-root=D:\DockerData." -ForegroundColor Yellow
+    Write-Host "             Run installer: & 'D:\dev\downloads\DockerDesktopInstaller.exe' install --installation-dir='D:\dev\DockerDesktop' --wsl-default-data-root='D:\DockerData' --backend=wsl-2 --accept-license --quiet" -ForegroundColor Yellow
+    $allPassed = $false
 }
 
 Write-Host "============================================================" -ForegroundColor Cyan

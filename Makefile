@@ -13,7 +13,7 @@ help:
 	@echo "  ci          Run full local CI pipeline (check + test)"
 
 doctor:
-	@bash infrastructure/scripts/doctor.sh || powershell.exe -ExecutionPolicy Bypass -File infrastructure/scripts/doctor.ps1
+	bash infrastructure/scripts/doctor.sh
 
 up:
 	docker compose up -d
