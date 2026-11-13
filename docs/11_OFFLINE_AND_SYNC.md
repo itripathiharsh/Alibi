@@ -3,7 +3,9 @@
 Goal: ALIBI is useful offline and **never silently loses data** (NFR-REL-001).
 
 ## 1. Scope offline (FR-SYNC-001)
-| Capability | Android offline | Web offline |
+> **ADR-020:** web offline (FR-SYNC-002) is deferred (C); in v1 the web is online-only, so the "Web offline" column and the Dexie store in §2 are **not built**. Android must also treat a sleeping hosted server (~1 min cold start) as "reachable but slow": backoff, no error UI.
+
+| Capability | Android offline | Web offline (deferred) |
 |-----------|-----------------|-------------|
 | Create task (raw capture) | ✓ | ✓ (queued) |
 | View synced tasks, subtasks, projects, categories, tags | ✓ | ✓ (cached) |
@@ -15,7 +17,7 @@ Goal: ALIBI is useful offline and **never silently loses data** (NFR-REL-001).
 
 ## 2. Local storage
 - **Android:** expo-sqlite + Drizzle. Tables mirror syncable server tables (subset of columns) + `outbox`, `sync_state`, `conflicts`. Encrypted at rest relies on Android file-based encryption (device default); no secrets in SQLite (tokens in secure-store).
-- **Web:** Dexie (IndexedDB): `tasks`, `categories`, `projects`, `tags`, `calendar_cache`, `outbox`, `sync_state`. Cleared on logout.
+- **Web (deferred, ADR-020):** Dexie (IndexedDB): `tasks`, `categories`, `projects`, `tags`, `calendar_cache`, `outbox`, `sync_state`. Cleared on logout.
 - UI reads local store; writes go to local store + outbox in **one local transaction**.
 
 ## 3. Entities synced

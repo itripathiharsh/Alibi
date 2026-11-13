@@ -53,7 +53,7 @@ Bug template: `docs/templates/BUG_TEMPLATE.md`. Every S1/S2 fix adds a regressio
 ## 6. Requirement acceptance tests (summary — full list in doc 16)
 | Area | Acceptance criterion (from spec) | Concrete test(s) |
 |------|---------------------------------|------------------|
-| Task creation | text and voice tasks persist correctly | `test_capture_text_persists_immediately`, `test_capture_voice_end_to_end` (fixture audio → whisper tiny in CI), E2E web+Android capture flows |
+| Task creation | text and voice tasks persist correctly | `test_capture_text_persists_immediately`, `test_capture_voice_end_to_end` (local mode: fixture audio → whisper tiny in CI; hosted: on-device transcript → `/tasks/capture` with origin `voice`), E2E Android capture flows (web has no capture, ADR-020) |
 | Classification | category extraction validated | golden set category accuracy (deterministic ML path on persona data) ≥ 0.8 at L2; grounding tests |
 | Scheduling | respects deadlines and fixed events | AC-SCH-1..7 |
 | Learning | updates from real activity events | AC-PLE-1, observation counts after scripted journeys |
@@ -70,17 +70,19 @@ Bug template: `docs/templates/BUG_TEMPLATE.md`. Every S1/S2 fix adds a regressio
 | Sync | no silent data loss | AC-SYNC-1/2 |
 | AI gateway | provider failure handled | AC-AI-2 |
 | Local mode | core works without cloud | AC-AI-1, AC-DEP-2 full E2E with network egress blocked |
+| Hosted mode (ADR-018) | runs within free-tier limits | M2b AC: `/health/ready` over HTTPS, RSS < 400 MB after smoke, backup→restore identical, no AI egress when disabled |
 
 ## 7. Manual QA charters (run at each milestone exit for delivered areas; record in milestone report)
 1. **Capture speed:** 10 real tasks by voice and text in a noisy and quiet room; count interactions and time; note any wrong field.
 2. **Fabrication hunt:** 20 vague inputs ("sometime finish slides", "call him") → verify no deadline/project invented.
 3. **Airplane mode day (Android):** start offline in the morning, do a realistic day, reconnect at night → compare with server and web.
-4. **Two-device conflict:** phone + web editing same tasks → conflicts visible and resolvable.
+4. **Two-device conflict:** phone + web editing same tasks (web: status/reschedule/title/notes only) → conflicts visible and resolvable.
 5. **Sharing leak attempt:** create mixed data, share professional report, open link in incognito, inspect HTML/PDF/XLSX, try URL tampering, revoke, retry.
-6. **AI outage:** disable network / stop Ollama / invalid keys mid-use → app degrades gracefully, messages clear.
+6. **AI outage:** disable network / invalid keys / exhausted free quota mid-use (and stop Ollama in local mode) → app degrades gracefully, messages clear.
 7. **Dashboard sanity:** manually count a week's tasks/time from the task list and compare with dashboard.
 8. **Accessibility:** TalkBack through capture, complete task, dashboard; keyboard-only web pass.
 9. **Restore drill:** backup → destroy volume → restore → app identical.
+10. **Sleeping server (hosted):** let the Render service sleep, then open the app, sync, open a share link → no error screens, wait time recorded.
 
 ## 8. Milestone entry/exit (generic; specifics in doc 15)
 **Entry:** previous milestone tagged; CI green; no open S1/S2; this milestone's docs read; design notes for the milestone written in `docs/milestones/M{N}_PLAN.md` (≤ 1 page: approach, risks, test plan).

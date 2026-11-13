@@ -15,6 +15,14 @@ Four primary destinations only — bottom tab bar on mobile, left rail on web �
 Settings (account, working hours, categories, AI providers, privacy, devices, backup/export) via avatar menu — not a tab.
 Global **Capture button** (FAB on mobile, `N` shortcut + top bar button on web) on every screen.
 
+### 1a. Web scope in v1 (ADR-020)
+Web uses the **same four tabs** (Dashboard, Tasks, AI Intelligence, Reports) and the avatar-menu Settings, but as a **dashboard**:
+- Dashboard: full. Reports: full (generate, preview, download, shares).
+- Tasks: lists + search + task detail with simple edits (status, reschedule, title, notes). Calendar toggle is **view-only**.
+- AI Intelligence: vault search (read-only), patterns, proposals review, assistant (if AI enabled); AI settings.
+- **Not on web:** capture button/voice, timers, evidence/document upload, calendar editing, offline mode. These are Android-only.
+- The "offline" state in §3 applies to Android only; on web, show an error state with retry instead.
+
 ## 2. Critical flow: capture in ≤ 3 interactions
 1. Tap FAB (or long-press for voice) → sheet opens with keyboard focused / recording started.
 2. Type/speak → "Save". Task appears instantly in list with a subtle "understanding…" shimmer.

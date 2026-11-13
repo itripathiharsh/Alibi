@@ -76,12 +76,15 @@ Failure → template narrative (deterministic sentences).
 - **XLSX** (openpyxl): sheets Summary, Completed, Pending, Overdue, Time by category, Deliverables; typed cells (dates as dates, minutes as numbers), frozen header row.
 - **CSV**: one file per section zipped, or single `completed.csv` for EOD; UTF-8 with BOM (Excel-friendly), RFC 4180 quoting; formula-injection protection (prefix `'` for cells starting with = + - @).
 
+**Hosted mode (ADR-020):** rendered files are not stored. The frozen `facts` JSON is the stored artefact, and PDF/XLSX/CSV are rendered on demand and streamed (same renderers, same deterministic output for the same facts). ReportLab/openpyxl are imported lazily (memory budget).
+
 ### 5.4 Snapshot semantics
 Report facts are frozen at generation; later edits don't change an existing report (re-generate creates a new one). Shared links show `shared_facts` (re-filtered at share time with the share's scope).
 
 ## 6. Sharing (FR-SHARE) — see also doc 12
 Token: 32 random bytes base64url; DB stores SHA-256. URL `https://<host>/s/<token>`. Viewer is server-rendered HTML (no app JS, no auth), shows scope banner and expiry.
 Access logs every hit (hashed IP/UA). Expired/revoked → 410 page without content. Owner sees history + access counts.
+Hosted: the viewer may hit a sleeping server (~1 min cold start). The recipient's link must not fail; document the expected wait in the share message.
 
 ## 7. Tests
 - Formula unit tests with hand-computed fixtures for every metric (including boundary: midnight-spanning entries, tz edges at 18:30Z = 00:00 IST, DST irrelevant for IST but test with `Europe/London` user too).

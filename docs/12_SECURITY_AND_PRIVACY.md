@@ -26,12 +26,14 @@ Threats (STRIDE-lite):
 ## 3. Transport
 - Local mode on LAN: recommended **Tailscale** (free personal plan, WireGuard-encrypted) instead of exposing ports; or Caddy with local CA. Plain HTTP allowed only for `localhost`.
 - Cloud mode: TLS terminated by Caddy/platform; HSTS; Android `network_security_config` blocks cleartext except debug builds.
+- Hosted mode (ADR-018): TLS by Render (API) and Vercel (web); DB connections to Neon require TLS (`sslmode=require`). All secrets live only in the platforms' env settings, entered by the owner; never in the repo or in workflow logs.
 
 ## 4. Data protection
 - Provider API keys: Fernet (AES-128-CBC + HMAC) with `ALIBI_ENCRYPTION_KEY`; key rotation command `make rotate-encryption-key` re-encrypts rows.
 - Files stored under `ALIBI_STORAGE_DIR` with random keys (not original names); served only via authenticated endpoint with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
 - Upload validation: MIME sniffing (python-magic or `filetype`), size limits, PDF/DOCX parsed in worker with timeouts; no execution.
 - Backups: `pg_dump -Fc` + storage dir tarball; optional encryption with `age` (free) when backups leave the machine.
+- **Hosted mode (ADR-018/020):** files go through the storage interface into Postgres (Render's disk is ephemeral), with the same authenticated download rules. Backups run in GitHub Actions and are **always** `age`-encrypted (public key as a repo secret, private key offline with the owner). The `pg_dump` covers files too, because they're in the DB.
 
 ## 5. Authorization
 - Every repository query includes `user_id = :current_user` (base class enforces; raw SQL helpers require it).

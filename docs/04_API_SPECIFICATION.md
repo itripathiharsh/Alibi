@@ -36,6 +36,7 @@ This document defines conventions and the endpoint catalogue; schemas live in Py
 | ai_invalid_output | 502 | Provider returned unusable output after repair |
 | rate_limited | 429 | |
 | payload_too_large | 413 | Upload > limit |
+| storage_quota_exceeded | 413 | Total stored files would exceed the configured quota (hosted default 250 MB, ADR-020) |
 | share_expired / share_revoked | 410 | |
 
 ## 4. Endpoint catalogue
@@ -93,11 +94,12 @@ Category body: `{name, sharing_class, external_ai_allowed, color}`.
 | GET | /time-entries/running | current timer or null |
 
 ### 4.6 Evidence & uploads
-`POST /tasks/{id}/evidence` (multipart file or JSON link/text; MIME allow-list: pdf, png, jpg, webp, docx, xlsx, txt, md, csv; ≤ 25 MB), `GET /evidence/{id}/download` (auth, `Content-Disposition: attachment`), `DELETE /evidence/{id}`.
+`POST /tasks/{id}/evidence` (multipart file or JSON link/text; MIME allow-list: pdf, png, jpg, webp, docx, xlsx, txt, md, csv; ≤ 25 MB in local mode, **≤ 2 MB in hosted mode with a 250 MB total quota → 413 `payload_too_large` / `storage_quota_exceeded`**, ADR-020; limits come from config), `GET /evidence/{id}/download` (auth, `Content-Disposition: attachment`), `DELETE /evidence/{id}`.
 
 ### 4.7 Voice (FR-TASK-002, FR-AI-010)
 `POST /voice/transcribe` multipart `audio` (m4a/aac/webm/wav ≤ 2 min / 10 MB), `language?` → `{transcript, language, duration_s, engine, confidence}`.
 `POST /voice/capture` = transcribe + `/tasks/capture` in one call with `{id}`.
+Hosted mode (ADR-020): these endpoints return 503 `ai_unavailable` unless external AI is enabled (then `engine=groq`); audio is never persisted. The Android client normally transcribes on-device and calls `/tasks/capture` directly with origin `voice`.
 
 ### 4.8 Calendar (FR-CAL)
 | GET | /calendar | `from`, `to` (≤ 62 days) → expanded instances: fixed events, work blocks, deadline markers, actual time segments, each with `kind` |
