@@ -1,4 +1,4 @@
-#Requires -Version 7.3
+#Requires -Version 5.1
 <#
 .SYNOPSIS
   ALIBI PowerShell task runner (Windows equivalent of Makefile)
@@ -16,7 +16,9 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-$PSNativeCommandUseErrorActionPreference = $true
+if ($PSVersionTable.PSVersion.Major -ge 7) {
+    $PSNativeCommandUseErrorActionPreference = $true
+}
 
 # Allow environment overrides for Node 22 and Java 17, with defaults
 $nodeDir = if ($env:ALIBI_NODE_DIR) { $env:ALIBI_NODE_DIR } else { "D:\dev\Node22" }
