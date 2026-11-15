@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.api.v1.analytics import router as analytics_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.categories import router as categories_router
 from app.api.v1.evidence import router as evidence_router
@@ -23,6 +24,7 @@ router.include_router(tags_router, prefix="/api/v1")
 router.include_router(tasks_router, prefix="/api/v1")
 router.include_router(time_entries_router, prefix="/api/v1")
 router.include_router(evidence_router, prefix="/api/v1")
+router.include_router(analytics_router, prefix="/api/v1")
 
 
 class HealthLiveResponse(BaseModel):

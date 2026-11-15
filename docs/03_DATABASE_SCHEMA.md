@@ -182,6 +182,12 @@ Retention 90 days. Duplicate `op_id` → return stored result (idempotency).
 | 0002 | M1 | workspaces, categories (+ seed of 4 system categories per user **at user creation in service**, not in migration) |
 | 0003 | M2 | projects, tags, tasks, subtasks, task_tags, task_dependencies, recurrence_rules, task_events, time_entries, evidence, ai_extractions, work_logs |
 | 0004 | M3 | analytics indexes, materialized daily rollup `mv_daily_task_stats` (refreshed by job; source of truth remains base tables) |
+
+### 3.7b Analytics & Materialized Views (Added in 0004)
+- **`mv_daily_task_stats`**: Materialized view aggregating `(user_id, stat_date, completed_count, on_time_count)` in `Asia/Kolkata` local timezone.
+- **`uq_mv_daily_task_stats`**: Unique index on `(user_id, stat_date)` enabling `REFRESH MATERIALIZED VIEW CONCURRENTLY`.
+- **`refresh_daily_task_stats()`**: PL/pgSQL function executing concurrent view refresh.
+- **Analytics indexes**: `ix_tasks_user_status_completed`, `ix_tasks_user_deadline`, `ix_time_entries_user_started_ended`, `ix_time_entries_user_started`.
 | 0005 | M4 | ai_provider_settings, ai_usage_logs |
 | 0006 | M5 | behavior_observations, learned_patterns, memory_profiles, task_predictions, ml_models |
 | 0007 | M6 | calendar_events, schedule_recommendations |

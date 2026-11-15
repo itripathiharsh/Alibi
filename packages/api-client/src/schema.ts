@@ -796,6 +796,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analytics/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Summary
+         * @description Retrieve summarized metrics (time spent, completions, pending, overdue, rates) for period.
+         */
+        get: operations["get_summary_api_v1_analytics_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/productivity-score": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Productivity Score
+         * @description Retrieve transparent productivity score v1 (0-100 or null if insufficient data).
+         */
+        get: operations["get_productivity_score_api_v1_analytics_productivity_score_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/formula": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Formula
+         * @description Return the transparent definition and rules of Productivity Score Formula v1.
+         */
+        get: operations["get_formula_api_v1_analytics_formula_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/charts/completion-trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Completion Trend
+         * @description Retrieve time-series of task completion counts for trend line/bar charts.
+         */
+        get: operations["get_completion_trend_api_v1_analytics_charts_completion_trend_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/charts/time-distribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Time Distribution
+         * @description Retrieve time logged grouped by category with percentages for donut/bar charts.
+         */
+        get: operations["get_time_distribution_api_v1_analytics_charts_time_distribution_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/charts/consistency-heatmap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Consistency Heatmap
+         * @description Retrieve daily completed tasks and minutes logged for 1-year calendar heatmap.
+         */
+        get: operations["get_consistency_heatmap_api_v1_analytics_charts_consistency_heatmap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/charts/est-vs-actual": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Est Vs Actual
+         * @description Retrieve estimated vs actual minutes comparison for completed tasks.
+         */
+        get: operations["get_est_vs_actual_api_v1_analytics_charts_est_vs_actual_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/charts/category-workload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Category Workload
+         * @description Retrieve category workload metrics (completed, open, and logged minutes).
+         */
+        get: operations["get_category_workload_api_v1_analytics_charts_category_workload_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -955,12 +1115,49 @@ export interface components {
             /** Position */
             position?: number | null;
         };
+        /** CategoryWorkloadItem */
+        CategoryWorkloadItem: {
+            /** Category Id */
+            category_id?: string | null;
+            /** Category Name */
+            category_name: string;
+            /** Category Color */
+            category_color: string;
+            /** Completed Count */
+            completed_count: number;
+            /** Open Count */
+            open_count: number;
+            /** Total Min */
+            total_min: number;
+        };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
             /** Current Password */
             current_password: string;
             /** New Password */
             new_password: string;
+        };
+        /** CompletionTrendPoint */
+        CompletionTrendPoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Completed Count */
+            completed_count: number;
+        };
+        /** ConsistencyHeatmapItem */
+        ConsistencyHeatmapItem: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Completed Count */
+            completed_count: number;
+            /** Minutes Logged */
+            minutes_logged: number;
         };
         /** DeviceInfo */
         DeviceInfo: {
@@ -1009,6 +1206,24 @@ export interface components {
             last_seen_at: string;
             /** Created At */
             created_at: string;
+        };
+        /** EstVsActualItem */
+        EstVsActualItem: {
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+            /** Title */
+            title: string;
+            /** Category Name */
+            category_name: string;
+            /** Estimate Min */
+            estimate_min: number;
+            /** Actual Min */
+            actual_min: number;
+            /** Ratio */
+            ratio: number;
         };
         /** EvidenceResponse */
         EvidenceResponse: {
@@ -1104,6 +1319,37 @@ export interface components {
             password: string;
             device?: components["schemas"]["DeviceInfo"];
         };
+        /** ProductivityScoreResponse */
+        ProductivityScoreResponse: {
+            /**
+             * Score
+             * @description Productivity score 0-100 or None if insufficient data
+             */
+            score: number | null;
+            /**
+             * Formula Version
+             * @default 1
+             */
+            formula_version: number;
+            /**
+             * Period
+             * @enum {string}
+             */
+            period: "daily" | "weekly" | "monthly" | "custom";
+            /** Completion Component */
+            completion_component?: number | null;
+            /** On Time Component */
+            on_time_component?: number | null;
+            /** Accuracy Component */
+            accuracy_component?: number | null;
+            /**
+             * Insufficient Data
+             * @default false
+             */
+            insufficient_data: boolean;
+            /** Message */
+            message?: string | null;
+        };
         /** ProjectCreateRequest */
         ProjectCreateRequest: {
             /** Name */
@@ -1176,6 +1422,26 @@ export interface components {
             /** Refresh Token */
             refresh_token?: string | null;
         };
+        /** ScoreFormulaResponse */
+        ScoreFormulaResponse: {
+            /**
+             * Formula Version
+             * @default 1
+             */
+            formula_version: number;
+            /** Description */
+            description: string;
+            /** Weights */
+            weights: {
+                [key: string]: number;
+            };
+            /** Rules */
+            rules: string[];
+            /** Components */
+            components: {
+                [key: string]: string;
+            };
+        };
         /** SetupRequest */
         SetupRequest: {
             /**
@@ -1240,6 +1506,66 @@ export interface components {
             title?: string | null;
             /** Completed */
             completed?: boolean | null;
+        };
+        /** SummaryMetricsResponse */
+        SummaryMetricsResponse: {
+            /**
+             * Period
+             * @enum {string}
+             */
+            period: "daily" | "weekly" | "monthly" | "custom";
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+            /** Timezone */
+            timezone: string;
+            /**
+             * Total Time Min
+             * @description Total minutes spent in period overlapping entries
+             */
+            total_time_min: number;
+            /**
+             * Tasks Completed
+             * @description Count of tasks completed in period
+             */
+            tasks_completed: number;
+            /**
+             * Tasks Pending
+             * @description Count of open tasks as of period end
+             */
+            tasks_pending: number;
+            /**
+             * Tasks Overdue
+             * @description Count of open tasks past deadline
+             */
+            tasks_overdue: number;
+            /**
+             * Completion Rate
+             * @description Completion rate or None if insufficient data
+             */
+            completion_rate?: number | null;
+            /**
+             * On Time Rate
+             * @description On-time completion rate or None if insufficient data
+             */
+            on_time_rate?: number | null;
+            /**
+             * Efficiency
+             * @description Estimate-to-actual ratio or None if insufficient data
+             */
+            efficiency?: number | null;
+            /**
+             * Estimate Accuracy
+             * @description Share within +-25% or None if insufficient data
+             */
+            estimate_accuracy?: number | null;
         };
         /** TagCreateRequest */
         TagCreateRequest: {
@@ -1514,6 +1840,19 @@ export interface components {
             deadline_kind?: string | null;
             /** Estimate User Min */
             estimate_user_min?: number | null;
+        };
+        /** TimeDistributionItem */
+        TimeDistributionItem: {
+            /** Category Id */
+            category_id?: string | null;
+            /** Category Name */
+            category_name: string;
+            /** Category Color */
+            category_color: string;
+            /** Total Min */
+            total_min: number;
+            /** Percentage */
+            percentage: number;
         };
         /** TimeEntryManualCreateRequest */
         TimeEntryManualCreateRequest: {
@@ -3189,6 +3528,266 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_summary_api_v1_analytics_summary_get: {
+        parameters: {
+            query?: {
+                /** @description daily, weekly, monthly, or custom */
+                period?: "daily" | "weekly" | "monthly" | "custom";
+                /** @description Start date (YYYY-MM-DD) for custom */
+                from?: string | null;
+                /** @description End date (YYYY-MM-DD) for custom */
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryMetricsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_productivity_score_api_v1_analytics_productivity_score_get: {
+        parameters: {
+            query?: {
+                /** @description daily (rolling 7d), weekly, monthly, or custom */
+                period?: "daily" | "weekly" | "monthly" | "custom";
+                /** @description Start date for custom */
+                from?: string | null;
+                /** @description End date for custom */
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductivityScoreResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_formula_api_v1_analytics_formula_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoreFormulaResponse"];
+                };
+            };
+        };
+    };
+    get_completion_trend_api_v1_analytics_charts_completion_trend_get: {
+        parameters: {
+            query?: {
+                /** @description daily, weekly, monthly, or custom */
+                period?: "daily" | "weekly" | "monthly" | "custom";
+                from?: string | null;
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompletionTrendPoint"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_time_distribution_api_v1_analytics_charts_time_distribution_get: {
+        parameters: {
+            query?: {
+                /** @description daily, weekly, monthly, or custom */
+                period?: "daily" | "weekly" | "monthly" | "custom";
+                from?: string | null;
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeDistributionItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_consistency_heatmap_api_v1_analytics_charts_consistency_heatmap_get: {
+        parameters: {
+            query?: {
+                /** @description Days of history (up to 366) */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsistencyHeatmapItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_est_vs_actual_api_v1_analytics_charts_est_vs_actual_get: {
+        parameters: {
+            query?: {
+                /** @description daily, weekly, monthly, or custom */
+                period?: "daily" | "weekly" | "monthly" | "custom";
+                from?: string | null;
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstVsActualItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_category_workload_api_v1_analytics_charts_category_workload_get: {
+        parameters: {
+            query?: {
+                /** @description daily, weekly, monthly, or custom */
+                period?: "daily" | "weekly" | "monthly" | "custom";
+                from?: string | null;
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryWorkloadItem"][];
+                };
             };
             /** @description Validation Error */
             422: {

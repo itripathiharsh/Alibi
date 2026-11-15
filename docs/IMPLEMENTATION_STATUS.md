@@ -1,9 +1,9 @@
 # Implementation Status
 
-_Last updated: 2026-11-16 by agent (Milestone M2 Complete — All Acceptance Criteria Verified)_
+_Last updated: 2026-11-16 by agent (Milestone M3 Complete — All Acceptance Criteria Verified)_
 
 ## Current milestone
-**M3 — Dashboard & analytics** · state: **Planning / In progress** · entry criteria: ✅ M2b complete, early hosted infrastructure and restore drill verified
+**M4 — AI provider gateway (+ voice)** · state: **Planning / In progress** · entry criteria: ✅ M3 complete, transparent score, analytics materialized views, and full dashboard verified
 
 ## Milestones
 | Milestone | State | Started | Completed | Tag | Report |
@@ -12,8 +12,8 @@ _Last updated: 2026-11-16 by agent (Milestone M2 Complete — All Acceptance Cri
 | M1 Database & authentication | Complete | 2026-11-15 | 2026-11-15 | `m1-complete` | [M1 Report](milestones/M1_REPORT.md) |
 | M2 Task management (+ mobile shell) | Complete | 2026-11-15 | 2026-11-16 | `m2-complete` | [M2 Report](milestones/M2_REPORT.md) |
 | M2b Early hosted deployment (ADR-018/020) | Complete | 2026-11-16 | 2026-11-16 | `m2b-complete` | [M2b Report](milestones/M2b_REPORT.md) |
-| M3 Dashboard & analytics | In progress | 2026-11-16 | | | |
-| M4 AI gateway (+ voice) | Not started | | | | |
+| M3 Dashboard & analytics | Complete | 2026-11-16 | 2026-11-16 | `m3-complete` | [M3 Report](milestones/M3_REPORT.md) |
+| M4 AI gateway (+ voice) | In progress | 2026-11-16 | | | |
 | M5 Personal Learning Engine | Not started | | | | |
 | M6 Scheduling (+ minimal calendar) | Not started | | | | |
 | M7 RAG & Knowledge Vault | Not started | | | | |
@@ -40,6 +40,7 @@ See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: 0 / 124 passing.
 | 2026-11-15 | M1 Full CI | Milestone M1 CI Pipeline | 30 tests passed, 5 packages/apps typechecked, Next.js build clean | `make.ps1 ci` & `docs/milestones/M1_REPORT.md` |
 | 2026-11-16 | M2 Full CI | Milestone M2 CI Pipeline | 41 tests passed (Hypothesis + Golden 160 items 100% exact match), Next.js build clean, 5 pkgs typechecked | `make.ps1 ci` & `docs/milestones/M2_REPORT.md` |
 | 2026-11-16 | M2b Restore Drill | Milestone M2b Hosted Infrastructure & Restore Drill | 41 CI passed, restore drill passed (Pre 68, Post 68 tasks identical) | `infrastructure/scripts/restore_drill.ps1` & `docs/milestones/M2b_REPORT.md` |
+| 2026-11-16 | M3 Full CI | Milestone M3 CI Pipeline | 50 tests passed (Score invariants, Midnight-spanning time, MV equivalence, p95 14.8ms latency), Next.js build clean, 5 pkgs typechecked | `make.ps1 ci` & `docs/milestones/M3_REPORT.md` |
 
 ## Open blockers
 None.

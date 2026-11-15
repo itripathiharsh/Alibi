@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -6,6 +6,7 @@ import {
   View,
   Pressable,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -14,107 +15,331 @@ import {
   WifiOff,
   CheckCircle2,
   Clock,
-  Flame,
+  Target,
   Layers,
   ArrowRight,
   RefreshCw,
+  AlertTriangle,
+  Award,
+  TrendingUp,
+  BarChart2,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
+import { getAccessToken } from "../../lib/auth";
 import { getServerUrl, pingServer, type ServerMeta } from "../../lib/config";
+
+type Period = "daily" | "weekly" | "monthly";
+
+interface SummaryData {
+  total_time_min: number;
+  tasks_completed: number;
+  tasks_pending: number;
+  tasks_overdue: number;
+  completion_rate: number | null;
+  on_time_rate: number | null;
+  efficiency: number | null;
+}
+
+interface ScoreData {
+  score: number | null;
+  completion_component: number | null;
+  on_time_component: number | null;
+  accuracy_component: number | null;
+  insufficient_data: boolean;
+}
+
+interface TrendPoint {
+  date: string;
+  completed_count: number;
+}
+
+interface TimeDistItem {
+  category_name: string;
+  category_color: string;
+  total_min: number;
+  percentage: number;
+}
+
+interface EstVsActualItem {
+  task_id: string;
+  title: string;
+  category_name: string;
+  estimate_min: number;
+  actual_min: number;
+  ratio: number;
+}
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const [period, setPeriod] = useState<Period>("weekly");
+  const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [score, setScore] = useState<ScoreData | null>(null);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
+  const [timeDist, setTimeDist] = useState<TimeDistItem[]>([]);
+  const [estVsActual, setEstVsActual] = useState<EstVsActualItem[]>([]);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [serverUrl, setServerUrlState] = useState(getServerUrl());
-  const [pingLoading, setPingLoading] = useState(false);
   const [pingResult, setPingResult] = useState<{
     success: boolean;
     data?: ServerMeta;
     error?: string;
   } | null>(null);
 
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      const headers: Record<string, string> = { Accept: "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const baseUrl = getServerUrl();
+      const [sumRes, scoreRes, trendRes, distRes, evaRes] = await Promise.all([
+        fetch(`${baseUrl}/api/v1/analytics/summary?period=${period}`, { headers }),
+        fetch(`${baseUrl}/api/v1/analytics/productivity-score?period=${period}`, { headers }),
+        fetch(`${baseUrl}/api/v1/analytics/charts/completion-trend?period=${period}`, { headers }),
+        fetch(`${baseUrl}/api/v1/analytics/charts/time-distribution?period=${period}`, { headers }),
+        fetch(`${baseUrl}/api/v1/analytics/charts/est-vs-actual?period=${period}`, { headers }),
+      ]);
+
+      if (sumRes.ok) setSummary(await sumRes.json());
+      if (scoreRes.ok) setScore(await scoreRes.json());
+      if (trendRes.ok) setTrend(await trendRes.json());
+      if (distRes.ok) setTimeDist(await distRes.json());
+      if (evaRes.ok) setEstVsActual(await evaRes.json());
+    } catch {
+      // Fallback gracefully on network error
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [period]);
+
   const checkConnection = async () => {
-    setPingLoading(true);
-    const result = await pingServer();
-    setPingResult(result);
-    setPingLoading(false);
+    const res = await pingServer();
+    setPingResult(res);
   };
 
   useEffect(() => {
     setServerUrlState(getServerUrl());
-    // Auto-ping server on mount
     checkConnection();
-  }, []);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  const onRefresh = () => {
+    setIsRefreshing(true);
+    checkConnection();
+    fetchDashboardData();
+  };
+
+  const formatHours = (mins: number) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h === 0) return `${m}m`;
+    return `${h}h ${m}m`;
+  };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+    >
+      {/* Period Switcher */}
+      <View style={styles.periodRow}>
+        {(["daily", "weekly", "monthly"] as Period[]).map((p) => (
+          <Pressable
+            key={p}
+            style={[styles.periodTab, period === p && styles.periodTabActive]}
+            onPress={() => setPeriod(p)}
+          >
+            <Text style={[styles.periodText, period === p && styles.periodTextActive]}>
+              {p === "daily" ? "Today" : p === "weekly" ? "This Week" : "This Month"}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       {/* Productivity Score Banner */}
       <View style={styles.scoreCard}>
         <View style={styles.scoreHeader}>
-          <View>
-            <Text style={styles.scoreSubtitle}>Daily Productivity Score</Text>
-            <Text style={styles.scoreTitle}>Excellent Focus</Text>
+          <View style={styles.scoreTitleGroup}>
+            <View style={styles.scoreBadgeRow}>
+              <Award size={16} color={theme.colors.accent.emerald} />
+              <Text style={styles.scoreSubtitle}>Productivity Score</Text>
+            </View>
+            <Text style={styles.scoreTitle}>
+              {score && score.score !== null && score.score !== undefined
+                ? score.score >= 80
+                  ? "Outstanding Focus"
+                  : score.score >= 60
+                  ? "Steady Progress"
+                  : "Needs Pacing"
+                : "Awaiting Data"}
+            </Text>
           </View>
           <View style={styles.scoreCircle}>
-            <Text style={styles.scoreValue}>84</Text>
-            <Text style={styles.scoreMax}>/ 100</Text>
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : !score || score.insufficient_data || score.score === null ? (
+              <Text style={styles.scoreNone}>—</Text>
+            ) : (
+              <>
+                <Text style={styles.scoreValue}>{score.score}</Text>
+                <Text style={styles.scoreMax}>/ 100</Text>
+              </>
+            )}
           </View>
         </View>
 
-        <View style={styles.formulaRow}>
-          <Text style={styles.formulaLabel}>Formula (ADR-010):</Text>
-          <Text style={styles.formulaValue}>0.5 · Completion + 0.3 · On-Time + 0.2 · Estimate</Text>
+        {/* Breakdown chips */}
+        <View style={styles.componentRow}>
+          <View style={styles.componentItem}>
+            <Text style={styles.componentLabel}>Completion</Text>
+            <Text style={styles.componentValue}>
+              {score?.completion_component !== null && score?.completion_component !== undefined
+                ? `${Math.round(score.completion_component * 100)}%`
+                : "—"}
+            </Text>
+          </View>
+          <View style={styles.componentItem}>
+            <Text style={styles.componentLabel}>On-Time</Text>
+            <Text style={styles.componentValue}>
+              {score?.on_time_component !== null && score?.on_time_component !== undefined
+                ? `${Math.round(score.on_time_component * 100)}%`
+                : "—"}
+            </Text>
+          </View>
+          <View style={styles.componentItem}>
+            <Text style={styles.componentLabel}>Accuracy</Text>
+            <Text style={styles.componentValue}>
+              {score?.accuracy_component !== null && score?.accuracy_component !== undefined
+                ? `${Math.round(score.accuracy_component * 100)}%`
+                : "—"}
+            </Text>
+          </View>
         </View>
       </View>
 
-      {/* Quick Metrics Grid */}
+      {/* 4 Core Quick Metrics Grid */}
       <View style={styles.metricsGrid}>
+        <View style={styles.metricCard}>
+          <View style={styles.metricIconRow}>
+            <Clock size={16} color={theme.colors.accent.emerald} />
+            <Text style={styles.metricLabel}>Time Spent</Text>
+          </View>
+          <Text style={styles.metricValue}>
+            {isLoading ? "..." : formatHours(summary?.total_time_min || 0)}
+          </Text>
+          <Text style={styles.metricSubtext}>Logged in period</Text>
+        </View>
+
         <View style={styles.metricCard}>
           <View style={styles.metricIconRow}>
             <CheckCircle2 size={16} color={theme.colors.accent.emerald} />
             <Text style={styles.metricLabel}>Completed</Text>
           </View>
-          <Text style={styles.metricValue}>3</Text>
-          <Text style={styles.metricSubtext}>of 5 planned tasks</Text>
-        </View>
-
-        <View style={styles.metricCard}>
-          <View style={styles.metricIconRow}>
-            <Clock size={16} color={theme.colors.accent.amber} />
-            <Text style={styles.metricLabel}>Focus Time</Text>
-          </View>
-          <Text style={styles.metricValue}>2h 25m</Text>
-          <Text style={styles.metricSubtext}>actual logged time</Text>
-        </View>
-
-        <View style={styles.metricCard}>
-          <View style={styles.metricIconRow}>
-            <Flame size={16} color="#EC4899" />
-            <Text style={styles.metricLabel}>Streak</Text>
-          </View>
-          <Text style={styles.metricValue}>5 Days</Text>
-          <Text style={styles.metricSubtext}>consistent habit</Text>
+          <Text style={styles.metricValue}>
+            {isLoading ? "..." : summary?.tasks_completed ?? 0}
+          </Text>
+          <Text style={styles.metricSubtext}>Finished tasks</Text>
         </View>
 
         <View style={styles.metricCard}>
           <View style={styles.metricIconRow}>
             <Layers size={16} color="#818CF8" />
-            <Text style={styles.metricLabel}>Active</Text>
+            <Text style={styles.metricLabel}>Pending</Text>
           </View>
-          <Text style={styles.metricValue}>2</Text>
-          <Text style={styles.metricSubtext}>in progress now</Text>
+          <Text style={styles.metricValue}>
+            {isLoading ? "..." : summary?.tasks_pending ?? 0}
+          </Text>
+          <Text style={styles.metricSubtext}>Open items</Text>
+        </View>
+
+        <View style={styles.metricCard}>
+          <View style={styles.metricIconRow}>
+            <AlertTriangle size={16} color={theme.colors.danger} />
+            <Text style={styles.metricLabel}>Overdue</Text>
+          </View>
+          <Text
+            style={[
+              styles.metricValue,
+              (summary?.tasks_overdue || 0) > 0 && { color: theme.colors.danger },
+            ]}
+          >
+            {isLoading ? "..." : summary?.tasks_overdue ?? 0}
+          </Text>
+          <Text style={styles.metricSubtext}>Past deadline</Text>
         </View>
       </View>
 
-      {/* AC-M0-2: LAN Backend Connectivity Card */}
+      {/* Visual Chart Section: Completion Trend */}
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <BarChart2 size={16} color={theme.colors.accent.emerald} />
+          <Text style={styles.sectionTitle}>Daily Completion Trend</Text>
+        </View>
+        {trend.length === 0 ? (
+          <Text style={styles.emptyText}>No completions in this period</Text>
+        ) : (
+          <View style={styles.trendList}>
+            {trend.map((pt) => (
+              <View key={pt.date} style={styles.trendRow}>
+                <Text style={styles.trendDate}>{pt.date}</Text>
+                <View style={styles.trendBarContainer}>
+                  <View
+                    style={[
+                      styles.trendBar,
+                      { width: `${Math.min(100, Math.max(8, pt.completed_count * 25))}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.trendCount}>{pt.completed_count}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Visual Chart Section: Estimated vs Actual Ratio */}
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Target size={16} color={theme.colors.accent.amber} />
+          <Text style={styles.sectionTitle}>Estimated vs. Actual</Text>
+        </View>
+        {estVsActual.length === 0 ? (
+          <Text style={styles.emptyText}>No completed tasks with estimates</Text>
+        ) : (
+          <View style={styles.evaList}>
+            {estVsActual.slice(0, 5).map((item) => (
+              <View key={item.task_id} style={styles.evaRow}>
+                <View style={styles.evaInfo}>
+                  <Text style={styles.evaTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.evaSub}>
+                    Est: {formatHours(item.estimate_min)} · Act: {formatHours(item.actual_min)}
+                  </Text>
+                </View>
+                <View style={styles.evaBadge}>
+                  <Text style={styles.evaRatio}>{item.ratio}×</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Backend LAN Connectivity Card */}
       <View style={styles.lanCard}>
         <View style={styles.lanHeader}>
           <View style={styles.lanTitleRow}>
             {pingResult?.success ? (
-              <Wifi size={20} color={theme.colors.accent.emerald} />
+              <Wifi size={18} color={theme.colors.accent.emerald} />
             ) : (
-              <WifiOff size={20} color={theme.colors.accent.amber} />
+              <WifiOff size={18} color={theme.colors.accent.amber} />
             )}
-            <Text style={styles.lanTitle}>Backend LAN Health (AC-M0-2)</Text>
+            <Text style={styles.lanTitle}>Backend Health</Text>
           </View>
           <View
             style={[
@@ -128,80 +353,11 @@ export default function DashboardScreen() {
                 pingResult?.success ? styles.statusTextSuccess : styles.statusTextIdle,
               ]}
             >
-              {pingLoading ? "Pinging..." : pingResult?.success ? "Connected" : "Disconnected"}
+              {pingResult?.success ? "Connected" : "Disconnected"}
             </Text>
           </View>
         </View>
-
-        <Text style={styles.lanEndpoint}>Endpoint: {serverUrl}/api/v1/meta</Text>
-
-        {pingResult?.success && pingResult.data && (
-          <View style={styles.metaBox}>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaKey}>App Mode:</Text>
-              <Text style={styles.metaVal}>{pingResult.data.mode}</Text>
-            </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaKey}>Version:</Text>
-              <Text style={styles.metaVal}>{pingResult.data.version}</Text>
-            </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaKey}>Database:</Text>
-              <Text style={styles.metaVal}>{pingResult.data.database}</Text>
-            </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaKey}>Latency:</Text>
-              <Text style={styles.metaVal}>{pingResult.data.responseTimeMs} ms</Text>
-            </View>
-          </View>
-        )}
-
-        {pingResult && !pingResult.success && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{pingResult.error}</Text>
-            <Text style={styles.errorHint}>
-              Hint: On an Android phone, change the server URL in Settings to your PC's LAN IP
-              (e.g., http://192.168.1.X:8000) and ensure Windows Firewall port 8000 is open.
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.lanActions}>
-          <Pressable
-            style={[styles.actionBtn, styles.actionBtnPrimary]}
-            onPress={checkConnection}
-            disabled={pingLoading}
-          >
-            {pingLoading ? (
-              <ActivityIndicator size="small" color="#090D16" />
-            ) : (
-              <>
-                <RefreshCw size={14} color="#090D16" />
-                <Text style={styles.actionBtnPrimaryText}>Ping /api/v1/meta</Text>
-              </>
-            )}
-          </Pressable>
-
-          <Pressable
-            style={[styles.actionBtn, styles.actionBtnOutline]}
-            onPress={() => router.push("/settings" as const)}
-          >
-            <Text style={styles.actionBtnOutlineText}>Configure IP</Text>
-            <ArrowRight size={14} color={theme.colors.text.secondary} />
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Architecture & Milestone Note */}
-      <View style={styles.infoCard}>
-        <View style={styles.infoHeader}>
-          <Activity size={16} color={theme.colors.accent.amber} />
-          <Text style={styles.infoTitle}>Milestone M0 Environment</Text>
-        </View>
-        <Text style={styles.infoText}>
-          ALIBI Mobile client shell pinned to Expo SDK 58 (ADR-021). Strict local-first
-          architecture with offline SQLite sync landing in Milestone M10.
-        </Text>
+        <Text style={styles.lanEndpoint}>{serverUrl}</Text>
       </View>
     </ScrollView>
   );
@@ -215,11 +371,38 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 16,
+    paddingBottom: 40,
+  },
+  periodRow: {
+    flexDirection: "row",
+    backgroundColor: theme.colors.surface.card,
+    borderRadius: 8,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+  },
+  periodTab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: 8,
+  },
+  periodTabActive: {
+    backgroundColor: theme.colors.surface.surface2,
+  },
+  periodText: {
+    fontSize: 12,
+    color: theme.colors.text.secondary,
+    fontWeight: "500",
+  },
+  periodTextActive: {
+    color: theme.colors.text.primary,
+    fontWeight: "600",
   },
   scoreCard: {
     backgroundColor: theme.colors.surface.card,
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
     borderColor: theme.colors.border.subtle,
   },
@@ -228,55 +411,67 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  scoreTitleGroup: {
+    flex: 1,
+  },
+  scoreBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   scoreSubtitle: {
-    color: theme.colors.text.secondary,
     fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    color: theme.colors.text.secondary,
   },
   scoreTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "700",
+    color: theme.colors.text.primary,
     marginTop: 4,
   },
   scoreCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "rgba(245, 158, 11, 0.12)",
-    borderWidth: 2,
-    borderColor: theme.colors.accent.amber,
+    backgroundColor: theme.colors.surface.surface2,
+    borderWidth: 3,
+    borderColor: theme.colors.accent.emerald,
     alignItems: "center",
     justifyContent: "center",
   },
   scoreValue: {
-    color: theme.colors.accent.amber,
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "800",
+    color: theme.colors.text.primary,
   },
   scoreMax: {
+    fontSize: 9,
     color: theme.colors.text.secondary,
-    fontSize: 10,
-    fontWeight: "600",
   },
-  formulaRow: {
-    marginTop: 16,
-    paddingTop: 12,
+  scoreNone: {
+    fontSize: 20,
+    color: theme.colors.text.secondary,
+  },
+  componentRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
     borderTopWidth: 1,
     borderTopColor: theme.colors.border.subtle,
+    marginTop: 16,
+    paddingTop: 8,
   },
-  formulaLabel: {
+  componentItem: {
+    alignItems: "center",
+  },
+  componentLabel: {
+    fontSize: 10,
     color: theme.colors.text.secondary,
-    fontSize: 11,
-    fontWeight: "600",
   },
-  formulaValue: {
+  componentValue: {
+    fontSize: 13,
+    fontWeight: "600",
     color: theme.colors.text.primary,
-    fontSize: 12,
     marginTop: 2,
-    fontFamily: "monospace",
   },
   metricsGrid: {
     flexDirection: "row",
@@ -285,10 +480,10 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    minWidth: "45%",
+    minWidth: "46%",
     backgroundColor: theme.colors.surface.card,
-    padding: 14,
-    borderRadius: 12,
+    borderRadius: 8,
+    padding: 16,
     borderWidth: 1,
     borderColor: theme.colors.border.subtle,
   },
@@ -298,27 +493,120 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   metricLabel: {
+    fontSize: 11,
     color: theme.colors.text.secondary,
-    fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   metricValue: {
-    color: theme.colors.text.primary,
     fontSize: 20,
-    fontWeight: "800",
-    marginTop: 8,
+    fontWeight: "700",
+    color: theme.colors.text.primary,
+    marginTop: 6,
   },
   metricSubtext: {
-    color: theme.colors.text.secondary,
     fontSize: 10,
+    color: theme.colors.text.secondary,
     marginTop: 2,
+  },
+  sectionCard: {
+    backgroundColor: theme.colors.surface.card,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+    gap: 12,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.colors.text.primary,
+  },
+  emptyText: {
+    fontSize: 11,
+    color: theme.colors.text.secondary,
+    fontStyle: "italic",
+    textAlign: "center",
+    paddingVertical: 12,
+  },
+  trendList: {
+    gap: 8,
+  },
+  trendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  trendDate: {
+    fontSize: 10,
+    color: theme.colors.text.secondary,
+    width: 68,
+  },
+  trendBarContainer: {
+    flex: 1,
+    height: 12,
+    backgroundColor: theme.colors.surface.surface2,
+    borderRadius: 6,
+    overflow: "hidden",
+  },
+  trendBar: {
+    height: "100%",
+    backgroundColor: theme.colors.accent.emerald,
+    borderRadius: 6,
+  },
+  trendCount: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: theme.colors.text.primary,
+    width: 20,
+    textAlign: "right",
+  },
+  evaList: {
+    gap: 8,
+  },
+  evaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border.subtle,
+  },
+  evaInfo: {
+    flex: 1,
+  },
+  evaTitle: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: theme.colors.text.primary,
+  },
+  evaSub: {
+    fontSize: 10,
+    color: theme.colors.text.secondary,
+    marginTop: 2,
+  },
+  evaBadge: {
+    backgroundColor: theme.colors.surface.surface2,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  evaRatio: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: theme.colors.accent.emerald,
   },
   lanCard: {
     backgroundColor: theme.colors.surface.card,
-    borderRadius: 16,
-    padding: 18,
+    borderRadius: 8,
+    padding: 12,
     borderWidth: 1,
     borderColor: theme.colors.border.subtle,
+    gap: 4,
   },
   lanHeader: {
     flexDirection: "row",
@@ -328,16 +616,20 @@ const styles = StyleSheet.create({
   lanTitleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
   lanTitle: {
+    fontSize: 11,
+    fontWeight: "600",
     color: theme.colors.text.primary,
-    fontSize: 14,
-    fontWeight: "700",
+  },
+  lanEndpoint: {
+    fontSize: 10,
+    color: theme.colors.text.secondary,
   },
   statusPill: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 12,
   },
   statusPillSuccess: {
@@ -347,8 +639,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(245, 158, 11, 0.15)",
   },
   statusPillText: {
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 10,
+    fontWeight: "600",
   },
   statusTextSuccess: {
     color: theme.colors.accent.emerald,
@@ -356,108 +648,4 @@ const styles = StyleSheet.create({
   statusTextIdle: {
     color: theme.colors.accent.amber,
   },
-  lanEndpoint: {
-    color: theme.colors.text.secondary,
-    fontSize: 11,
-    fontFamily: "monospace",
-    marginTop: 8,
-  },
-  metaBox: {
-    marginTop: 12,
-    backgroundColor: theme.colors.background.base,
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: theme.colors.border.subtle,
-    gap: 4,
-  },
-  metaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  metaKey: {
-    color: theme.colors.text.secondary,
-    fontSize: 12,
-  },
-  metaVal: {
-    color: theme.colors.accent.emerald,
-    fontSize: 12,
-    fontWeight: "700",
-    fontFamily: "monospace",
-  },
-  errorBox: {
-    marginTop: 12,
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.3)",
-  },
-  errorText: {
-    color: "#EF4444",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  errorHint: {
-    color: theme.colors.text.secondary,
-    fontSize: 11,
-    marginTop: 6,
-    lineHeight: 16,
-  },
-  lanActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 14,
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  actionBtnPrimary: {
-    backgroundColor: theme.colors.accent.amber,
-  },
-  actionBtnPrimaryText: {
-    color: "#090D16",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  actionBtnOutline: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: theme.colors.border.subtle,
-  },
-  actionBtnOutlineText: {
-    color: theme.colors.text.primary,
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  infoCard: {
-    backgroundColor: theme.colors.surface.card,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: theme.colors.border.subtle,
-  },
-  infoHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  infoTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  infoText: {
-    color: theme.colors.text.secondary,
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: 6,
-  },
 });
-

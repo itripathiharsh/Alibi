@@ -2560,6 +2560,655 @@
         }
       }
     },
+    "/api/v1/analytics/summary": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Summary",
+        "description": "Retrieve summarized metrics (time spent, completions, pending, overdue, rates) for period.",
+        "operationId": "get_summary_api_v1_analytics_summary_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly",
+                "custom"
+              ],
+              "type": "string",
+              "description": "daily, weekly, monthly, or custom",
+              "default": "weekly",
+              "title": "Period"
+            },
+            "description": "daily, weekly, monthly, or custom"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start date (YYYY-MM-DD) for custom",
+              "title": "From"
+            },
+            "description": "Start date (YYYY-MM-DD) for custom"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "End date (YYYY-MM-DD) for custom",
+              "title": "To"
+            },
+            "description": "End date (YYYY-MM-DD) for custom"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryMetricsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/productivity-score": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Productivity Score",
+        "description": "Retrieve transparent productivity score v1 (0-100 or null if insufficient data).",
+        "operationId": "get_productivity_score_api_v1_analytics_productivity_score_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly",
+                "custom"
+              ],
+              "type": "string",
+              "description": "daily (rolling 7d), weekly, monthly, or custom",
+              "default": "weekly",
+              "title": "Period"
+            },
+            "description": "daily (rolling 7d), weekly, monthly, or custom"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start date for custom",
+              "title": "From"
+            },
+            "description": "Start date for custom"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "End date for custom",
+              "title": "To"
+            },
+            "description": "End date for custom"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductivityScoreResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/formula": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Formula",
+        "description": "Return the transparent definition and rules of Productivity Score Formula v1.",
+        "operationId": "get_formula_api_v1_analytics_formula_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreFormulaResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/charts/completion-trend": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Completion Trend",
+        "description": "Retrieve time-series of task completion counts for trend line/bar charts.",
+        "operationId": "get_completion_trend_api_v1_analytics_charts_completion_trend_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly",
+                "custom"
+              ],
+              "type": "string",
+              "description": "daily, weekly, monthly, or custom",
+              "default": "weekly",
+              "title": "Period"
+            },
+            "description": "daily, weekly, monthly, or custom"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CompletionTrendPoint"
+                  },
+                  "title": "Response Get Completion Trend Api V1 Analytics Charts Completion Trend Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/charts/time-distribution": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Time Distribution",
+        "description": "Retrieve time logged grouped by category with percentages for donut/bar charts.",
+        "operationId": "get_time_distribution_api_v1_analytics_charts_time_distribution_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly",
+                "custom"
+              ],
+              "type": "string",
+              "description": "daily, weekly, monthly, or custom",
+              "default": "weekly",
+              "title": "Period"
+            },
+            "description": "daily, weekly, monthly, or custom"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TimeDistributionItem"
+                  },
+                  "title": "Response Get Time Distribution Api V1 Analytics Charts Time Distribution Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/charts/consistency-heatmap": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Consistency Heatmap",
+        "description": "Retrieve daily completed tasks and minutes logged for 1-year calendar heatmap.",
+        "operationId": "get_consistency_heatmap_api_v1_analytics_charts_consistency_heatmap_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 366,
+              "minimum": 7,
+              "description": "Days of history (up to 366)",
+              "default": 365,
+              "title": "Days"
+            },
+            "description": "Days of history (up to 366)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConsistencyHeatmapItem"
+                  },
+                  "title": "Response Get Consistency Heatmap Api V1 Analytics Charts Consistency Heatmap Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/charts/est-vs-actual": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Est Vs Actual",
+        "description": "Retrieve estimated vs actual minutes comparison for completed tasks.",
+        "operationId": "get_est_vs_actual_api_v1_analytics_charts_est_vs_actual_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly",
+                "custom"
+              ],
+              "type": "string",
+              "description": "daily, weekly, monthly, or custom",
+              "default": "weekly",
+              "title": "Period"
+            },
+            "description": "daily, weekly, monthly, or custom"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EstVsActualItem"
+                  },
+                  "title": "Response Get Est Vs Actual Api V1 Analytics Charts Est Vs Actual Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/charts/category-workload": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Category Workload",
+        "description": "Retrieve category workload metrics (completed, open, and logged minutes).",
+        "operationId": "get_category_workload_api_v1_analytics_charts_category_workload_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly",
+                "custom"
+              ],
+              "type": "string",
+              "description": "daily, weekly, monthly, or custom",
+              "default": "weekly",
+              "title": "Period"
+            },
+            "description": "daily, weekly, monthly, or custom"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryWorkloadItem"
+                  },
+                  "title": "Response Get Category Workload Api V1 Analytics Charts Category Workload Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health/live": {
       "get": {
         "tags": [
@@ -2880,6 +3529,51 @@
         "type": "object",
         "title": "CategoryUpdate"
       },
+      "CategoryWorkloadItem": {
+        "properties": {
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "category_name": {
+            "type": "string",
+            "title": "Category Name"
+          },
+          "category_color": {
+            "type": "string",
+            "title": "Category Color"
+          },
+          "completed_count": {
+            "type": "integer",
+            "title": "Completed Count"
+          },
+          "open_count": {
+            "type": "integer",
+            "title": "Open Count"
+          },
+          "total_min": {
+            "type": "integer",
+            "title": "Total Min"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_name",
+          "category_color",
+          "completed_count",
+          "open_count",
+          "total_min"
+        ],
+        "title": "CategoryWorkloadItem"
+      },
       "ChangePasswordRequest": {
         "properties": {
           "current_password": {
@@ -2898,6 +3592,49 @@
           "new_password"
         ],
         "title": "ChangePasswordRequest"
+      },
+      "CompletionTrendPoint": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "completed_count": {
+            "type": "integer",
+            "title": "Completed Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "completed_count"
+        ],
+        "title": "CompletionTrendPoint"
+      },
+      "ConsistencyHeatmapItem": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "completed_count": {
+            "type": "integer",
+            "title": "Completed Count"
+          },
+          "minutes_logged": {
+            "type": "integer",
+            "title": "Minutes Logged"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "completed_count",
+          "minutes_logged"
+        ],
+        "title": "ConsistencyHeatmapItem"
       },
       "DeviceInfo": {
         "properties": {
@@ -3013,6 +3750,45 @@
           "created_at"
         ],
         "title": "DeviceResponse"
+      },
+      "EstVsActualItem": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Task Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "category_name": {
+            "type": "string",
+            "title": "Category Name"
+          },
+          "estimate_min": {
+            "type": "integer",
+            "title": "Estimate Min"
+          },
+          "actual_min": {
+            "type": "integer",
+            "title": "Actual Min"
+          },
+          "ratio": {
+            "type": "number",
+            "title": "Ratio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "title",
+          "category_name",
+          "estimate_min",
+          "actual_min",
+          "ratio"
+        ],
+        "title": "EstVsActualItem"
       },
       "EvidenceResponse": {
         "properties": {
@@ -3238,6 +4014,92 @@
         ],
         "title": "LoginRequest"
       },
+      "ProductivityScoreResponse": {
+        "properties": {
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score",
+            "description": "Productivity score 0-100 or None if insufficient data"
+          },
+          "formula_version": {
+            "type": "integer",
+            "title": "Formula Version",
+            "default": 1
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "custom"
+            ],
+            "title": "Period"
+          },
+          "completion_component": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Component"
+          },
+          "on_time_component": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Time Component"
+          },
+          "accuracy_component": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy Component"
+          },
+          "insufficient_data": {
+            "type": "boolean",
+            "title": "Insufficient Data",
+            "default": false
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score",
+          "period"
+        ],
+        "title": "ProductivityScoreResponse"
+      },
       "ProjectCreateRequest": {
         "properties": {
           "name": {
@@ -3453,6 +4315,48 @@
         "type": "object",
         "title": "RefreshRequest"
       },
+      "ScoreFormulaResponse": {
+        "properties": {
+          "formula_version": {
+            "type": "integer",
+            "title": "Formula Version",
+            "default": 1
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Weights"
+          },
+          "rules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rules"
+          },
+          "components": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Components"
+          }
+        },
+        "type": "object",
+        "required": [
+          "description",
+          "weights",
+          "rules",
+          "components"
+        ],
+        "title": "ScoreFormulaResponse"
+      },
       "SetupRequest": {
         "properties": {
           "email": {
@@ -3626,6 +4530,114 @@
         },
         "type": "object",
         "title": "SubtaskUpdateRequest"
+      },
+      "SummaryMetricsResponse": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "custom"
+            ],
+            "title": "Period"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "total_time_min": {
+            "type": "integer",
+            "title": "Total Time Min",
+            "description": "Total minutes spent in period overlapping entries"
+          },
+          "tasks_completed": {
+            "type": "integer",
+            "title": "Tasks Completed",
+            "description": "Count of tasks completed in period"
+          },
+          "tasks_pending": {
+            "type": "integer",
+            "title": "Tasks Pending",
+            "description": "Count of open tasks as of period end"
+          },
+          "tasks_overdue": {
+            "type": "integer",
+            "title": "Tasks Overdue",
+            "description": "Count of open tasks past deadline"
+          },
+          "completion_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Rate",
+            "description": "Completion rate or None if insufficient data"
+          },
+          "on_time_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Time Rate",
+            "description": "On-time completion rate or None if insufficient data"
+          },
+          "efficiency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Efficiency",
+            "description": "Estimate-to-actual ratio or None if insufficient data"
+          },
+          "estimate_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Accuracy",
+            "description": "Share within +-25% or None if insufficient data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "start_at",
+          "end_at",
+          "timezone",
+          "total_time_min",
+          "tasks_completed",
+          "tasks_pending",
+          "tasks_overdue"
+        ],
+        "title": "SummaryMetricsResponse"
       },
       "TagCreateRequest": {
         "properties": {
@@ -4510,6 +5522,46 @@
         },
         "type": "object",
         "title": "TaskUpdateRequest"
+      },
+      "TimeDistributionItem": {
+        "properties": {
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "category_name": {
+            "type": "string",
+            "title": "Category Name"
+          },
+          "category_color": {
+            "type": "string",
+            "title": "Category Color"
+          },
+          "total_min": {
+            "type": "integer",
+            "title": "Total Min"
+          },
+          "percentage": {
+            "type": "number",
+            "title": "Percentage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_name",
+          "category_color",
+          "total_min",
+          "percentage"
+        ],
+        "title": "TimeDistributionItem"
       },
       "TimeEntryManualCreateRequest": {
         "properties": {

@@ -114,11 +114,14 @@ Hosted mode (ADR-020): these endpoints return 503 `ai_unavailable` unless extern
 | GET | /scheduling/proposals?status=proposed | pending proposals |
 
 ### 4.10 Analytics (FR-DASH)
-| GET | /analytics/summary | `period=day|week|month|custom`, `date` or `from`/`to`, `category_id?` → metrics with `{value, components?, sample_size, status: ok|insufficient_data}` |
-| GET | /analytics/series | `metric`, `granularity=day|week`, range → time series |
-| GET | /analytics/heatmap | `from`,`to` → per day minutes + completed count |
-| GET | /analytics/timeline | `date` → time entries + completions for the day |
-| GET | /analytics/formula | returns formula definitions (versioned) shown in UI |
+| GET | /analytics/summary | `period=daily|weekly|monthly|custom`, `from`, `to` → `{period, total_time_min, tasks_completed, tasks_pending, tasks_overdue, completion_rate, on_time_rate, efficiency, estimate_accuracy}` |
+| GET | /analytics/productivity-score | `period=daily|weekly|monthly|custom`, `from`, `to` → `{score, formula_version, period, completion_component, on_time_component, accuracy_component, insufficient_data, message}` |
+| GET | /analytics/formula | returns versioned formula definition, weights, invariance rules, components dictionary |
+| GET | /analytics/charts/completion-trend | `period`, `from`, `to` → list of `{date, completed_count}` |
+| GET | /analytics/charts/time-distribution | `period`, `from`, `to` → list of `{category_id, category_name, category_color, total_min, percentage}` |
+| GET | /analytics/charts/consistency-heatmap | `days` (up to 366) → list of `{date, completed_count, minutes_logged}` |
+| GET | /analytics/charts/est-vs-actual | `period`, `from`, `to` → list of `{task_id, title, category_name, estimate_min, actual_min, ratio}` |
+| GET | /analytics/charts/category-workload | `period`, `from`, `to` → list of `{category_id, category_name, category_color, completed_count, open_count, total_min}` |
 
 ### 4.11 Learning (FR-LEARN)
 | GET | /learning/profile | compiled profile + maturity levels |

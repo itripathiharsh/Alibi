@@ -142,3 +142,4 @@ Each new dependency introduced for M0 and beyond is recorded with license and ra
 - **`dateparser`** (BSD-3-Clause): Multi-locale deterministic natural language date parsing with Indian DMY date preference per FR-TASK-003 and doc 06 §7; stdlib `strptime` requires exact static format strings.
 - **`python-multipart`** (Apache-2.0): Required by FastAPI / Starlette for parsing RFC 7578 multipart/form-data evidence file uploads per doc 04 §4.6.
 - **`hypothesis`** (MPL-2.0, dev-only): Property-based testing engine required by AC-M2-5 to prove `actual_min == sum(durations)` across arbitrary randomized sequences of timer actions.
+- **`recharts`** (MIT): React SVG charting component library specified in approved stack (AGENTS §3) for analytics dashboard visualizations with accessible data table toggles per doc 05 §3 and doc 10 §4.
