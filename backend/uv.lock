@@ -32,6 +32,7 @@ dependencies = [
     { name = "cryptography" },
     { name = "dateparser" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "openpyxl" },
     { name = "pgvector" },
     { name = "psutil" },
@@ -49,7 +50,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "hypothesis" },
     { name = "import-linter" },
     { name = "mypy" },
@@ -67,6 +67,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=43.0.0" },
     { name = "dateparser", specifier = ">=1.5.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "httpx", specifier = ">=0.28.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pgvector", specifier = ">=0.5.1" },
     { name = "psutil", specifier = ">=6.1.0" },
@@ -84,7 +85,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx", specifier = ">=0.28.0" },
     { name = "hypothesis", specifier = ">=6.170.15" },
     { name = "import-linter", specifier = ">=2.1" },
     { name = "mypy", specifier = ">=1.13.0" },

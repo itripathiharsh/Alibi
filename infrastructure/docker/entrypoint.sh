@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -e
 
 # ALIBI Production Container Entrypoint
 # In hosted mode or when RUN_MIGRATIONS=true, execute database migrations before startup

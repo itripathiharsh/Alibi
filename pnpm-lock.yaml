@@ -145,6 +145,12 @@ importers:
 
   packages/domain-types: {}
 
+  packages/sync-core:
+    dependencies:
+      '@alibi/domain-types':
+        specifier: workspace:*
+        version: link:../domain-types
+
 packages:
 
   2g@1.0.1:

@@ -67,3 +67,4 @@ export function coalesceOperations(operations: SyncOperation[]): SyncOperation[]
 
   return result;
 }
+

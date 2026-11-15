@@ -62,3 +62,4 @@ export interface SyncApiClient {
     tags: unknown[];
   }>;
 }
+

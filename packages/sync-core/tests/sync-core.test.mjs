@@ -175,3 +175,4 @@ test('SyncEngine: push and pull cycle', async () => {
   assert.deepEqual(completedOps, ['op-test-1']);
   assert.equal(appliedChanges.length, 1);
 });
+

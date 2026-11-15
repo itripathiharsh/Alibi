@@ -76,3 +76,4 @@ The application delivers a privacy-first, local-first, AI-augmented personal pro
   - `m10-complete`: Cross-Platform Sync Engine & Outbox Protocol
   - `m11-complete`: Hosted Hardening, Runbook & Restore Drill
   - `v1.0.0`: Full Production Release
+

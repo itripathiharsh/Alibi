@@ -118,3 +118,4 @@ export class SyncEngine {
     return pullResult.changes.length;
   }
 }
+
