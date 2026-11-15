@@ -1,9 +1,9 @@
 # Implementation Status
 
-_Last updated: 2026-11-16 by agent (Milestone M3 Complete — All Acceptance Criteria Verified)_
+_Last updated: 2026-11-16 by agent (Milestone M4 Complete — All Acceptance Criteria Verified)_
 
 ## Current milestone
-**M4 — AI provider gateway (+ voice)** · state: **Planning / In progress** · entry criteria: ✅ M3 complete, transparent score, analytics materialized views, and full dashboard verified
+**M5 — Personal Learning Engine** · state: **Planning / In progress** · entry criteria: ✅ M4 complete, AI gateway, grounding validator, voice endpoints, and telemetry verified
 
 ## Milestones
 | Milestone | State | Started | Completed | Tag | Report |
@@ -13,8 +13,8 @@ _Last updated: 2026-11-16 by agent (Milestone M3 Complete — All Acceptance Cri
 | M2 Task management (+ mobile shell) | Complete | 2026-11-15 | 2026-11-16 | `m2-complete` | [M2 Report](milestones/M2_REPORT.md) |
 | M2b Early hosted deployment (ADR-018/020) | Complete | 2026-11-16 | 2026-11-16 | `m2b-complete` | [M2b Report](milestones/M2b_REPORT.md) |
 | M3 Dashboard & analytics | Complete | 2026-11-16 | 2026-11-16 | `m3-complete` | [M3 Report](milestones/M3_REPORT.md) |
-| M4 AI gateway (+ voice) | In progress | 2026-11-16 | | | |
-| M5 Personal Learning Engine | Not started | | | | |
+| M4 AI gateway (+ voice) | Complete | 2026-11-16 | 2026-11-16 | `m4-complete` | [M4 Report](milestones/M4_REPORT.md) |
+| M5 Personal Learning Engine | In progress | 2026-11-16 | | | |
 | M6 Scheduling (+ minimal calendar) | Not started | | | | |
 | M7 RAG & Knowledge Vault | Not started | | | | |
 | M8 Calendar & reminders | Not started | | | | |

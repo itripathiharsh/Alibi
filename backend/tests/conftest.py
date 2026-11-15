@@ -39,3 +39,67 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture
+async def auth_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    """Provides an authenticated client with seeded user and default workspace."""
+    import uuid
+
+    from app.core.security import create_access_token
+    from app.models.category import Category
+    from app.models.user import User
+    from app.models.workspace import Workspace
+
+    user_id = uuid.uuid4()
+    workspace_id = uuid.uuid4()
+    device_id = uuid.uuid4()
+
+    user = User(
+        id=user_id,
+        email=f"authtest_{uuid.uuid4().hex[:6]}@example.com",
+        password_hash="test-hash",
+        display_name="Auth Test User",
+        timezone="Asia/Kolkata",
+    )
+    db_session.add(user)
+
+    workspace = Workspace(
+        id=workspace_id,
+        user_id=user_id,
+        name="Personal Workspace",
+        is_default=True,
+    )
+    db_session.add(workspace)
+
+    category = Category(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        workspace_id=workspace_id,
+        name="General",
+        slug="general",
+        sharing_class="personal",
+        color="#3b82f6",
+        is_system=True,
+        external_ai_allowed=True,
+    )
+    db_session.add(category)
+    await db_session.commit()
+
+    token = create_access_token(user_id=user_id, device_id=device_id)
+
+    async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        yield db_session
+
+    app.dependency_overrides[get_db] = _override_get_db
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {token}"},
+    ) as ac:
+        ac.user_id = user_id  # type: ignore[attr-defined]
+        ac.workspace_id = workspace_id  # type: ignore[attr-defined]
+        ac.category_id = category.id  # type: ignore[attr-defined]
+        yield ac
+    app.dependency_overrides.pop(get_db, None)

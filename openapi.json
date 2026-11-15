@@ -3209,6 +3209,377 @@
         }
       }
     },
+    "/api/v1/ai/config": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Get Ai Config",
+        "description": "Get the current global AI external permission state (default False).",
+        "operationId": "get_ai_config_api_v1_ai_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIGlobalConfigRead"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Update Ai Config",
+        "description": "Toggle external AI outbound calls master switch.",
+        "operationId": "update_ai_config_api_v1_ai_config_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIGlobalConfigUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIGlobalConfigRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/ai/providers": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "List Providers",
+        "description": "List configured AI providers for the user with masked keys (key_last4).",
+        "operationId": "list_providers_api_v1_ai_providers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AIProviderSettingRead"
+                  },
+                  "type": "array",
+                  "title": "Response List Providers Api V1 Ai Providers Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/ai/providers/{provider}": {
+      "put": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Update Provider",
+        "description": "Update AI provider settings. API keys are strictly write-only and encrypted at rest.",
+        "operationId": "update_provider_api_v1_ai_providers__provider__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIProviderSettingUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderSettingRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/providers/{provider}/key": {
+      "delete": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Delete Provider Key",
+        "description": "Delete the encrypted API key for a provider.",
+        "operationId": "delete_provider_key_api_v1_ai_providers__provider__key_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/providers/{provider}/test": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Test Provider Connection",
+        "description": "Test connectivity and credential validity for a provider.",
+        "operationId": "test_provider_connection_api_v1_ai_providers__provider__test_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AITestConnectionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ai/usage": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Get Ai Usage Summary",
+        "description": "Get aggregated usage metrics and estimated cost per provider/model.",
+        "operationId": "get_ai_usage_summary_api_v1_ai_usage_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIUsageSummaryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/voice/transcribe": {
+      "post": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "Transcribe Audio Endpoint",
+        "description": "Transcribe voice audio to text without persisting audio to disk (privacy by default).",
+        "operationId": "transcribe_audio_endpoint_api_v1_voice_transcribe_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_transcribe_audio_endpoint_api_v1_voice_transcribe_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranscriptionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/voice/capture": {
+      "post": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "Voice Capture Endpoint",
+        "description": "Transcribe voice audio and run it through the grounded task extraction pipeline.",
+        "operationId": "voice_capture_endpoint_api_v1_voice_capture_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_voice_capture_endpoint_api_v1_voice_capture_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceCaptureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "tags": [
@@ -3278,6 +3649,276 @@
   },
   "components": {
     "schemas": {
+      "AIGlobalConfigRead": {
+        "properties": {
+          "ai_external_enabled": {
+            "type": "boolean",
+            "title": "Ai External Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ai_external_enabled"
+        ],
+        "title": "AIGlobalConfigRead"
+      },
+      "AIGlobalConfigUpdate": {
+        "properties": {
+          "ai_external_enabled": {
+            "type": "boolean",
+            "title": "Ai External Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ai_external_enabled"
+        ],
+        "title": "AIGlobalConfigUpdate"
+      },
+      "AIProviderSettingRead": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "key_last4": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Last4"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "models": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Models"
+          },
+          "fallback_rank": {
+            "type": "integer",
+            "title": "Fallback Rank",
+            "default": 0
+          },
+          "last_test_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Test At"
+          },
+          "last_test_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Test Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "enabled"
+        ],
+        "title": "AIProviderSettingRead"
+      },
+      "AIProviderSettingUpdate": {
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key",
+            "description": "Write-only plaintext API key, encrypted before storage"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "models": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Models"
+          },
+          "fallback_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Rank"
+          }
+        },
+        "type": "object",
+        "title": "AIProviderSettingUpdate"
+      },
+      "AITestConnectionResponse": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "status"
+        ],
+        "title": "AITestConnectionResponse"
+      },
+      "AIUsageSummaryItem": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "operation": {
+            "type": "string",
+            "title": "Operation"
+          },
+          "total_calls": {
+            "type": "integer",
+            "title": "Total Calls"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "avg_latency_ms": {
+            "type": "integer",
+            "title": "Avg Latency Ms"
+          },
+          "error_count": {
+            "type": "integer",
+            "title": "Error Count"
+          },
+          "estimated_cost_usd": {
+            "type": "string",
+            "title": "Estimated Cost Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "model",
+          "operation",
+          "total_calls",
+          "input_tokens",
+          "output_tokens",
+          "avg_latency_ms",
+          "error_count",
+          "estimated_cost_usd"
+        ],
+        "title": "AIUsageSummaryItem"
+      },
+      "AIUsageSummaryResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AIUsageSummaryItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total_calls": {
+            "type": "integer",
+            "title": "Total Calls"
+          },
+          "total_cost_usd": {
+            "type": "string",
+            "title": "Total Cost Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total_calls",
+          "total_cost_usd"
+        ],
+        "title": "AIUsageSummaryResponse"
+      },
       "AppMetaResponse": {
         "properties": {
           "name": {
@@ -3336,6 +3977,34 @@
         },
         "type": "object",
         "title": "Body_create_evidence_api_v1_tasks__task_id__evidence_post"
+      },
+      "Body_transcribe_audio_endpoint_api_v1_voice_transcribe_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_transcribe_audio_endpoint_api_v1_voice_transcribe_post"
+      },
+      "Body_voice_capture_endpoint_api_v1_voice_capture_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_voice_capture_endpoint_api_v1_voice_capture_post"
       },
       "CategoryCreate": {
         "properties": {
@@ -5840,6 +6509,35 @@
         ],
         "title": "TokenResponse"
       },
+      "TranscriptionResponse": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "TranscriptionResponse"
+      },
       "UpdateMeRequest": {
         "properties": {
           "display_name": {
@@ -5962,6 +6660,24 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VoiceCaptureResponse": {
+        "properties": {
+          "transcription": {
+            "$ref": "#/components/schemas/TranscriptionResponse"
+          },
+          "parsed_draft": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parsed Draft"
+          }
+        },
+        "type": "object",
+        "required": [
+          "transcription",
+          "parsed_draft"
+        ],
+        "title": "VoiceCaptureResponse"
       }
     },
     "securitySchemes": {

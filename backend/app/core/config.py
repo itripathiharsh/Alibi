@@ -41,6 +41,9 @@ class Settings(BaseSettings):
         alias="DATABASE_URL",
     )
 
+    # AI & Privacy Gating (Privacy by default: False)
+    ai_external_enabled: bool = Field(default=False, alias="AI_EXTERNAL_ENABLED")
+
     # App Info
     app_name: str = "ALIBI"
     app_version: str = "0.1.0"

@@ -956,6 +956,170 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ai Config
+         * @description Get the current global AI external permission state (default False).
+         */
+        get: operations["get_ai_config_api_v1_ai_config_get"];
+        /**
+         * Update Ai Config
+         * @description Toggle external AI outbound calls master switch.
+         */
+        put: operations["update_ai_config_api_v1_ai_config_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Providers
+         * @description List configured AI providers for the user with masked keys (key_last4).
+         */
+        get: operations["list_providers_api_v1_ai_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/providers/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Provider
+         * @description Update AI provider settings. API keys are strictly write-only and encrypted at rest.
+         */
+        put: operations["update_provider_api_v1_ai_providers__provider__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/providers/{provider}/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Provider Key
+         * @description Delete the encrypted API key for a provider.
+         */
+        delete: operations["delete_provider_key_api_v1_ai_providers__provider__key_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/providers/{provider}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Provider Connection
+         * @description Test connectivity and credential validity for a provider.
+         */
+        post: operations["test_provider_connection_api_v1_ai_providers__provider__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ai Usage Summary
+         * @description Get aggregated usage metrics and estimated cost per provider/model.
+         */
+        get: operations["get_ai_usage_summary_api_v1_ai_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/transcribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Transcribe Audio Endpoint
+         * @description Transcribe voice audio to text without persisting audio to disk (privacy by default).
+         */
+        post: operations["transcribe_audio_endpoint_api_v1_voice_transcribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/capture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Voice Capture Endpoint
+         * @description Transcribe voice audio and run it through the grounded task extraction pipeline.
+         */
+        post: operations["voice_capture_endpoint_api_v1_voice_capture_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -1020,6 +1184,97 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AIGlobalConfigRead */
+        AIGlobalConfigRead: {
+            /** Ai External Enabled */
+            ai_external_enabled: boolean;
+        };
+        /** AIGlobalConfigUpdate */
+        AIGlobalConfigUpdate: {
+            /** Ai External Enabled */
+            ai_external_enabled: boolean;
+        };
+        /** AIProviderSettingRead */
+        AIProviderSettingRead: {
+            /** Provider */
+            provider: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Key Last4 */
+            key_last4?: string | null;
+            /** Base Url */
+            base_url?: string | null;
+            /** Models */
+            models?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Fallback Rank
+             * @default 0
+             */
+            fallback_rank: number;
+            /** Last Test At */
+            last_test_at?: string | null;
+            /** Last Test Status */
+            last_test_status?: string | null;
+        };
+        /** AIProviderSettingUpdate */
+        AIProviderSettingUpdate: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /**
+             * Api Key
+             * @description Write-only plaintext API key, encrypted before storage
+             */
+            api_key?: string | null;
+            /** Base Url */
+            base_url?: string | null;
+            /** Models */
+            models?: {
+                [key: string]: unknown;
+            } | null;
+            /** Fallback Rank */
+            fallback_rank?: number | null;
+        };
+        /** AITestConnectionResponse */
+        AITestConnectionResponse: {
+            /** Provider */
+            provider: string;
+            /** Status */
+            status: string;
+            /** Error */
+            error?: string | null;
+        };
+        /** AIUsageSummaryItem */
+        AIUsageSummaryItem: {
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Operation */
+            operation: string;
+            /** Total Calls */
+            total_calls: number;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Avg Latency Ms */
+            avg_latency_ms: number;
+            /** Error Count */
+            error_count: number;
+            /** Estimated Cost Usd */
+            estimated_cost_usd: string;
+        };
+        /** AIUsageSummaryResponse */
+        AIUsageSummaryResponse: {
+            /** Items */
+            items: components["schemas"]["AIUsageSummaryItem"][];
+            /** Total Calls */
+            total_calls: number;
+            /** Total Cost Usd */
+            total_cost_usd: string;
+        };
         /** AppMetaResponse */
         AppMetaResponse: {
             /** Name */
@@ -1040,6 +1295,16 @@ export interface components {
             data?: components["schemas"]["EvidenceTextOrLinkRequest"] | null;
             /** File */
             file?: string;
+        };
+        /** Body_transcribe_audio_endpoint_api_v1_voice_transcribe_post */
+        Body_transcribe_audio_endpoint_api_v1_voice_transcribe_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_voice_capture_endpoint_api_v1_voice_capture_post */
+        Body_voice_capture_endpoint_api_v1_voice_capture_post: {
+            /** File */
+            file: string;
         };
         /** CategoryCreate */
         CategoryCreate: {
@@ -1963,6 +2228,18 @@ export interface components {
             user?: components["schemas"]["UserProfile"] | null;
             device?: components["schemas"]["DeviceProfile"] | null;
         };
+        /** TranscriptionResponse */
+        TranscriptionResponse: {
+            /** Text */
+            text: string;
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
+            /** Duration S */
+            duration_s?: number | null;
+        };
         /** UpdateMeRequest */
         UpdateMeRequest: {
             /** Display Name */
@@ -2004,6 +2281,14 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VoiceCaptureResponse */
+        VoiceCaptureResponse: {
+            transcription: components["schemas"]["TranscriptionResponse"];
+            /** Parsed Draft */
+            parsed_draft: {
+                [key: string]: unknown;
+            };
         };
     };
     responses: never;
@@ -3787,6 +4072,260 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CategoryWorkloadItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ai_config_api_v1_ai_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AIGlobalConfigRead"];
+                };
+            };
+        };
+    };
+    update_ai_config_api_v1_ai_config_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AIGlobalConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AIGlobalConfigRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_providers_api_v1_ai_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AIProviderSettingRead"][];
+                };
+            };
+        };
+    };
+    update_provider_api_v1_ai_providers__provider__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AIProviderSettingUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AIProviderSettingRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_provider_key_api_v1_ai_providers__provider__key_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_provider_connection_api_v1_ai_providers__provider__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AITestConnectionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ai_usage_summary_api_v1_ai_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AIUsageSummaryResponse"];
+                };
+            };
+        };
+    };
+    transcribe_audio_endpoint_api_v1_voice_transcribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_transcribe_audio_endpoint_api_v1_voice_transcribe_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranscriptionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    voice_capture_endpoint_api_v1_voice_capture_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_voice_capture_endpoint_api_v1_voice_capture_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceCaptureResponse"];
                 };
             };
             /** @description Validation Error */

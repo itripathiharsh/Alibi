@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.api.v1.ai import router as ai_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.categories import router as categories_router
@@ -11,6 +12,7 @@ from app.api.v1.projects import router as projects_router
 from app.api.v1.tags import router as tags_router
 from app.api.v1.tasks import router as tasks_router
 from app.api.v1.time_entries import router as time_entries_router
+from app.api.v1.voice import router as voice_router
 from app.core.config import settings
 from app.core.errors import ServiceUnavailableError
 from app.core.time import format_iso
@@ -25,6 +27,8 @@ router.include_router(tasks_router, prefix="/api/v1")
 router.include_router(time_entries_router, prefix="/api/v1")
 router.include_router(evidence_router, prefix="/api/v1")
 router.include_router(analytics_router, prefix="/api/v1")
+router.include_router(ai_router, prefix="/api/v1")
+router.include_router(voice_router, prefix="/api/v1")
 
 
 class HealthLiveResponse(BaseModel):
