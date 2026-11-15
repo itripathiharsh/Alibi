@@ -3580,6 +3580,138 @@
         ]
       }
     },
+    "/api/v1/learning/profile": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Get Learning Profile",
+        "description": "Get the user's compiled learning profile, maturity metrics, and routines.",
+        "operationId": "get_learning_profile_api_v1_learning_profile_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryProfileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/learning/predict-duration": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Predict Task Duration",
+        "description": "Predict task duration with calibrated confidence intervals (doc 07 \u00a75).",
+        "operationId": "predict_task_duration_api_v1_learning_predict_duration_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DurationPredictionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DurationPredictionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/learning/patterns": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "List Learned Patterns",
+        "description": "List active and candidate behavioral patterns (routines, work periods).",
+        "operationId": "list_learned_patterns_api_v1_learning_patterns_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LearnedPatternResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Learned Patterns Api V1 Learning Patterns Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/learning/reset": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Reset User Learning",
+        "description": "Reset all learned models, patterns, predictions, and profile snapshots (AC-PLE-7).",
+        "operationId": "reset_user_learning_api_v1_learning_reset_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetLearningResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "tags": [
@@ -4420,6 +4552,106 @@
         ],
         "title": "DeviceResponse"
       },
+      "DurationPredictionRequest": {
+        "properties": {
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "user_estimate_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Estimate Min"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "DurationPredictionRequest"
+      },
+      "DurationPredictionResponse": {
+        "properties": {
+          "p50_min": {
+            "type": "integer",
+            "title": "P50 Min"
+          },
+          "p10_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P10 Min"
+          },
+          "p90_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P90 Min"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "maturity_level": {
+            "type": "integer",
+            "title": "Maturity Level"
+          },
+          "correction_factor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Factor"
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "p50_min",
+          "confidence",
+          "maturity_level"
+        ],
+        "title": "DurationPredictionResponse"
+      },
       "EstVsActualItem": {
         "properties": {
           "task_id": {
@@ -4660,6 +4892,62 @@
         "type": "object",
         "title": "HealthReadyResponse"
       },
+      "LearnedPatternResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "pattern_type": {
+            "type": "string",
+            "title": "Pattern Type"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "value": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Value"
+          },
+          "sample_count": {
+            "type": "integer",
+            "title": "Sample Count"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "first_observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Observed At"
+          },
+          "last_observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Observed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "pattern_type",
+          "key",
+          "value",
+          "sample_count",
+          "confidence",
+          "status",
+          "first_observed_at",
+          "last_observed_at"
+        ],
+        "title": "LearnedPatternResponse"
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -4682,6 +4970,48 @@
           "password"
         ],
         "title": "LoginRequest"
+      },
+      "MemoryProfileResponse": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "compiled_at": {
+            "type": "string",
+            "title": "Compiled At"
+          },
+          "maturity": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Maturity"
+          },
+          "routines": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Routines"
+          },
+          "preferences": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Preferences"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "compiled_at",
+          "maturity",
+          "routines",
+          "preferences"
+        ],
+        "title": "MemoryProfileResponse"
       },
       "ProductivityScoreResponse": {
         "properties": {
@@ -4983,6 +5313,24 @@
         },
         "type": "object",
         "title": "RefreshRequest"
+      },
+      "ResetLearningResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "ResetLearningResponse"
       },
       "ScoreFormulaResponse": {
         "properties": {

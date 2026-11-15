@@ -1120,6 +1120,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/learning/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Learning Profile
+         * @description Get the user's compiled learning profile, maturity metrics, and routines.
+         */
+        get: operations["get_learning_profile_api_v1_learning_profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/predict-duration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Predict Task Duration
+         * @description Predict task duration with calibrated confidence intervals (doc 07 §5).
+         */
+        post: operations["predict_task_duration_api_v1_learning_predict_duration_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/patterns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Learned Patterns
+         * @description List active and candidate behavioral patterns (routines, work periods).
+         */
+        get: operations["list_learned_patterns_api_v1_learning_patterns_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset User Learning
+         * @description Reset all learned models, patterns, predictions, and profile snapshots (AC-PLE-7).
+         */
+        post: operations["reset_user_learning_api_v1_learning_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -1472,6 +1552,35 @@ export interface components {
             /** Created At */
             created_at: string;
         };
+        /** DurationPredictionRequest */
+        DurationPredictionRequest: {
+            /** Category Id */
+            category_id?: string | null;
+            /** User Estimate Min */
+            user_estimate_min?: number | null;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+        };
+        /** DurationPredictionResponse */
+        DurationPredictionResponse: {
+            /** P50 Min */
+            p50_min: number;
+            /** P10 Min */
+            p10_min?: number | null;
+            /** P90 Min */
+            p90_min?: number | null;
+            /** Confidence */
+            confidence: number;
+            /** Maturity Level */
+            maturity_level: number;
+            /** Correction Factor */
+            correction_factor?: number | null;
+            /** Explanation */
+            explanation?: string | null;
+        };
         /** EstVsActualItem */
         EstVsActualItem: {
             /**
@@ -1573,6 +1682,35 @@ export interface components {
              */
             database: string;
         };
+        /** LearnedPatternResponse */
+        LearnedPatternResponse: {
+            /** Id */
+            id: string;
+            /** Pattern Type */
+            pattern_type: string;
+            /** Key */
+            key: string;
+            /** Value */
+            value: {
+                [key: string]: unknown;
+            };
+            /** Sample Count */
+            sample_count: number;
+            /** Confidence */
+            confidence: number;
+            /** Status */
+            status: string;
+            /**
+             * First Observed At
+             * Format: date-time
+             */
+            first_observed_at: string;
+            /**
+             * Last Observed At
+             * Format: date-time
+             */
+            last_observed_at: string;
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -1583,6 +1721,25 @@ export interface components {
             /** Password */
             password: string;
             device?: components["schemas"]["DeviceInfo"];
+        };
+        /** MemoryProfileResponse */
+        MemoryProfileResponse: {
+            /** Version */
+            version: number;
+            /** Compiled At */
+            compiled_at: string;
+            /** Maturity */
+            maturity: {
+                [key: string]: unknown;
+            };
+            /** Routines */
+            routines: {
+                [key: string]: unknown;
+            }[];
+            /** Preferences */
+            preferences: {
+                [key: string]: unknown;
+            }[];
         };
         /** ProductivityScoreResponse */
         ProductivityScoreResponse: {
@@ -1686,6 +1843,13 @@ export interface components {
         RefreshRequest: {
             /** Refresh Token */
             refresh_token?: string | null;
+        };
+        /** ResetLearningResponse */
+        ResetLearningResponse: {
+            /** Status */
+            status: string;
+            /** Message */
+            message: string;
         };
         /** ScoreFormulaResponse */
         ScoreFormulaResponse: {
@@ -4335,6 +4499,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_learning_profile_api_v1_learning_profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryProfileResponse"];
+                };
+            };
+        };
+    };
+    predict_task_duration_api_v1_learning_predict_duration_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DurationPredictionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DurationPredictionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_learned_patterns_api_v1_learning_patterns_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearnedPatternResponse"][];
+                };
+            };
+        };
+    };
+    reset_user_learning_api_v1_learning_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetLearningResponse"];
                 };
             };
         };
