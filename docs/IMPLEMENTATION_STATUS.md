@@ -40,6 +40,7 @@ See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: **124 / 124 pass
 | 2026-11-15 | M1 Full CI | Milestone M1 CI Pipeline | 30 tests passed, 5 packages/apps typechecked, Next.js build clean | `make.ps1 ci` & `docs/milestones/M1_REPORT.md` |
 | 2026-11-16 | M2 Full CI | Milestone M2 CI Pipeline | 41 tests passed (Hypothesis + Golden 160 items 100% exact match), Next.js build clean, 5 pkgs typechecked | `make.ps1 ci` & `docs/milestones/M2_REPORT.md` |
 | 2026-11-16 | M12 Full CI | Release v1.0.0 Full CI Pipeline | 91 backend tests passed, 5 sync-core tests passed, 6 workspace packages typechecked, web Next.js standalone clean | `make.ps1 ci` & `docs/milestones/M12_REPORT.md` |
+| 2026-11-16 | Release Build | Mobile Android APK & UI Motion Release | Assembled debug APK (139.4 MB, Hermes, C++ CMake, full ABI support); Web & Mobile tactile animations; 100% checks green | `assembleDebug` & `D:\alibi\apps\mobile\android\app\build\outputs\apk\debug\app-debug.apk` |
 
 ## Open blockers
 None. All milestones delivered.

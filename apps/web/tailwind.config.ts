@@ -32,6 +32,24 @@ const config: Config = {
         card: tokens.radius.card,
         sheet: tokens.radius.sheet,
       },
+      keyframes: {
+        fadeIn: {
+          "0%": { opacity: "0", transform: "translateY(4px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        scaleIn: {
+          "0%": { opacity: "0", transform: "scale(0.97)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+        shimmer: {
+          "100%": { transform: "translateX(100%)" },
+        },
+      },
+      animation: {
+        fadeIn: "fadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1)",
+        scaleIn: "scaleIn 180ms cubic-bezier(0.16, 1, 0.3, 1)",
+        shimmer: "shimmer 2s infinite",
+      },
     },
   },
   plugins: [],

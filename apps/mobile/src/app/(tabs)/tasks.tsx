@@ -232,7 +232,10 @@ export default function TasksScreen() {
             return (
               <View key={task.id} style={styles.taskCard}>
                 <View style={styles.taskHeader}>
-                  <Pressable onPress={() => handleStatusToggle(task)} style={styles.checkboxBtn}>
+                  <Pressable
+                    onPress={() => handleStatusToggle(task)}
+                    style={({ pressed }) => [styles.checkboxBtn, pressed && { transform: [{ scale: 0.9 }] }]}
+                  >
                     {isDone ? (
                       <CheckCircle2 size={22} color={theme.colors.accent.emerald} />
                     ) : (
@@ -255,9 +258,10 @@ export default function TasksScreen() {
                   {/* Timer Button */}
                   {!isDone && (
                     <Pressable
-                      style={[
+                      style={({ pressed }) => [
                         styles.timerBtn,
                         isTimerRunning && styles.timerBtnActive,
+                        pressed && { transform: [{ scale: 0.92 }] },
                       ]}
                       onPress={() => handleTimerAction(task)}
                     >

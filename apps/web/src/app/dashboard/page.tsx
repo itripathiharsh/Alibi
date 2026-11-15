@@ -227,7 +227,7 @@ export default function DashboardPage() {
                     cx="50"
                     cy="50"
                     r="40"
-                    className="stroke-primary"
+                    className="stroke-primary transition-all duration-700 ease-out"
                     strokeWidth="8"
                     strokeDasharray={2 * Math.PI * 40}
                     strokeDashoffset={2 * Math.PI * 40 * (1 - (score.score ?? 0) / 100)}
@@ -235,7 +235,7 @@ export default function DashboardPage() {
                     fill="transparent"
                   />
                 </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <div className="absolute inset-0 flex flex-col items-center justify-center animate-scaleIn">
                   <span className="text-4xl font-extrabold tabular-nums text-text">
                     {score.score}
                   </span>
@@ -276,7 +276,7 @@ export default function DashboardPage() {
 
         {/* 6 Core Metric Tiles */}
         <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <div className="p-4 rounded-card bg-surface border border-border shadow-sm">
+          <div className="p-4 rounded-card bg-surface border border-border shadow-sm card-interactive">
             <div className="flex items-center gap-2 text-text-muted text-xs">
               <Clock className="w-4 h-4 text-primary" />
               <span>Time Spent</span>
@@ -287,7 +287,7 @@ export default function DashboardPage() {
             <p className="text-[11px] text-text-muted mt-1">Logged in period</p>
           </div>
 
-          <div className="p-4 rounded-card bg-surface border border-border shadow-sm">
+          <div className="p-4 rounded-card bg-surface border border-border shadow-sm card-interactive">
             <div className="flex items-center gap-2 text-text-muted text-xs">
               <CheckCircle2 className="w-4 h-4 text-success" />
               <span>Completed</span>
@@ -298,7 +298,7 @@ export default function DashboardPage() {
             <p className="text-[11px] text-text-muted mt-1">Tasks finished</p>
           </div>
 
-          <div className="p-4 rounded-card bg-surface border border-border shadow-sm">
+          <div className="p-4 rounded-card bg-surface border border-border shadow-sm card-interactive">
             <div className="flex items-center gap-2 text-text-muted text-xs">
               <Activity className="w-4 h-4 text-primary" />
               <span>Pending</span>
@@ -309,7 +309,7 @@ export default function DashboardPage() {
             <p className="text-[11px] text-text-muted mt-1">Open tasks</p>
           </div>
 
-          <div className="p-4 rounded-card bg-surface border border-border shadow-sm">
+          <div className="p-4 rounded-card bg-surface border border-border shadow-sm card-interactive">
             <div className="flex items-center gap-2 text-text-muted text-xs">
               <AlertTriangle className="w-4 h-4 text-danger" />
               <span>Past Deadline</span>
@@ -320,7 +320,7 @@ export default function DashboardPage() {
             <p className="text-[11px] text-text-muted mt-1">Overdue items</p>
           </div>
 
-          <div className="p-4 rounded-card bg-surface border border-border shadow-sm">
+          <div className="p-4 rounded-card bg-surface border border-border shadow-sm card-interactive">
             <div className="flex items-center gap-2 text-text-muted text-xs">
               <Target className="w-4 h-4 text-accent" />
               <span>Completion Rate</span>
@@ -337,7 +337,7 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="p-4 rounded-card bg-surface border border-border shadow-sm">
+          <div className="p-4 rounded-card bg-surface border border-border shadow-sm card-interactive">
             <div className="flex items-center gap-2 text-text-muted text-xs">
               <TrendingUp className="w-4 h-4 text-warning" />
               <span>Efficiency</span>

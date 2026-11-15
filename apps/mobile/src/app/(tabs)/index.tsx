@@ -223,7 +223,9 @@ export default function DashboardScreen() {
 
       {/* 4 Core Quick Metrics Grid */}
       <View style={styles.metricsGrid}>
-        <View style={styles.metricCard}>
+        <Pressable
+          style={({ pressed }) => [styles.metricCard, pressed && styles.metricCardPressed]}
+        >
           <View style={styles.metricIconRow}>
             <Clock size={16} color={theme.colors.accent.emerald} />
             <Text style={styles.metricLabel}>Time Spent</Text>
@@ -232,9 +234,11 @@ export default function DashboardScreen() {
             {isLoading ? "..." : formatHours(summary?.total_time_min || 0)}
           </Text>
           <Text style={styles.metricSubtext}>Logged in period</Text>
-        </View>
+        </Pressable>
 
-        <View style={styles.metricCard}>
+        <Pressable
+          style={({ pressed }) => [styles.metricCard, pressed && styles.metricCardPressed]}
+        >
           <View style={styles.metricIconRow}>
             <CheckCircle2 size={16} color={theme.colors.accent.emerald} />
             <Text style={styles.metricLabel}>Completed</Text>
@@ -243,9 +247,11 @@ export default function DashboardScreen() {
             {isLoading ? "..." : summary?.tasks_completed ?? 0}
           </Text>
           <Text style={styles.metricSubtext}>Finished tasks</Text>
-        </View>
+        </Pressable>
 
-        <View style={styles.metricCard}>
+        <Pressable
+          style={({ pressed }) => [styles.metricCard, pressed && styles.metricCardPressed]}
+        >
           <View style={styles.metricIconRow}>
             <Layers size={16} color="#818CF8" />
             <Text style={styles.metricLabel}>Pending</Text>
@@ -254,9 +260,11 @@ export default function DashboardScreen() {
             {isLoading ? "..." : summary?.tasks_pending ?? 0}
           </Text>
           <Text style={styles.metricSubtext}>Open items</Text>
-        </View>
+        </Pressable>
 
-        <View style={styles.metricCard}>
+        <Pressable
+          style={({ pressed }) => [styles.metricCard, pressed && styles.metricCardPressed]}
+        >
           <View style={styles.metricIconRow}>
             <AlertTriangle size={16} color={theme.colors.danger} />
             <Text style={styles.metricLabel}>Overdue</Text>
@@ -270,7 +278,7 @@ export default function DashboardScreen() {
             {isLoading ? "..." : summary?.tasks_overdue ?? 0}
           </Text>
           <Text style={styles.metricSubtext}>Past deadline</Text>
-        </View>
+        </Pressable>
       </View>
 
       {/* Visual Chart Section: Completion Trend */}
@@ -486,6 +494,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: theme.colors.border.subtle,
+  },
+  metricCardPressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.85,
+    borderColor: theme.colors.accent.primary,
   },
   metricIconRow: {
     flexDirection: "row",
