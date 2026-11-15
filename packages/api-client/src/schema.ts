@@ -1284,6 +1284,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/vault/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notes
+         * @description List recent knowledge vault notes for current user.
+         */
+        get: operations["list_notes_api_v1_vault_notes_get"];
+        put?: never;
+        /**
+         * Create Note
+         * @description Manually create and chunk a note in the personal knowledge vault.
+         */
+        post: operations["create_note_api_v1_vault_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vault/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search Vault
+         * @description Execute keyword, semantic vector, or hybrid RRF search over user knowledge items.
+         */
+        post: operations["search_vault_api_v1_vault_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chat With Assistant
+         * @description Send a question to the assistant and receive a grounded response with citations.
+         */
+        post: operations["chat_with_assistant_api_v1_assistant_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Chat Threads
+         * @description List recent conversation threads with the grounded assistant.
+         */
+        get: operations["list_chat_threads_api_v1_assistant_threads_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/threads/{thread_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Thread Messages
+         * @description Retrieve message history for a specific conversation thread.
+         */
+        get: operations["get_thread_messages_api_v1_assistant_threads__thread_id__messages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -1621,6 +1725,67 @@ export interface components {
             /** New Password */
             new_password: string;
         };
+        /** ChatAskRequest */
+        ChatAskRequest: {
+            /** Message */
+            message: string;
+            /** Thread Id */
+            thread_id?: string | null;
+        };
+        /** ChatMessageResponse */
+        ChatMessageResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Thread Id
+             * Format: uuid
+             */
+            thread_id: string;
+            /** Role */
+            role: string;
+            /** Content */
+            content: string;
+            /** Sources */
+            sources?: {
+                [key: string]: unknown;
+            }[];
+            /** Tool Calls */
+            tool_calls?: {
+                [key: string]: unknown;
+            }[];
+            /** Provider */
+            provider?: string | null;
+            /** Model */
+            model?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ChatThreadResponse */
+        ChatThreadResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** CompletionTrendPoint */
         CompletionTrendPoint: {
             /**
@@ -1879,6 +2044,78 @@ export interface components {
             preferences: {
                 [key: string]: unknown;
             }[];
+        };
+        /** NoteCreateRequest */
+        NoteCreateRequest: {
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /**
+             * Occurred On
+             * Format: date
+             */
+            occurred_on?: string;
+            /**
+             * Source Type
+             * @default manual
+             */
+            source_type: string;
+            /** Category Id */
+            category_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /**
+             * Privacy Class
+             * @default personal
+             */
+            privacy_class: string;
+        };
+        /** NoteResponse */
+        NoteResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Source Type */
+            source_type: string;
+            /** Source Id */
+            source_id: string | null;
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /**
+             * Occurred On
+             * Format: date
+             */
+            occurred_on: string;
+            /** Category Id */
+            category_id: string | null;
+            /** Project Id */
+            project_id: string | null;
+            /** Task Id */
+            task_id: string | null;
+            /** Privacy Class */
+            privacy_class: string;
+            /** Embed Status */
+            embed_status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** ProductivityScoreResponse */
         ProductivityScoreResponse: {
@@ -2646,6 +2883,57 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VaultSearchRequest */
+        VaultSearchRequest: {
+            /** Query */
+            query: string;
+            /**
+             * Mode
+             * @default hybrid
+             * @enum {string}
+             */
+            mode: "hybrid" | "keyword" | "semantic";
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
+            /** Category Id */
+            category_id?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Source Type */
+            source_type?: string | null;
+            /** Privacy Class */
+            privacy_class?: string | null;
+            /**
+             * Limit
+             * @default 12
+             */
+            limit: number;
+        };
+        /** VaultSearchResultResponse */
+        VaultSearchResultResponse: {
+            /**
+             * Note Id
+             * Format: uuid
+             */
+            note_id: string;
+            /** Title */
+            title: string;
+            /** Snippet */
+            snippet: string;
+            /** Source Type */
+            source_type: string;
+            /**
+             * Occurred On
+             * Format: date
+             */
+            occurred_on: string;
+            /** Privacy Class */
+            privacy_class: string;
+            /** Score */
+            score: number;
         };
         /** VoiceCaptureResponse */
         VoiceCaptureResponse: {
@@ -4948,6 +5236,198 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CalendarEventRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notes_api_v1_vault_notes_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_note_api_v1_vault_notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_vault_api_v1_vault_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VaultSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VaultSearchResultResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chat_with_assistant_api_v1_assistant_chat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatAskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_chat_threads_api_v1_assistant_threads_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatThreadResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_thread_messages_api_v1_assistant_threads__thread_id__messages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"][];
                 };
             };
             /** @description Validation Error */

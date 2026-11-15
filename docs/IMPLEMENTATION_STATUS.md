@@ -1,9 +1,9 @@
 # Implementation Status
 
-_Last updated: 2026-11-16 by agent (Milestone M6 Complete — All Acceptance Criteria Verified)_
+_Last updated: 2026-11-16 by agent (Milestone M7 Complete — All Acceptance Criteria Verified)_
 
 ## Current milestone
-**M7 — RAG & Knowledge Vault** · state: **Planning / In progress** · entry criteria: ✅ M6 complete, scheduling solver, proposal lifecycle, and calendar events verified
+**M8 — Calendar & reminders** · state: **Planning / In progress** · entry criteria: ✅ M7 complete, vault ingestion, hybrid search, and grounded assistant verified
 
 ## Milestones
 | Milestone | State | Started | Completed | Tag | Report |
@@ -16,8 +16,8 @@ _Last updated: 2026-11-16 by agent (Milestone M6 Complete — All Acceptance Cri
 | M4 AI gateway (+ voice) | Complete | 2026-11-16 | 2026-11-16 | `m4-complete` | [M4 Report](milestones/M4_REPORT.md) |
 | M5 Personal Learning Engine | Complete | 2026-11-16 | 2026-11-16 | `m5-complete` | [M5 Report](milestones/M5_REPORT.md) |
 | M6 Scheduling (+ minimal calendar) | Complete | 2026-11-16 | 2026-11-16 | `m6-complete` | [M6 Report](milestones/M6_REPORT.md) |
-| M7 RAG & Knowledge Vault | In progress | 2026-11-16 | | | |
-| M8 Calendar & reminders | Not started | | | | |
+| M7 RAG & Knowledge Vault | Complete | 2026-11-16 | 2026-11-16 | `m7-complete` | [M7 Report](milestones/M7_REPORT.md) |
+| M8 Calendar & reminders | In progress | 2026-11-16 | | | |
 | M9 Reports & sharing | Not started | | | | |
 | M10 Offline & sync | Not started | | | | |
 | M11 Hosted hardening | Not started | | | | |

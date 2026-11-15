@@ -25,4 +25,3 @@ class ProviderAdapter(ABC):
     async def health(self) -> dict[str, Any]:
         """Verify connectivity and credentials."""
         ...
-

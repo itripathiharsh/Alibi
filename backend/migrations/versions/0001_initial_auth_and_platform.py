@@ -8,16 +8,16 @@ Implements M1 Task 1: Extensions, global sequence, trigger functions,
 users, devices, refresh_tokens, audit_log, and jobs tables.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -81,7 +81,9 @@ def upgrade() -> None:
         sa.Column("password_hash", sa.String(), nullable=False),
         sa.Column("display_name", sa.String(length=100), nullable=True),
         sa.Column("timezone", sa.String(length=50), server_default="Asia/Kolkata", nullable=False),
-        sa.Column("settings", postgresql.JSONB(astext_type=sa.Text()), server_default="{}", nullable=False),
+        sa.Column(
+            "settings", postgresql.JSONB(astext_type=sa.Text()), server_default="{}", nullable=False
+        ),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("password_changed_at", sa.DateTime(timezone=True), nullable=True),
@@ -92,7 +94,12 @@ def upgrade() -> None:
     op.create_table(
         "devices",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("name", sa.String(length=100), nullable=False),
         sa.Column("platform", sa.String(length=20), nullable=False),
         sa.Column("app_version", sa.String(length=50), nullable=True),
@@ -108,8 +115,18 @@ def upgrade() -> None:
     op.create_table(
         "refresh_tokens",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("device_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("devices.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "device_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("devices.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("family_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("token_hash", sa.LargeBinary(length=32), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
@@ -125,10 +142,17 @@ def upgrade() -> None:
     op.create_table(
         "audit_log",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "user_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("action", sa.String(length=50), nullable=False),
         sa.Column("ip_hash", sa.String(length=64), nullable=True),
-        sa.Column("detail", postgresql.JSONB(astext_type=sa.Text()), server_default="{}", nullable=False),
+        sa.Column(
+            "detail", postgresql.JSONB(astext_type=sa.Text()), server_default="{}", nullable=False
+        ),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
     op.create_index("ix_audit_log_action", "audit_log", ["action"])
@@ -146,18 +170,29 @@ def upgrade() -> None:
         "jobs",
         sa.Column("id", sa.BigInteger(), autoincrement=True, primary_key=True),
         sa.Column("kind", sa.String(length=100), nullable=False),
-        sa.Column("payload", postgresql.JSONB(astext_type=sa.Text()), server_default="{}", nullable=False),
+        sa.Column(
+            "payload", postgresql.JSONB(astext_type=sa.Text()), server_default="{}", nullable=False
+        ),
         sa.Column("status", sa.String(length=20), server_default="queued", nullable=False),
         sa.Column("attempts", sa.Integer(), server_default="0", nullable=False),
         sa.Column("max_attempts", sa.Integer(), server_default="5", nullable=False),
-        sa.Column("run_after", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "run_after", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+        ),
         sa.Column("locked_by", sa.String(length=100), nullable=True),
         sa.Column("locked_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_error", sa.Text(), nullable=True),
         sa.Column("dedupe_key", sa.String(length=200), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
-        sa.CheckConstraint("status IN ('queued', 'running', 'done', 'failed', 'dead')", name="chk_job_status"),
+        sa.CheckConstraint(
+            "status IN ('queued', 'running', 'done', 'failed', 'dead')", name="chk_job_status"
+        ),
     )
     op.create_index("ix_jobs_kind", "jobs", ["kind"])
     op.create_index("ix_jobs_status", "jobs", ["status"])

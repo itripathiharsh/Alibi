@@ -93,4 +93,3 @@ async def test_categories_crud_and_system_protection(
     # Listing again shows 4 categories
     list_resp_2 = await client.get("/api/v1/categories", headers=headers)
     assert len(list_resp_2.json()) == 4
-

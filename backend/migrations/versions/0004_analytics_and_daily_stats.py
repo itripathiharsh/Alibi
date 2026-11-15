@@ -8,15 +8,14 @@ Implements M3 Task 3: composite analytics indexes, mv_daily_task_stats materiali
 and refresh function.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
-import sqlalchemy as sa
 
 revision: str = "0004"
-down_revision: Union[str, None] = "0003"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0003"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -88,4 +87,3 @@ def downgrade() -> None:
     op.drop_index("ix_time_entries_user_started_ended", table_name="time_entries")
     op.drop_index("ix_tasks_user_deadline", table_name="tasks")
     op.drop_index("ix_tasks_user_status_completed", table_name="tasks")
-

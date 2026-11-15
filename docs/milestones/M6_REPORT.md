@@ -51,3 +51,4 @@
 ## 8. Documentation updated
 - `docs/IMPLEMENTATION_STATUS.md` updated to reflect M6 Complete.
 - `openapi.json` and `@alibi/api-client` regenerated with Scheduling schemas.
+

@@ -8,16 +8,16 @@ Implements M5 Task 1: behavior_observations, learned_patterns, memory_profiles,
 task_predictions, and ml_models per doc 03 §3.6.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0006"
-down_revision: Union[str, None] = "0005"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0005"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -116,7 +116,9 @@ def upgrade() -> None:
             server_default=sa.text("CURRENT_TIMESTAMP"),
             nullable=False,
         ),
-        sa.Column("algorithm_version", sa.String(20), server_default=sa.text("'v1'"), nullable=False),
+        sa.Column(
+            "algorithm_version", sa.String(20), server_default=sa.text("'v1'"), nullable=False
+        ),
         sa.CheckConstraint(
             "pattern_type IN ('routine','duration','work_period','postponement','session_length','interruption','category_distribution')",
             name="chk_learned_pattern_type",
@@ -125,7 +127,9 @@ def upgrade() -> None:
             "status IN ('candidate','active','confirmed','dismissed','stale')",
             name="chk_learned_pattern_status",
         ),
-        sa.UniqueConstraint("user_id", "pattern_type", "key", name="uq_learned_patterns_user_type_key"),
+        sa.UniqueConstraint(
+            "user_id", "pattern_type", "key", name="uq_learned_patterns_user_type_key"
+        ),
     )
 
     # 3. memory_profiles
@@ -248,6 +252,7 @@ def downgrade() -> None:
     op.drop_table("task_predictions")
     op.drop_table("memory_profiles")
     op.drop_table("learned_patterns")
-    op.execute("DROP TRIGGER IF EXISTS trg_behavior_observations_append_only ON behavior_observations;")
+    op.execute(
+        "DROP TRIGGER IF EXISTS trg_behavior_observations_append_only ON behavior_observations;"
+    )
     op.drop_table("behavior_observations")
-
