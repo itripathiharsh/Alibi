@@ -11,6 +11,7 @@ from app.api.v1.analytics import router as analytics_router
 from app.api.v1.assistant import router as assistant_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.categories import router as categories_router
+from app.api.v1.data import router as data_router
 from app.api.v1.evidence import router as evidence_router
 from app.api.v1.learning import router as learning_router
 from app.api.v1.notifications import router as notifications_router
@@ -48,6 +49,7 @@ router.include_router(assistant_router, prefix="/api/v1")
 router.include_router(notifications_router, prefix="/api/v1")
 router.include_router(reports_router, prefix="/api/v1")
 router.include_router(sync_router, prefix="/api/v1")
+router.include_router(data_router, prefix="/api/v1")
 
 
 @router.get("/s/{token}", response_class=HTMLResponse, tags=["Public Share"])

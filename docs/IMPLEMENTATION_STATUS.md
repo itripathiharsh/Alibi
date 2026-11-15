@@ -1,9 +1,9 @@
 # Implementation Status
 
-_Last updated: 2026-11-16 by agent (Milestone M9 Complete — All Acceptance Criteria Verified)_
+_Last updated: 2026-11-16 by agent (v1.0.0 Release Complete — All Milestones M0..M12 and 124 Requirements Verified)_
 
 ## Current milestone
-**M10 — Offline & sync** · state: **Planning / In progress** · entry criteria: ✅ M9 complete, factual reports, CSV/XLSX exports, and secure public sharing verified
+**v1.0.0 Production Release** · state: **Complete** · entry criteria: ✅ All 13 milestones (M0–M12) complete, full CI green, 124/124 requirements verified
 
 ## Milestones
 | Milestone | State | Started | Completed | Tag | Report |
@@ -21,12 +21,12 @@ _Last updated: 2026-11-16 by agent (Milestone M9 Complete — All Acceptance Cri
 | M9 Reports & sharing | Complete | 2026-11-16 | 2026-11-16 | `m9-complete` | [M9 Report](milestones/M9_REPORT.md) |
 | M10 Offline & sync | Complete | 2026-11-16 | 2026-11-16 | `m10-complete` | [M10 Report](milestones/M10_REPORT.md) |
 | M11 Hosted hardening | Complete | 2026-11-16 | 2026-11-16 | `m11-complete` | [M11 Report](milestones/M11_REPORT.md) |
-| M12 Integration & hardening | In progress | 2026-11-16 | | | |
+| M12 Integration & hardening | Complete | 2026-11-16 | 2026-11-16 | `v1.0.0` | [M12 Report](milestones/M12_REPORT.md) |
 
 States: Not started · Planning · In progress · Blocked · In QA · Complete.
 
 ## Requirement progress
-See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: 0 / 124 passing.
+See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: **124 / 124 passing (100%)**.
 
 ## Latest test evidence
 | Date | Commit | Suite | Result | Link |
@@ -39,9 +39,10 @@ See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: 0 / 124 passing.
 | 2026-11-15 | Task 12 | Exit Gate Verification & M0 Report | All AC-M0-1..6 passing; doctor green, compose healthy, gitleaks verified, CI green | `docs/milestones/M0_REPORT.md` |
 | 2026-11-15 | M1 Full CI | Milestone M1 CI Pipeline | 30 tests passed, 5 packages/apps typechecked, Next.js build clean | `make.ps1 ci` & `docs/milestones/M1_REPORT.md` |
 | 2026-11-16 | M2 Full CI | Milestone M2 CI Pipeline | 41 tests passed (Hypothesis + Golden 160 items 100% exact match), Next.js build clean, 5 pkgs typechecked | `make.ps1 ci` & `docs/milestones/M2_REPORT.md` |
+| 2026-11-16 | M12 Full CI | Release v1.0.0 Full CI Pipeline | 91 backend tests passed, 5 sync-core tests passed, 6 workspace packages typechecked, web Next.js standalone clean | `make.ps1 ci` & `docs/milestones/M12_REPORT.md` |
 
 ## Open blockers
-None.
+None. All milestones delivered.
 
 ## Update rules
 Update this file in the same commit as any feature change. "Complete" requires a linked test run.

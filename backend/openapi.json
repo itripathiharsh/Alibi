@@ -5179,6 +5179,84 @@
         }
       }
     },
+    "/api/v1/data/export": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Full data export in JSON (FR-DATA-001)",
+        "description": "Exports all user tasks, projects, categories, notes, time entries, and reports in a portable JSON archive.",
+        "operationId": "export_user_data_api_v1_data_export_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Export User Data Api V1 Data Export Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/data/account": {
+      "delete": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Permanently delete user account and all data (FR-DATA-003)",
+        "description": "Verifies user password and cascade-deletes user record and all associated data with zero data remnants.",
+        "operationId": "delete_user_account_api_v1_data_account_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountDeleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Delete User Account Api V1 Data Account Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/s/{token}": {
       "get": {
         "tags": [
@@ -5560,6 +5638,27 @@
           "total_cost_usd"
         ],
         "title": "AIUsageSummaryResponse"
+      },
+      "AccountDeleteRequest": {
+        "properties": {
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "description": "Current owner password for re-authentication"
+          },
+          "confirm": {
+            "type": "boolean",
+            "title": "Confirm",
+            "description": "Must be set to True to confirm permanent deletion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "password",
+          "confirm"
+        ],
+        "title": "AccountDeleteRequest",
+        "description": "Payload to confirm permanent account deletion."
       },
       "AppMetaResponse": {
         "properties": {

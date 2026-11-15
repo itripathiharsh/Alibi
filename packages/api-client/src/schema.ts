@@ -1700,6 +1700,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/data/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Full data export in JSON (FR-DATA-001)
+         * @description Exports all user tasks, projects, categories, notes, time entries, and reports in a portable JSON archive.
+         */
+        get: operations["export_user_data_api_v1_data_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Permanently delete user account and all data (FR-DATA-003)
+         * @description Verifies user password and cascade-deletes user record and all associated data with zero data remnants.
+         */
+        delete: operations["delete_user_account_api_v1_data_account_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/s/{token}": {
         parameters: {
             query?: never;
@@ -1874,6 +1914,22 @@ export interface components {
             total_calls: number;
             /** Total Cost Usd */
             total_cost_usd: string;
+        };
+        /**
+         * AccountDeleteRequest
+         * @description Payload to confirm permanent account deletion.
+         */
+        AccountDeleteRequest: {
+            /**
+             * Password
+             * @description Current owner password for re-authentication
+             */
+            password: string;
+            /**
+             * Confirm
+             * @description Must be set to True to confirm permanent deletion
+             */
+            confirm: boolean;
         };
         /** AppMetaResponse */
         AppMetaResponse: {
@@ -6653,6 +6709,63 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_user_data_api_v1_data_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    delete_user_account_api_v1_data_account_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
                     };
                 };
             };
