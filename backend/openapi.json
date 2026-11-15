@@ -4952,6 +4952,233 @@
         }
       }
     },
+    "/api/v1/sync/push": {
+      "post": {
+        "tags": [
+          "Sync"
+        ],
+        "summary": "Push Sync Operations",
+        "description": "Push offline operations batch to server with idempotency and merge (doc 11 \u00a74.2).",
+        "operationId": "push_sync_operations_api_v1_sync_push_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncPushRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPushResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sync/pull": {
+      "get": {
+        "tags": [
+          "Sync"
+        ],
+        "summary": "Pull Sync Changes",
+        "description": "Pull incremental server changes since a sequence cursor (doc 11 \u00a74.3).",
+        "operationId": "pull_sync_changes_api_v1_sync_pull_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "since_seq",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Since Seq"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPullResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sync/bootstrap": {
+      "get": {
+        "tags": [
+          "Sync"
+        ],
+        "summary": "Bootstrap Sync",
+        "description": "Download full initial snapshot for new client or epoch reset (doc 11 \u00a74.5).",
+        "operationId": "bootstrap_sync_api_v1_sync_bootstrap_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncBootstrapResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sync/conflicts": {
+      "get": {
+        "tags": [
+          "Sync"
+        ],
+        "summary": "List Sync Conflicts",
+        "description": "List open conflicts requiring user decision (doc 11 \u00a76).",
+        "operationId": "list_sync_conflicts_api_v1_sync_conflicts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SyncConflictResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Sync Conflicts Api V1 Sync Conflicts Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sync/conflicts/{conflict_id}/resolve": {
+      "post": {
+        "tags": [
+          "Sync"
+        ],
+        "summary": "Resolve Sync Conflict",
+        "description": "Resolve a sync conflict choosing local or server value (doc 11 \u00a76).",
+        "operationId": "resolve_sync_conflict_api_v1_sync_conflicts__conflict_id__resolve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conflict_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conflict Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncConflictResolveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Resolve Sync Conflict Api V1 Sync Conflicts  Conflict Id  Resolve Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/s/{token}": {
       "get": {
         "tags": [
@@ -7979,6 +8206,252 @@
           "tasks_overdue"
         ],
         "title": "SummaryMetricsResponse"
+      },
+      "SyncBootstrapResponse": {
+        "properties": {
+          "server_epoch": {
+            "type": "string",
+            "title": "Server Epoch"
+          },
+          "tasks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "categories": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "projects": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "tags": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "server_epoch",
+          "tasks",
+          "categories",
+          "projects",
+          "tags"
+        ],
+        "title": "SyncBootstrapResponse"
+      },
+      "SyncConflictResolveRequest": {
+        "properties": {
+          "resolution": {
+            "type": "string",
+            "pattern": "^(resolved_local|resolved_server)$",
+            "title": "Resolution"
+          }
+        },
+        "type": "object",
+        "required": [
+          "resolution"
+        ],
+        "title": "SyncConflictResolveRequest"
+      },
+      "SyncConflictResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entity Id"
+          },
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "local_value": {
+            "title": "Local Value"
+          },
+          "server_value": {
+            "title": "Server Value"
+          },
+          "op_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Op Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "entity_type",
+          "entity_id",
+          "field",
+          "local_value",
+          "server_value",
+          "op_id",
+          "status",
+          "created_at"
+        ],
+        "title": "SyncConflictResponse"
+      },
+      "SyncOpSchema": {
+        "properties": {
+          "op_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Op Id"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entity Id"
+          },
+          "op_type": {
+            "type": "string",
+            "title": "Op Type"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "client_ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Client Ts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "op_id",
+          "entity_type",
+          "entity_id",
+          "op_type"
+        ],
+        "title": "SyncOpSchema"
+      },
+      "SyncPullResponse": {
+        "properties": {
+          "server_epoch": {
+            "type": "string",
+            "title": "Server Epoch"
+          },
+          "since_seq": {
+            "type": "integer",
+            "title": "Since Seq"
+          },
+          "next_seq": {
+            "type": "integer",
+            "title": "Next Seq"
+          },
+          "changes": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Changes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "server_epoch",
+          "since_seq",
+          "next_seq",
+          "changes"
+        ],
+        "title": "SyncPullResponse"
+      },
+      "SyncPushRequest": {
+        "properties": {
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/SyncOpSchema"
+            },
+            "type": "array",
+            "title": "Operations"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "operations"
+        ],
+        "title": "SyncPushRequest"
+      },
+      "SyncPushResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "title": "SyncPushResponse"
       },
       "TagCreateRequest": {
         "properties": {

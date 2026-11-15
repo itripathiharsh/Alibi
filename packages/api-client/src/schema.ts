@@ -1600,6 +1600,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sync/push": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Push Sync Operations
+         * @description Push offline operations batch to server with idempotency and merge (doc 11 §4.2).
+         */
+        post: operations["push_sync_operations_api_v1_sync_push_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sync/pull": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pull Sync Changes
+         * @description Pull incremental server changes since a sequence cursor (doc 11 §4.3).
+         */
+        get: operations["pull_sync_changes_api_v1_sync_pull_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sync/bootstrap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bootstrap Sync
+         * @description Download full initial snapshot for new client or epoch reset (doc 11 §4.5).
+         */
+        get: operations["bootstrap_sync_api_v1_sync_bootstrap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sync/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sync Conflicts
+         * @description List open conflicts requiring user decision (doc 11 §6).
+         */
+        get: operations["list_sync_conflicts_api_v1_sync_conflicts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sync/conflicts/{conflict_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve Sync Conflict
+         * @description Resolve a sync conflict choosing local or server value (doc 11 §6).
+         */
+        post: operations["resolve_sync_conflict_api_v1_sync_conflicts__conflict_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/s/{token}": {
         parameters: {
             query?: never;
@@ -2896,6 +2996,120 @@ export interface components {
              * @description Share within +-25% or None if insufficient data
              */
             estimate_accuracy?: number | null;
+        };
+        /** SyncBootstrapResponse */
+        SyncBootstrapResponse: {
+            /** Server Epoch */
+            server_epoch: string;
+            /** Tasks */
+            tasks: {
+                [key: string]: unknown;
+            }[];
+            /** Categories */
+            categories: {
+                [key: string]: unknown;
+            }[];
+            /** Projects */
+            projects: {
+                [key: string]: unknown;
+            }[];
+            /** Tags */
+            tags: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** SyncConflictResolveRequest */
+        SyncConflictResolveRequest: {
+            /** Resolution */
+            resolution: string;
+        };
+        /** SyncConflictResponse */
+        SyncConflictResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Entity Type */
+            entity_type: string;
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Field */
+            field: string;
+            /** Local Value */
+            local_value: unknown;
+            /** Server Value */
+            server_value: unknown;
+            /**
+             * Op Id
+             * Format: uuid
+             */
+            op_id: string;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** SyncOpSchema */
+        SyncOpSchema: {
+            /**
+             * Op Id
+             * Format: uuid
+             */
+            op_id: string;
+            /** Entity Type */
+            entity_type: string;
+            /**
+             * Entity Id
+             * Format: uuid
+             */
+            entity_id: string;
+            /** Op Type */
+            op_type: string;
+            /** Base Version */
+            base_version?: number | null;
+            /** Payload */
+            payload?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Client Ts
+             * Format: date-time
+             */
+            client_ts?: string;
+        };
+        /** SyncPullResponse */
+        SyncPullResponse: {
+            /** Server Epoch */
+            server_epoch: string;
+            /** Since Seq */
+            since_seq: number;
+            /** Next Seq */
+            next_seq: number;
+            /** Changes */
+            changes: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** SyncPushRequest */
+        SyncPushRequest: {
+            /** Operations */
+            operations: components["schemas"]["SyncOpSchema"][];
+            /** Device Id */
+            device_id?: string | null;
+        };
+        /** SyncPushResponse */
+        SyncPushResponse: {
+            /** Results */
+            results: {
+                [key: string]: unknown;
+            }[];
         };
         /** TagCreateRequest */
         TagCreateRequest: {
@@ -6288,6 +6502,148 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    push_sync_operations_api_v1_sync_push_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncPushRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncPushResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pull_sync_changes_api_v1_sync_pull_get: {
+        parameters: {
+            query?: {
+                since_seq?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncPullResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bootstrap_sync_api_v1_sync_bootstrap_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncBootstrapResponse"];
+                };
+            };
+        };
+    };
+    list_sync_conflicts_api_v1_sync_conflicts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncConflictResponse"][];
+                };
+            };
+        };
+    };
+    resolve_sync_conflict_api_v1_sync_conflicts__conflict_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conflict_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncConflictResolveRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

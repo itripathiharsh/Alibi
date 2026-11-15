@@ -85,4 +85,3 @@ def test_render_html_viewer() -> None:
     assert "Executive Sponsor" in html
     assert "Professional Only" in html
     assert "2026-11-23 23:59 UTC" in html
-

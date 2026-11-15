@@ -17,6 +17,7 @@ from app.api.v1.notifications import router as notifications_router
 from app.api.v1.projects import router as projects_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.scheduling import router as scheduling_router
+from app.api.v1.sync import router as sync_router
 from app.api.v1.tags import router as tags_router
 from app.api.v1.tasks import router as tasks_router
 from app.api.v1.time_entries import router as time_entries_router
@@ -46,6 +47,7 @@ router.include_router(vault_router, prefix="/api/v1")
 router.include_router(assistant_router, prefix="/api/v1")
 router.include_router(notifications_router, prefix="/api/v1")
 router.include_router(reports_router, prefix="/api/v1")
+router.include_router(sync_router, prefix="/api/v1")
 
 
 @router.get("/s/{token}", response_class=HTMLResponse, tags=["Public Share"])

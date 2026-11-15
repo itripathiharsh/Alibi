@@ -12,4 +12,3 @@ __all__ = [
     "render_html_viewer",
     "ReportShareService",
 ]
-
