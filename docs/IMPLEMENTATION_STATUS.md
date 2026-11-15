@@ -1,6 +1,6 @@
 # Implementation Status
 
-_Last updated: 2026-11-15 by agent (M0 Task 2 complete)_
+_Last updated: 2026-11-15 by agent (M0 Task 2 & Task 3 complete)_
 
 ## Current milestone
 **M0 — Environment & architecture** · state: **In progress** · entry criteria: ✅ planning pack present, environment verified, Docker verified

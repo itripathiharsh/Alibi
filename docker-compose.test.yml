@@ -1,0 +1,19 @@
+services:
+  postgres-test:
+    image: pgvector/pgvector:pg16
+    container_name: alibi-postgres-test
+    environment:
+      POSTGRES_USER: ${POSTGRES_TEST_USER:-alibi_test}
+      POSTGRES_PASSWORD: ${POSTGRES_TEST_PASSWORD:-change-me-test}
+      POSTGRES_DB: ${POSTGRES_TEST_DB:-alibi_test}
+    ports:
+      - "${POSTGRES_TEST_PORT:-5434}:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_TEST_USER:-alibi_test} -d ${POSTGRES_TEST_DB:-alibi_test}"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+      start_period: 3s
+
