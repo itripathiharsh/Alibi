@@ -90,4 +90,3 @@ async def test_notifications_lifecycle_and_quiet_hours(auth_client: httpx.AsyncC
     assert list_res2.status_code == 200
     dismissed_items = list_res2.json()
     assert any(n["id"] == notif_id for n in dismissed_items)
-

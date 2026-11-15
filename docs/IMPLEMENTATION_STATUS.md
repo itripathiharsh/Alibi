@@ -1,9 +1,9 @@
 # Implementation Status
 
-_Last updated: 2026-11-16 by agent (Milestone M8 Complete — All Acceptance Criteria Verified)_
+_Last updated: 2026-11-16 by agent (Milestone M9 Complete — All Acceptance Criteria Verified)_
 
 ## Current milestone
-**M9 — Reports & sharing** · state: **Planning / In progress** · entry criteria: ✅ M8 complete, calendar conflicts, reminders, and quiet hours verified
+**M10 — Offline & sync** · state: **Planning / In progress** · entry criteria: ✅ M9 complete, factual reports, CSV/XLSX exports, and secure public sharing verified
 
 ## Milestones
 | Milestone | State | Started | Completed | Tag | Report |
@@ -18,8 +18,8 @@ _Last updated: 2026-11-16 by agent (Milestone M8 Complete — All Acceptance Cri
 | M6 Scheduling (+ minimal calendar) | Complete | 2026-11-16 | 2026-11-16 | `m6-complete` | [M6 Report](milestones/M6_REPORT.md) |
 | M7 RAG & Knowledge Vault | Complete | 2026-11-16 | 2026-11-16 | `m7-complete` | [M7 Report](milestones/M7_REPORT.md) |
 | M8 Calendar & reminders | Complete | 2026-11-16 | 2026-11-16 | `m8-complete` | [M8 Report](milestones/M8_REPORT.md) |
-| M9 Reports & sharing | In progress | 2026-11-16 | | | |
-| M10 Offline & sync | Not started | | | | |
+| M9 Reports & sharing | Complete | 2026-11-16 | 2026-11-16 | `m9-complete` | [M9 Report](milestones/M9_REPORT.md) |
+| M10 Offline & sync | In progress | 2026-11-16 | | | |
 | M11 Hosted hardening | Not started | | | | |
 | M12 Integration & hardening | Not started | | | | |
 

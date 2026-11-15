@@ -31,4 +31,3 @@ def test_quiet_hours_boundary_conditions() -> None:
     assert is_in_quiet_hours(datetime(2026, 11, 16, 7, 0, tzinfo=tz)) is False
     # 21:59 -> NOT quiet
     assert is_in_quiet_hours(datetime(2026, 11, 16, 21, 59, tzinfo=tz)) is False
-

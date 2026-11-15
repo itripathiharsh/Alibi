@@ -139,6 +139,7 @@ Each new dependency introduced for M0 and beyond is recorded with license and ra
 - **`cryptography`** (Apache-2.0 / BSD-3-Clause): Authenticated Fernet (AES-128-CBC + HMAC) encryption for provider keys in DB.
 - **`expo-secure-store`** (MIT): Android Keystore-backed secure storage for access and refresh tokens on mobile (doc 12 §2). AsyncStorage lacks OS-level hardware-backed encryption.
 - **`pgvector`** (PostgreSQL / Apache-2.0): Type-safe asyncpg and SQLAlchemy Vector(384) mapping for vector similarity search in PostgreSQL 16.
+- **`openpyxl`** (MIT): Reading and writing Excel .xlsx files with typed cells and frozen headers for tabular report exports (doc 10 §5.3). Python stdlib only supports CSV.
 - **`python-dateutil`** (Apache-2.0 / BSD-3-Clause): RFC 5545 RRULE recurrence parsing and evaluation per FR-TASK-018 and doc 04 §4.4; Python stdlib lacks iCalendar recurrence expansion.
 - **`dateparser`** (BSD-3-Clause): Multi-locale deterministic natural language date parsing with Indian DMY date preference per FR-TASK-003 and doc 06 §7; stdlib `strptime` requires exact static format strings.
 - **`python-multipart`** (Apache-2.0): Required by FastAPI / Starlette for parsing RFC 7578 multipart/form-data evidence file uploads per doc 04 §4.6.
