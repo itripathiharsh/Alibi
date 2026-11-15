@@ -1200,6 +1200,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/scheduling/proposals/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Schedule Proposal
+         * @description Generate intelligent schedule proposal respecting hard constraints.
+         */
+        post: operations["generate_schedule_proposal_api_v1_scheduling_proposals_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scheduling/proposals/{recommendation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Schedule Proposal
+         * @description Get schedule recommendation by ID.
+         */
+        get: operations["get_schedule_proposal_api_v1_scheduling_proposals__recommendation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scheduling/proposals/{recommendation_id}/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide Schedule Proposal
+         * @description Apply, partially apply, or reject schedule proposal (AC-SCH-4 stale check).
+         */
+        post: operations["decide_schedule_proposal_api_v1_scheduling_proposals__recommendation_id__decide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scheduling/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Calendar Events
+         * @description List calendar events and scheduled work blocks.
+         */
+        get: operations["list_calendar_events_api_v1_scheduling_events_get"];
+        put?: never;
+        /**
+         * Create Calendar Event
+         * @description Create a fixed calendar event (e.g. meeting, class, appointment).
+         */
+        post: operations["create_calendar_event_api_v1_scheduling_events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -1385,6 +1469,61 @@ export interface components {
         Body_voice_capture_endpoint_api_v1_voice_capture_post: {
             /** File */
             file: string;
+        };
+        /** CalendarEventCreate */
+        CalendarEventCreate: {
+            /** Title */
+            title: string;
+            /**
+             * Kind
+             * @default fixed_event
+             */
+            kind: string;
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+            /**
+             * Is All Day
+             * @default false
+             */
+            is_all_day: boolean;
+            /** Task Id */
+            task_id?: string | null;
+        };
+        /** CalendarEventRead */
+        CalendarEventRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Kind */
+            kind: string;
+            /** Source */
+            source: string;
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+            /** Is All Day */
+            is_all_day: boolean;
+            /** Task Id */
+            task_id?: string | null;
         };
         /** CategoryCreate */
         CategoryCreate: {
@@ -1839,6 +1978,26 @@ export interface components {
             /** Status */
             status?: string | null;
         };
+        /** ProposalDecisionRequest */
+        ProposalDecisionRequest: {
+            /** Action */
+            action: string;
+            /** Accepted Indices */
+            accepted_indices?: number[] | null;
+        };
+        /** ProposalGenerateRequest */
+        ProposalGenerateRequest: {
+            /**
+             * Scope
+             * @default day
+             */
+            scope: string;
+            /**
+             * Horizon Days
+             * @default 1
+             */
+            horizon_days: number;
+        };
         /** RefreshRequest */
         RefreshRequest: {
             /** Refresh Token */
@@ -1850,6 +2009,48 @@ export interface components {
             status: string;
             /** Message */
             message: string;
+        };
+        /** ScheduleRecommendationRead */
+        ScheduleRecommendationRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Scope */
+            scope: string;
+            /**
+             * Horizon Start
+             * Format: date-time
+             */
+            horizon_start: string;
+            /**
+             * Horizon End
+             * Format: date-time
+             */
+            horizon_end: string;
+            /** Status */
+            status: string;
+            /** Proposals */
+            proposals: {
+                [key: string]: unknown;
+            }[];
+            /** Displacements */
+            displacements: {
+                [key: string]: unknown;
+            }[];
+            /** Unscheduled */
+            unscheduled: {
+                [key: string]: unknown;
+            }[];
+            /** Solver Status */
+            solver_status: string;
+            /** Solve Ms */
+            solve_ms: number;
+            /** Input Hash */
+            input_hash: string;
+            /** Explanation Text */
+            explanation_text?: string | null;
         };
         /** ScoreFormulaResponse */
         ScoreFormulaResponse: {
@@ -4592,6 +4793,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResetLearningResponse"];
+                };
+            };
+        };
+    };
+    generate_schedule_proposal_api_v1_scheduling_proposals_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalGenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleRecommendationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_schedule_proposal_api_v1_scheduling_proposals__recommendation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recommendation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleRecommendationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_schedule_proposal_api_v1_scheduling_proposals__recommendation_id__decide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recommendation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleRecommendationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_calendar_events_api_v1_scheduling_events_get: {
+        parameters: {
+            query?: {
+                start_at?: string | null;
+                end_at?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_calendar_event_api_v1_scheduling_events_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarEventCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -30,3 +30,4 @@ def assert_clean_insight(text: str) -> None:
         match = p.search(text)
         if match:
             raise ValueError(f"Banned vocabulary '{match.group(0)}' detected in insight text.")
+

@@ -67,3 +67,4 @@ SELECT
 FROM completion_component c
 CROSS JOIN on_time_component o
 CROSS JOIN accuracy_component a;
+

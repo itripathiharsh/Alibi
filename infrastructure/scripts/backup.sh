@@ -9,3 +9,4 @@ mkdir -p "$(dirname "$OUTPUT_FILE")"
 echo "Creating PostgreSQL backup for $DB_NAME..."
 pg_dump -U "$DB_USER" -d "$DB_NAME" -F c -f "$OUTPUT_FILE"
 echo "Backup complete: $OUTPUT_FILE"
+

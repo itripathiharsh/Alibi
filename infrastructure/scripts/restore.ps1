@@ -44,3 +44,4 @@ if ($LASTEXITCODE -gt 1) {
 
 Write-Host "Database restore completed successfully." -ForegroundColor Green
 exit 0
+

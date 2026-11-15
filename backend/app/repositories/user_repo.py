@@ -43,3 +43,4 @@ class UserRepository:
         """Update an existing user account."""
         await self.session.flush()
         return user
+

@@ -18,3 +18,4 @@ WHERE te.user_id = :user_id
   AND COALESCE(te.ended_at, :now_ts) > :start_ts
 GROUP BY c.id, c.name, c.color
 ORDER BY total_min DESC;
+

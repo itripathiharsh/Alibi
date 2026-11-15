@@ -13,3 +13,4 @@ WHERE user_id = :user_id
   AND completed_at < :end_ts
 GROUP BY DATE(completed_at AT TIME ZONE :tz)
 ORDER BY date ASC;
+

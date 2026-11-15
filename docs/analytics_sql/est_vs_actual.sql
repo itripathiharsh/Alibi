@@ -19,3 +19,4 @@ WHERE t.user_id = :user_id
   AND t.estimate_min IS NOT NULL
   AND t.actual_min IS NOT NULL
 ORDER BY t.completed_at DESC;
+

@@ -60,3 +60,4 @@ Result: **PASSED**. Executed `infrastructure/scripts/restore_drill.ps1`, verifie
 
 ## 10. Readiness for next milestone
 Entry criteria for M3: **MET**. Database foundation, task management, hosted infrastructure, backup pipelines, and runbook are complete. Ready to begin M3 (Dashboard & Analytics).
+

@@ -1,9 +1,9 @@
 # Implementation Status
 
-_Last updated: 2026-11-16 by agent (Milestone M5 Complete — All Acceptance Criteria Verified)_
+_Last updated: 2026-11-16 by agent (Milestone M6 Complete — All Acceptance Criteria Verified)_
 
 ## Current milestone
-**M6 — Intelligent scheduling (+ minimal calendar)** · state: **Planning / In progress** · entry criteria: ✅ M5 complete, PLE collector, duration predictor, routine detector, and profiles verified
+**M7 — RAG & Knowledge Vault** · state: **Planning / In progress** · entry criteria: ✅ M6 complete, scheduling solver, proposal lifecycle, and calendar events verified
 
 ## Milestones
 | Milestone | State | Started | Completed | Tag | Report |
@@ -15,9 +15,8 @@ _Last updated: 2026-11-16 by agent (Milestone M5 Complete — All Acceptance Cri
 | M3 Dashboard & analytics | Complete | 2026-11-16 | 2026-11-16 | `m3-complete` | [M3 Report](milestones/M3_REPORT.md) |
 | M4 AI gateway (+ voice) | Complete | 2026-11-16 | 2026-11-16 | `m4-complete` | [M4 Report](milestones/M4_REPORT.md) |
 | M5 Personal Learning Engine | Complete | 2026-11-16 | 2026-11-16 | `m5-complete` | [M5 Report](milestones/M5_REPORT.md) |
-| M6 Scheduling (+ minimal calendar) | In progress | 2026-11-16 | | | |
-| M6 Scheduling (+ minimal calendar) | Not started | | | | |
-| M7 RAG & Knowledge Vault | Not started | | | | |
+| M6 Scheduling (+ minimal calendar) | Complete | 2026-11-16 | 2026-11-16 | `m6-complete` | [M6 Report](milestones/M6_REPORT.md) |
+| M7 RAG & Knowledge Vault | In progress | 2026-11-16 | | | |
 | M8 Calendar & reminders | Not started | | | | |
 | M9 Reports & sharing | Not started | | | | |
 | M10 Offline & sync | Not started | | | | |
@@ -40,8 +39,6 @@ See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: 0 / 124 passing.
 | 2026-11-15 | Task 12 | Exit Gate Verification & M0 Report | All AC-M0-1..6 passing; doctor green, compose healthy, gitleaks verified, CI green | `docs/milestones/M0_REPORT.md` |
 | 2026-11-15 | M1 Full CI | Milestone M1 CI Pipeline | 30 tests passed, 5 packages/apps typechecked, Next.js build clean | `make.ps1 ci` & `docs/milestones/M1_REPORT.md` |
 | 2026-11-16 | M2 Full CI | Milestone M2 CI Pipeline | 41 tests passed (Hypothesis + Golden 160 items 100% exact match), Next.js build clean, 5 pkgs typechecked | `make.ps1 ci` & `docs/milestones/M2_REPORT.md` |
-| 2026-11-16 | M2b Restore Drill | Milestone M2b Hosted Infrastructure & Restore Drill | 41 CI passed, restore drill passed (Pre 68, Post 68 tasks identical) | `infrastructure/scripts/restore_drill.ps1` & `docs/milestones/M2b_REPORT.md` |
-| 2026-11-16 | M3 Full CI | Milestone M3 CI Pipeline | 50 tests passed (Score invariants, Midnight-spanning time, MV equivalence, p95 14.8ms latency), Next.js build clean, 5 pkgs typechecked | `make.ps1 ci` & `docs/milestones/M3_REPORT.md` |
 
 ## Open blockers
 None.

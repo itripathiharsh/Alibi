@@ -101,3 +101,4 @@ The drill validates that:
 1. Generate new 32-byte hex key: `openssl rand -hex 32`.
 2. Update `ALIBI_SECRET_KEY` in Render environment settings.
 3. *Note*: Users will be required to re-authenticate on their devices as existing JWT signatures will be invalidated.
+

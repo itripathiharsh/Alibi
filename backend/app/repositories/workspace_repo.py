@@ -29,3 +29,4 @@ class WorkspaceRepository:
         self.session.add(workspace)
         await self.session.flush()
         return workspace
+

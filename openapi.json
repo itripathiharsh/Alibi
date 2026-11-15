@@ -3712,6 +3712,283 @@
         ]
       }
     },
+    "/api/v1/scheduling/proposals/generate": {
+      "post": {
+        "tags": [
+          "Scheduling"
+        ],
+        "summary": "Generate Schedule Proposal",
+        "description": "Generate intelligent schedule proposal respecting hard constraints.",
+        "operationId": "generate_schedule_proposal_api_v1_scheduling_proposals_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalGenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleRecommendationRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/scheduling/proposals/{recommendation_id}": {
+      "get": {
+        "tags": [
+          "Scheduling"
+        ],
+        "summary": "Get Schedule Proposal",
+        "description": "Get schedule recommendation by ID.",
+        "operationId": "get_schedule_proposal_api_v1_scheduling_proposals__recommendation_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recommendation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Recommendation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleRecommendationRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scheduling/proposals/{recommendation_id}/decide": {
+      "post": {
+        "tags": [
+          "Scheduling"
+        ],
+        "summary": "Decide Schedule Proposal",
+        "description": "Apply, partially apply, or reject schedule proposal (AC-SCH-4 stale check).",
+        "operationId": "decide_schedule_proposal_api_v1_scheduling_proposals__recommendation_id__decide_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recommendation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Recommendation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleRecommendationRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scheduling/events": {
+      "get": {
+        "tags": [
+          "Scheduling"
+        ],
+        "summary": "List Calendar Events",
+        "description": "List calendar events and scheduled work blocks.",
+        "operationId": "list_calendar_events_api_v1_scheduling_events_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "start_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start At"
+            }
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End At"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalendarEventRead"
+                  },
+                  "title": "Response List Calendar Events Api V1 Scheduling Events Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Scheduling"
+        ],
+        "summary": "Create Calendar Event",
+        "description": "Create a fixed calendar event (e.g. meeting, class, appointment).",
+        "operationId": "create_calendar_event_api_v1_scheduling_events_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarEventCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarEventRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health/live": {
       "get": {
         "tags": [
@@ -4137,6 +4414,112 @@
           "file"
         ],
         "title": "Body_voice_capture_endpoint_api_v1_voice_capture_post"
+      },
+      "CalendarEventCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "kind": {
+            "type": "string",
+            "pattern": "^(fixed_event|work_block|deadline_marker|actual_time)$",
+            "title": "Kind",
+            "default": "fixed_event"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "is_all_day": {
+            "type": "boolean",
+            "title": "Is All Day",
+            "default": false
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "start_at",
+          "end_at"
+        ],
+        "title": "CalendarEventCreate"
+      },
+      "CalendarEventRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "is_all_day": {
+            "type": "boolean",
+            "title": "Is All Day"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "kind",
+          "source",
+          "start_at",
+          "end_at",
+          "is_all_day"
+        ],
+        "title": "CalendarEventRead"
       },
       "CategoryCreate": {
         "properties": {
@@ -5297,6 +5680,53 @@
         "type": "object",
         "title": "ProjectUpdateRequest"
       },
+      "ProposalDecisionRequest": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "pattern": "^(accept|partially_accept|reject)$",
+            "title": "Action"
+          },
+          "accepted_indices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted Indices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "ProposalDecisionRequest"
+      },
+      "ProposalGenerateRequest": {
+        "properties": {
+          "scope": {
+            "type": "string",
+            "pattern": "^(task|day|horizon)$",
+            "title": "Scope",
+            "default": "day"
+          },
+          "horizon_days": {
+            "type": "integer",
+            "maximum": 14.0,
+            "minimum": 1.0,
+            "title": "Horizon Days",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "title": "ProposalGenerateRequest"
+      },
       "RefreshRequest": {
         "properties": {
           "refresh_token": {
@@ -5331,6 +5761,95 @@
           "message"
         ],
         "title": "ResetLearningResponse"
+      },
+      "ScheduleRecommendationRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "horizon_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Horizon Start"
+          },
+          "horizon_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Horizon End"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "proposals": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Proposals"
+          },
+          "displacements": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Displacements"
+          },
+          "unscheduled": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Unscheduled"
+          },
+          "solver_status": {
+            "type": "string",
+            "title": "Solver Status"
+          },
+          "solve_ms": {
+            "type": "integer",
+            "title": "Solve Ms"
+          },
+          "input_hash": {
+            "type": "string",
+            "title": "Input Hash"
+          },
+          "explanation_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "scope",
+          "horizon_start",
+          "horizon_end",
+          "status",
+          "proposals",
+          "displacements",
+          "unscheduled",
+          "solver_status",
+          "solve_ms",
+          "input_hash"
+        ],
+        "title": "ScheduleRecommendationRead"
       },
       "ScoreFormulaResponse": {
         "properties": {

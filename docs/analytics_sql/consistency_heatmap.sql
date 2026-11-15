@@ -31,3 +31,4 @@ SELECT
 FROM daily_completions c
 FULL OUTER JOIN daily_time t ON c.activity_date = t.activity_date
 ORDER BY date ASC;
+

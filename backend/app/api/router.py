@@ -10,6 +10,7 @@ from app.api.v1.categories import router as categories_router
 from app.api.v1.evidence import router as evidence_router
 from app.api.v1.learning import router as learning_router
 from app.api.v1.projects import router as projects_router
+from app.api.v1.scheduling import router as scheduling_router
 from app.api.v1.tags import router as tags_router
 from app.api.v1.tasks import router as tasks_router
 from app.api.v1.time_entries import router as time_entries_router
@@ -31,6 +32,7 @@ router.include_router(analytics_router, prefix="/api/v1")
 router.include_router(ai_router, prefix="/api/v1")
 router.include_router(voice_router, prefix="/api/v1")
 router.include_router(learning_router, prefix="/api/v1")
+router.include_router(scheduling_router, prefix="/api/v1")
 
 
 class HealthLiveResponse(BaseModel):

@@ -30,3 +30,4 @@ services:
         value: "true"
       - key: AI_EXTERNAL_ENABLED
         value: "false"
+

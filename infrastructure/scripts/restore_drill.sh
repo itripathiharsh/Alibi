@@ -42,3 +42,4 @@ fi
 docker exec "$CONTAINER" psql -U "$DB_USER" -d postgres -c "DROP DATABASE IF EXISTS $DRILL_DB;" > /dev/null
 echo "=== Restore Drill PASSED (AC-M2b-4 Verified) ==="
 exit 0
+

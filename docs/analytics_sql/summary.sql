@@ -54,3 +54,4 @@ SELECT
     (SELECT COUNT(*) FROM completed_in_period) AS completed_count,
     (SELECT COUNT(*) FROM open_at_period_end) AS pending_count,
     (SELECT COUNT(*) FROM open_at_period_end WHERE deadline_at IS NOT NULL AND deadline_at < LEAST(:now_ts, :end_ts)) AS overdue_count;
+

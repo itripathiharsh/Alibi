@@ -250,3 +250,4 @@ def downgrade() -> None:
     op.drop_table("learned_patterns")
     op.execute("DROP TRIGGER IF EXISTS trg_behavior_observations_append_only ON behavior_observations;")
     op.drop_table("behavior_observations")
+

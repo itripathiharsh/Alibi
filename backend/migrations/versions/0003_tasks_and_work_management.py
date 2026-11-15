@@ -413,3 +413,4 @@ def downgrade() -> None:
     op.execute("DROP TRIGGER IF EXISTS trg_projects_sync_bump ON projects;")
     op.execute("DROP TRIGGER IF EXISTS trg_projects_sync_init ON projects;")
     op.drop_table("projects")
+

@@ -47,3 +47,4 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Backup successfully created: $OutputFile" -ForegroundColor Green
 exit 0
+

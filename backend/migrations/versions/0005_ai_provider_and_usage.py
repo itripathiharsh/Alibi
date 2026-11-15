@@ -108,3 +108,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("ai_usage_logs")
     op.drop_table("ai_provider_settings")
+

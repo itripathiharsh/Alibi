@@ -13,3 +13,4 @@ fi
 echo "Restoring PostgreSQL database $DB_NAME from $INPUT_FILE..."
 pg_restore -U "$DB_USER" -d "$DB_NAME" --clean --if-exists --no-owner --no-privileges "$INPUT_FILE" || true
 echo "Restore complete."
+

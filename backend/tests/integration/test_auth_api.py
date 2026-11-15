@@ -167,3 +167,4 @@ async def test_auth_full_lifecycle(client: AsyncClient, db_session: AsyncSession
         },
     )
     assert new_login.status_code == 200
+

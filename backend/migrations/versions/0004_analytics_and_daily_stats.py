@@ -88,3 +88,4 @@ def downgrade() -> None:
     op.drop_index("ix_time_entries_user_started_ended", table_name="time_entries")
     op.drop_index("ix_tasks_user_deadline", table_name="tasks")
     op.drop_index("ix_tasks_user_status_completed", table_name="tasks")
+

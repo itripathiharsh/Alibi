@@ -105,3 +105,4 @@ def downgrade() -> None:
     op.execute("DROP TRIGGER IF EXISTS trg_workspaces_sync_bump ON workspaces;")
     op.execute("DROP TRIGGER IF EXISTS trg_workspaces_sync_init ON workspaces;")
     op.drop_table("workspaces")
+

@@ -133,3 +133,4 @@ export async function logoutMobile(): Promise<void> {
 
   await clearAuthData();
 }
+
