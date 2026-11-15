@@ -1,0 +1,2 @@
+# Gitleaks ignore file for verified test fixtures
+b596a1552a0a57f9a2382753555176134cb2a523:backend/tests/unit/test_redaction.py:generic-api-key:13
