@@ -18,7 +18,67 @@ services:
       retries: 10
       start_period: 5s
 
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/backend.Dockerfile
+    container_name: alibi-api
+    restart: unless-stopped
+    environment:
+      ALIBI_MODE: local
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-alibi}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-alibi}
+      PORT: 8000
+      HOST: 0.0.0.0
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')\""]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/backend.Dockerfile
+    container_name: alibi-worker
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    environment:
+      ALIBI_MODE: local
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-alibi}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-alibi}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/web.Dockerfile
+    container_name: alibi-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1))\""]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
 volumes:
   postgres_data:
     name: alibi-postgres-data
-

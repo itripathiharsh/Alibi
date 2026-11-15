@@ -1,6 +1,6 @@
 # Implementation Status
 
-_Last updated: 2026-11-15 by agent (M0 Tasks 2 through 9 complete)_
+_Last updated: 2026-11-15 by agent (M0 Tasks 2 through 10 complete)_
 
 ## Current milestone
 **M0 — Environment & architecture** · state: **In progress** · entry criteria: ✅ planning pack present, environment verified, Docker verified
@@ -34,6 +34,7 @@ See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: 0 / 124 passing.
 | 2026-11-15 | Task 6 & 7 | Full CI Pipeline (Backend + Client) | 17 passed, 3 packages typechecked | `make.ps1 ci` (ruff, mypy, import-linter, openapi-staleness, pytest, tsc) |
 | 2026-11-15 | Task 8 | Next.js Dashboard Build | 8 static pages generated, TS strict clean | `pnpm --filter @alibi/web build` |
 | 2026-11-15 | Task 9 | Mobile Shell Typecheck & Android Export | 2564 modules bundled, Android JS bundle 3MB exported, 0 errors | `pnpm --filter @alibi/mobile typecheck` && `expo export` |
+| 2026-11-15 | Task 10 | Docker Compose 4-Service Stack | All 4 services healthy (api, worker, web, postgres); idle RSS api=56.6MB, worker=54.7MB, web=36.4MB | `docker compose up -d` && `docker stats --no-stream` |
 
 ## Open blockers
 None.
