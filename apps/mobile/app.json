@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "ALIBI",
+    "slug": "alibi",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "alibi",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#090D16"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.alibi.app"
+    },
+    "android": {
+      "package": "com.alibi.app",
+      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"]
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

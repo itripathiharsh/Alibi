@@ -14,7 +14,11 @@ node_modules/
 .expo/
 dist/
 build/
+.gradle/
+*.apk
 android/app/build/
+apps/mobile/android/app/build/
+apps/mobile/android/.gradle/
 coverage/
 *.tsbuildinfo
 *.log

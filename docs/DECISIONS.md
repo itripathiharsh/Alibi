@@ -124,3 +124,6 @@ Each new dependency introduced for M0 and beyond is recorded with license and ra
 - **`uuid6`** (MIT): RFC 9562 UUIDv7 generation for Python 3.12 (standard library `uuid` lacks v7 until 3.14).
 - **`tzdata`** (Apache-2.0): IANA time zone database provider required by Python standard library `zoneinfo` on Windows hosts.
 - **`pytest-asyncio`** (Apache-2.0): Asynchronous test runner support for FastAPI and asyncpg/SQLAlchemy async sessions.
+- **`query-string`** (MIT): URL query parameter parser required by `expo-router` deep link path navigation.
+- **`@react-native/assets-registry`** (MIT): React Native runtime asset table registry required by Metro bundler.
+- **`invariant`** (MIT): Assertion utility required by React Native AssetSourceResolver for Metro bundle compilation.
