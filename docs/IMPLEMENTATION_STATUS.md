@@ -1,14 +1,14 @@
 # Implementation Status
 
-_Last updated: 2026-11-15 by agent (M0 Tasks 2 through 11 complete)_
+_Last updated: 2026-11-15 by agent (M0 Complete — Pending Owner Approval for Tag)_
 
 ## Current milestone
-**M0 — Environment & architecture** · state: **In progress** · entry criteria: ✅ planning pack present, environment verified, Docker verified
+**M0 — Environment & architecture** · state: **Complete (Pending tag)** · entry criteria: ✅ planning pack present, environment verified, Docker verified
 
 ## Milestones
 | Milestone | State | Started | Completed | Tag | Report |
 |-----------|-------|---------|-----------|-----|--------|
-| M0 Environment & architecture | In progress | 2026-11-13 | | | |
+| M0 Environment & architecture | Complete (Pending tag) | 2026-11-13 | 2026-11-15 | (pending m0-complete) | [M0 Report](milestones/M0_REPORT.md) |
 | M1 Database & authentication | Not started | | | | |
 | M2 Task management (+ mobile shell) | Not started | | | | |
 | M2b Early hosted deployment (ADR-018/020) | Not started | | | | |
@@ -36,6 +36,7 @@ See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: 0 / 124 passing.
 | 2026-11-15 | Task 9 | Mobile Shell Typecheck & Android Export | 2564 modules bundled, Android JS bundle 3MB exported, 0 errors | `pnpm --filter @alibi/mobile typecheck` && `expo export` |
 | 2026-11-15 | Task 10 | Docker Compose 4-Service Stack | All 4 services healthy (api, worker, web, postgres); idle RSS api=56.6MB, worker=54.7MB, web=36.4MB | `docker compose up -d` && `docker stats --no-stream` |
 | 2026-11-15 | Task 11 | GitHub Actions & Pre-commit Workflows | Path-filtered CI (backend, frontend, mobile, security) + pre-commit hooks configured | YAML schema validation & gitleaks integration |
+| 2026-11-15 | Task 12 | Exit Gate Verification & M0 Report | All AC-M0-1..6 passing; doctor green, compose healthy, gitleaks verified, CI green | `docs/milestones/M0_REPORT.md` |
 
 ## Open blockers
 None.

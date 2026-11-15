@@ -5,7 +5,8 @@ IDs: `KI-###` for defects/limitations, `RISK-###` for planning risks. Every S1/S
 ## Open defects
 | ID | Severity | Area | Summary | Found in | Workaround | Owner | Status |
 |----|----------|------|---------|----------|-----------|-------|--------|
-| — | | | none yet | | | | |
+| KI-001 | S3 (Minor) | Tooling (Windows) | Windows Application Control (os error 4551) blocks unsigned `.venv/Scripts/*.exe` wrappers | M0 | Invoke tools via `python -m <module>` (handled automatically in `make.ps1`) | Agent | Mitigated |
+| KI-002 | S3 (Minor) | Build (Web) | Next.js standalone build attempts NTFS symlinks requiring elevated developer mode on Windows | M0 | Guarded with `BUILD_STANDALONE=true` so Windows local dev exports cleanly while Docker builds standalone | Agent | Mitigated |
 
 ## Risk register (planning)
 | ID | Risk | Likelihood | Impact | Mitigation | Trigger to re-evaluate |
