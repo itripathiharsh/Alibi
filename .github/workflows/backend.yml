@@ -1,0 +1,82 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "infrastructure/**"
+      - "Makefile"
+      - "make.ps1"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "infrastructure/**"
+      - "Makefile"
+      - "make.ps1"
+      - ".github/workflows/backend.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint, Typecheck & Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: alibi_test
+          POSTGRES_PASSWORD: change-me-test
+          POSTGRES_DB: alibi_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U alibi_test -d alibi_test"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --all-groups
+
+      - name: Lint with Ruff
+        working-directory: backend
+        run: uv run ruff check app tests
+
+      - name: Format check with Ruff
+        working-directory: backend
+        run: uv run ruff format --check app tests
+
+      - name: Type check with Mypy
+        working-directory: backend
+        run: uv run mypy --strict app
+
+      - name: Architecture contracts check with import-linter
+        working-directory: backend
+        run: uv run lint-imports
+
+      - name: Run Pytest suite
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://alibi_test:change-me-test@localhost:5434/alibi_test
+          ALIBI_MODE: local
+        run: uv run pytest -v
