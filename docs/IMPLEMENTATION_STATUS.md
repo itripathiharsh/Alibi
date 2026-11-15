@@ -1,6 +1,6 @@
 # Implementation Status
 
-_Last updated: 2026-11-15 by agent (M0 Tasks 2, 3, 4 & 5 complete)_
+_Last updated: 2026-11-15 by agent (M0 Tasks 2 through 7 complete)_
 
 ## Current milestone
 **M0 — Environment & architecture** · state: **In progress** · entry criteria: ✅ planning pack present, environment verified, Docker verified
@@ -31,7 +31,7 @@ See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: 0 / 124 passing.
 ## Latest test evidence
 | Date | Commit | Suite | Result | Link |
 |------|--------|-------|--------|------|
-| 2026-11-15 | Task 5 | Backend Unit & Integration Tests | 14 passed | `make.ps1 ci` (ruff, mypy, import-linter, pytest) |
+| 2026-11-15 | Task 6 & 7 | Full CI Pipeline (Backend + Client) | 17 passed, 3 packages typechecked | `make.ps1 ci` (ruff, mypy, import-linter, openapi-staleness, pytest, tsc) |
 
 ## Open blockers
 None.
