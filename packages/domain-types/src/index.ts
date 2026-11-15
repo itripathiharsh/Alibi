@@ -83,3 +83,4 @@ export interface ProductivityScore {
   period_start: string;
   period_end: string;
 }
+

@@ -1,0 +1,20 @@
+[importlinter]
+root_package = app
+
+[importlinter:contract:1]
+name = Core independence
+type = forbidden
+source_modules =
+    app.core
+forbidden_modules =
+    app.database
+    app.api
+
+[importlinter:contract:2]
+name = Database independence
+type = forbidden
+source_modules =
+    app.database
+forbidden_modules =
+    app.api
+

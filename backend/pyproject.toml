@@ -18,6 +18,7 @@ dependencies = [
     "asyncpg>=0.30.0",
     "alembic>=1.14.0",
     "psutil>=6.1.0",
+    "tzdata>=2024.2",
 ]
 
 [dependency-groups]
@@ -53,6 +54,7 @@ select = [
 ignore = ["E501"]
 
 [tool.mypy]
+plugins = ["pydantic.mypy"]
 python_version = "3.12"
 strict = true
 warn_return_any = true
@@ -69,6 +71,7 @@ minversion = "8.0"
 addopts = "-ra -q --strict-markers"
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 pythonpath = ["."]
 
 [tool.importlinter]

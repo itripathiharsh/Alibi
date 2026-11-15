@@ -122,4 +122,5 @@ Each new dependency introduced for M0 and beyond is recorded with license and ra
 - **`vitest`** (MIT) / **`jest`** (MIT): Unit test frameworks for TypeScript packages/web and React Native mobile.
 - **`uuidv7`** (MIT): Generates RFC 9562 UUIDv7 identifiers in TypeScript for client-side offline entity creation.
 - **`uuid6`** (MIT): RFC 9562 UUIDv7 generation for Python 3.12 (standard library `uuid` lacks v7 until 3.14).
+- **`tzdata`** (Apache-2.0): IANA time zone database provider required by Python standard library `zoneinfo` on Windows hosts.
 - **`pytest-asyncio`** (Apache-2.0): Asynchronous test runner support for FastAPI and asyncpg/SQLAlchemy async sessions.

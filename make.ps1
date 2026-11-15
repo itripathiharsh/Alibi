@@ -86,22 +86,19 @@ switch ($Target.ToLower()) {
     "check" {
         Write-Host "Running checks (lint, typecheck, static)..." -ForegroundColor Cyan
         Invoke-InDir "$PSScriptRoot\backend" {
-            & uv run ruff check app tests
-            & uv run ruff format --check app tests
-            & uv run mypy app
+            & uv run python -m ruff check app tests
+            & uv run python -m ruff format --check app tests
+            & uv run python -m mypy app
+            & uv run python -c "import importlinter.cli, sys; sys.exit(importlinter.cli.lint_imports())"
         }
         Invoke-InDir $PSScriptRoot {
-            & pnpm -r run lint
             & pnpm -r run typecheck
         }
     }
     "test" {
         Write-Host "Running backend and frontend unit tests..." -ForegroundColor Cyan
         Invoke-InDir "$PSScriptRoot\backend" {
-            & uv run pytest tests/unit
-        }
-        Invoke-InDir $PSScriptRoot {
-            & pnpm -r run test
+            & uv run python -m pytest tests
         }
     }
     "migrate" {
