@@ -1,6 +1,6 @@
 # Implementation Status
 
-_Last updated: 2026-11-15 by agent (M0 Tasks 2 through 7 complete)_
+_Last updated: 2026-11-15 by agent (M0 Tasks 2 through 8 complete)_
 
 ## Current milestone
 **M0 — Environment & architecture** · state: **In progress** · entry criteria: ✅ planning pack present, environment verified, Docker verified
@@ -32,6 +32,7 @@ See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: 0 / 124 passing.
 | Date | Commit | Suite | Result | Link |
 |------|--------|-------|--------|------|
 | 2026-11-15 | Task 6 & 7 | Full CI Pipeline (Backend + Client) | 17 passed, 3 packages typechecked | `make.ps1 ci` (ruff, mypy, import-linter, openapi-staleness, pytest, tsc) |
+| 2026-11-15 | Task 8 | Next.js Dashboard Build | 8 static pages generated, TS strict clean | `pnpm --filter @alibi/web build` |
 
 ## Open blockers
 None.

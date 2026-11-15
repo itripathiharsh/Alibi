@@ -16,6 +16,7 @@ dist/
 build/
 android/app/build/
 coverage/
+*.tsbuildinfo
 *.log
 *.gguf
 models/
