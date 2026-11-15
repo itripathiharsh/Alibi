@@ -5,6 +5,11 @@ import uuid
 import uuid6
 
 
+def generate_uuid7() -> uuid.UUID:
+    """Generate a time-ordered UUIDv7 as a UUID object."""
+    return uuid6.uuid7()
+
+
 def generate_uuidv7() -> str:
     """Generate a time-ordered UUIDv7 as a string."""
     return str(uuid6.uuid7())

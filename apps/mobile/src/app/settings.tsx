@@ -9,9 +9,10 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Server, Wifi, Check, AlertCircle, ArrowLeft } from "lucide-react-native";
+import { AlertCircle, ArrowLeft, Check, LogOut, Server, Wifi } from "lucide-react-native";
 import theme from "../lib/theme";
 import { getServerUrl, setServerUrl, pingServer, type ServerMeta } from "../lib/config";
+import { logoutMobile } from "../lib/auth";
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -155,9 +156,31 @@ export default function SettingsScreen() {
       <View style={styles.appInfoCard}>
         <Text style={styles.appInfoTitle}>ALIBI Mobile Client</Text>
         <Text style={styles.appInfoSubtitle}>
-          Milestone M0 Environment & Architecture · Expo SDK 58 (ADR-021)
+          Milestone M1 Database & Authentication · Expo SDK 58 (ADR-021)
         </Text>
       </View>
+
+      {/* Account / Sign Out */}
+      <Pressable
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          paddingVertical: 12,
+          backgroundColor: "#1F2937",
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: "#374151",
+        }}
+        onPress={async () => {
+          await logoutMobile();
+          router.replace("/login");
+        }}
+      >
+        <LogOut size={16} color="#F87171" />
+        <Text style={{ color: "#F87171", fontSize: 13, fontWeight: "600" }}>Sign Out</Text>
+      </Pressable>
 
       {/* Back Button */}
       <Pressable style={styles.backBtn} onPress={() => router.back()}>
@@ -351,3 +374,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+

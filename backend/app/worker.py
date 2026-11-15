@@ -8,9 +8,11 @@ from types import FrameType
 
 from app.core.config import settings
 from app.core.logging import logger, setup_logging
-from app.database.session import ping_database
+from app.database.session import AsyncSessionLocal, ping_database
+from app.services.job_service import JobService
 
 _shutdown_event = asyncio.Event()
+_worker_id = f"worker-{settings.alibi_mode}-{asyncio.get_event_loop_policy().__class__.__name__}"
 
 
 def _signal_handler(sig: int, _frame: FrameType | None) -> None:
@@ -21,9 +23,23 @@ def _signal_handler(sig: int, _frame: FrameType | None) -> None:
 
 
 async def worker_job_cycle() -> None:
-    """Single execution cycle of background worker."""
+    """Single execution cycle of background worker, draining pending jobs."""
     is_ready = await ping_database()
-    logger.info("Worker heartbeat", db_connected=is_ready, mode=settings.alibi_mode)
+    if not is_ready:
+        logger.warning("Database not ready; skipping job cycle")
+        return
+
+    logger.debug("Worker checking for queued jobs", worker_id=_worker_id)
+    try:
+        async with AsyncSessionLocal() as session:
+            job_service = JobService(session)
+            while not _shutdown_event.is_set():
+                processed = await job_service.process_one(_worker_id)
+                if not processed:
+                    break
+                await session.commit()
+    except Exception as exc:
+        logger.error("Error during worker job cycle", error=str(exc))
 
 
 async def run_worker() -> None:

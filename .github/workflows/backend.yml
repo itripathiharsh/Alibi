@@ -80,3 +80,4 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://alibi_test:change-me-test@localhost:5434/alibi_test
           ALIBI_MODE: local
         run: uv run pytest -v
+

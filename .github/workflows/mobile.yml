@@ -99,3 +99,4 @@ jobs:
           name: alibi-release-apk
           path: apps/mobile/android/app/build/outputs/apk/release/*.apk
           retention-days: 14
+

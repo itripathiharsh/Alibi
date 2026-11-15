@@ -77,3 +77,4 @@ export async function pingServer(customUrl?: string): Promise<{ success: boolean
     };
   }
 }
+

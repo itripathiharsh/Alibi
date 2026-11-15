@@ -124,3 +124,4 @@ Measured via `docker stats --no-stream` across running Docker Compose containers
 - [x] CI and pre-commit security gates active (`AC-M0-4`).
 
 **Verdict:** **READY FOR MILESTONE M1.** (Pending owner review and approval to tag `m0-complete`).
+

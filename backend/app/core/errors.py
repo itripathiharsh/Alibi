@@ -18,6 +18,7 @@ class ProblemDetails(BaseModel):
     )
     title: str = Field(..., description="Short, human-readable summary of the problem type")
     status: int = Field(..., description="HTTP status code")
+    code: str | None = Field(default=None, description="Application error code")
     detail: str | None = Field(
         default=None, description="Human-readable explanation specific to this occurrence"
     )
@@ -35,24 +36,74 @@ class AppException(Exception):
         title: str,
         status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail: str | None = None,
+        code: str | None = None,
         type_uri: str = "about:blank",
         invalid_params: list[InvalidParam] | None = None,
+        headers: dict[str, str] | None = None,
     ):
         super().__init__(detail or title)
         self.title = title
         self.status_code = status_code
         self.detail = detail
+        self.code = code
         self.type_uri = type_uri
         self.invalid_params = invalid_params
+        self.headers = headers or {}
 
 
 class NotFoundError(AppException):
-    def __init__(self, detail: str = "Resource not found"):
+    def __init__(self, detail: str = "Resource not found", code: str = "not_found"):
         super().__init__(
             title="Not Found",
             status_code=status.HTTP_404_NOT_FOUND,
             detail=detail,
+            code=code,
             type_uri="https://alibi.local/errors/not-found",
+        )
+
+
+class UnauthorizedError(AppException):
+    def __init__(self, detail: str = "Unauthorized", code: str = "unauthorized"):
+        super().__init__(
+            title="Unauthorized",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=detail,
+            code=code,
+            type_uri="https://alibi.local/errors/unauthorized",
+        )
+
+
+class ForbiddenError(AppException):
+    def __init__(self, detail: str = "Forbidden", code: str = "forbidden"):
+        super().__init__(
+            title="Forbidden",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=detail,
+            code=code,
+            type_uri="https://alibi.local/errors/forbidden",
+        )
+
+
+class ConflictError(AppException):
+    def __init__(self, detail: str = "Conflict", code: str = "conflict"):
+        super().__init__(
+            title="Conflict",
+            status_code=status.HTTP_409_CONFLICT,
+            detail=detail,
+            code=code,
+            type_uri="https://alibi.local/errors/conflict",
+        )
+
+
+class RateLimitError(AppException):
+    def __init__(self, detail: str = "Too many requests", retry_after: int = 900):
+        super().__init__(
+            title="Too Many Requests",
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=detail,
+            code="rate_limited",
+            type_uri="https://alibi.local/errors/rate-limited",
+            headers={"Retry-After": str(retry_after)},
         )
 
 
@@ -75,14 +126,18 @@ def register_error_handlers(app: FastAPI) -> None:
             type=exc.type_uri,
             title=exc.title,
             status=exc.status_code,
+            code=exc.code,
             detail=exc.detail,
             instance=request.url.path,
             invalid_params=exc.invalid_params,
         )
+        response_headers = {"Content-Type": "application/problem+json"}
+        if exc.headers:
+            response_headers.update(exc.headers)
         return JSONResponse(
             status_code=exc.status_code,
             content=problem.model_dump(exclude_none=True),
-            headers={"Content-Type": "application/problem+json"},
+            headers=response_headers,
         )
 
     @app.exception_handler(RequestValidationError)

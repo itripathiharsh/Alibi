@@ -106,14 +106,15 @@ switch ($Target.ToLower()) {
     "migrate" {
         Write-Host "Applying database migrations..." -ForegroundColor Cyan
         Invoke-InDir "$PSScriptRoot\backend" {
-            & uv run alembic upgrade head
+            & uv run python -m alembic upgrade head
         }
     }
     "openapi" {
         Write-Host "Exporting OpenAPI spec..." -ForegroundColor Cyan
         Invoke-InDir "$PSScriptRoot\backend" {
-            & uv run python -m app.main --export-openapi
+            & uv run python -m app.main --export-openapi "$PSScriptRoot\openapi.json"
         }
+        Copy-Item "$PSScriptRoot\openapi.json" "$PSScriptRoot\backend\openapi.json" -Force
     }
     "client" {
         Write-Host "Generating TypeScript API client..." -ForegroundColor Cyan

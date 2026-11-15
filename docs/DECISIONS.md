@@ -127,3 +127,7 @@ Each new dependency introduced for M0 and beyond is recorded with license and ra
 - **`query-string`** (MIT): URL query parameter parser required by `expo-router` deep link path navigation.
 - **`@react-native/assets-registry`** (MIT): React Native runtime asset table registry required by Metro bundler.
 - **`invariant`** (MIT): Assertion utility required by React Native AssetSourceResolver for Metro bundle compilation.
+- **`argon2-cffi`** (MIT): Industry standard password hashing (Argon2id) specified in doc 12 §2. Python stdlib lacks Argon2id.
+- **`pyjwt`** (MIT): Compact, cryptographically validated JWT access tokens (HS256).
+- **`cryptography`** (Apache-2.0 / BSD-3-Clause): Authenticated Fernet (AES-128-CBC + HMAC) encryption for provider keys in DB.
+- **`expo-secure-store`** (MIT): Android Keystore-backed secure storage for access and refresh tokens on mobile (doc 12 §2). AsyncStorage lacks OS-level hardware-backed encryption.

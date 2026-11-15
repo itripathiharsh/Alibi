@@ -1,6 +1,7 @@
 """Database engine and session management."""
 
 from collections.abc import AsyncGenerator
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -20,11 +21,17 @@ _session_maker: async_sessionmaker[AsyncSession] | None = None
 def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
+        pool_kwargs: dict[str, Any] = {}
+        if settings.alibi_env == "test":
+            from sqlalchemy import pool
+
+            pool_kwargs["poolclass"] = pool.NullPool
         _engine = create_async_engine(
             settings.database_url,
             echo=False,
             future=True,
             pool_pre_ping=True,
+            **pool_kwargs,
         )
     return _engine
 
@@ -46,8 +53,21 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with session_maker() as session:
         try:
             yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
         finally:
             await session.close()
+
+
+# Alias for dependency injection
+get_db = get_db_session
+
+
+def AsyncSessionLocal() -> AsyncSession:
+    """Convenience factory returning an active async session context manager."""
+    return get_session_maker()()
 
 
 async def ping_database() -> bool:

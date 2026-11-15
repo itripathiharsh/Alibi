@@ -56,3 +56,4 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: 1
         run: pnpm --filter @alibi/web build
+
