@@ -1,17 +1,17 @@
 # Implementation Status
 
-_Last updated: 2026-11-15 by agent (Milestone M1 Complete — All Acceptance Criteria Verified)_
+_Last updated: 2026-11-16 by agent (Milestone M2 Complete — All Acceptance Criteria Verified)_
 
 ## Current milestone
-**M2 — Task management (+ mobile shell)** · state: **Planning / Next Up** · entry criteria: ✅ M1 complete, auth & session foundation operational, jobs queue operational
+**M2b — Early hosted deployment (ADR-018/020)** · state: **Planning / Next Up** · entry criteria: ✅ M2 complete, full task pipeline verified, golden extraction set passing
 
 ## Milestones
 | Milestone | State | Started | Completed | Tag | Report |
 |-----------|-------|---------|-----------|-----|--------|
 | M0 Environment & architecture | Complete | 2026-11-13 | 2026-11-15 | `m0-complete` | [M0 Report](milestones/M0_REPORT.md) |
 | M1 Database & authentication | Complete | 2026-11-15 | 2026-11-15 | `m1-complete` | [M1 Report](milestones/M1_REPORT.md) |
-| M2 Task management (+ mobile shell) | In progress | 2026-11-15 | | | |
-| M2b Early hosted deployment (ADR-018/020) | Not started | | | | |
+| M2 Task management (+ mobile shell) | Complete | 2026-11-15 | 2026-11-16 | `m2-complete` | [M2 Report](milestones/M2_REPORT.md) |
+| M2b Early hosted deployment (ADR-018/020) | In progress | 2026-11-16 | | | |
 | M3 Dashboard & analytics | Not started | | | | |
 | M4 AI gateway (+ voice) | Not started | | | | |
 | M5 Personal Learning Engine | Not started | | | | |
@@ -38,6 +38,7 @@ See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: 0 / 124 passing.
 | 2026-11-15 | Task 11 | GitHub Actions & Pre-commit Workflows | Path-filtered CI (backend, frontend, mobile, security) + pre-commit hooks configured | YAML schema validation & gitleaks integration |
 | 2026-11-15 | Task 12 | Exit Gate Verification & M0 Report | All AC-M0-1..6 passing; doctor green, compose healthy, gitleaks verified, CI green | `docs/milestones/M0_REPORT.md` |
 | 2026-11-15 | M1 Full CI | Milestone M1 CI Pipeline | 30 tests passed, 5 packages/apps typechecked, Next.js build clean | `make.ps1 ci` & `docs/milestones/M1_REPORT.md` |
+| 2026-11-16 | M2 Full CI | Milestone M2 CI Pipeline | 41 tests passed (Hypothesis + Golden 160 items 100% exact match), Next.js build clean, 5 pkgs typechecked | `make.ps1 ci` & `docs/milestones/M2_REPORT.md` |
 
 ## Open blockers
 None.

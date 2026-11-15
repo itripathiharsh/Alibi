@@ -15,6 +15,16 @@ from app.repositories.user_repo import UserRepository
 from app.services.auth_service import AuthService
 from app.services.category_service import CategoryService
 
+__all__ = [
+    "AuthContext",
+    "get_auth_context",
+    "get_auth_service",
+    "get_category_service",
+    "get_current_user",
+    "get_db",
+    "security_scheme",
+]
+
 security_scheme = HTTPBearer(auto_error=False)
 
 
@@ -36,6 +46,10 @@ class AuthContext:
     def __init__(self, user: User, device_id: uuid.UUID) -> None:
         self.user = user
         self.device_id = device_id
+
+    @property
+    def user_id(self) -> uuid.UUID:
+        return self.user.id
 
 
 async def get_current_user(

@@ -1,0 +1,160 @@
+{"id": 1, "input": "Submit project report by tomorrow 5pm", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 2, "input": "Call doctor tomorrow morning", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 3, "input": "Prepare slides by tomorrow afternoon", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 4, "input": "Review client feedback tomorrow evening", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 5, "input": "Finish code review tomorrow night", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 6, "input": "Send weekly update by EOD", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 7, "input": "Deploy backend fix before end of day", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 8, "input": "Call mom tonight", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 9, "input": "Team sprint planning by next monday", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 10, "input": "Submit timesheet before next week", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 11, "input": "Prepare invoice by friday", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 12, "input": "Review architecture doc by wednesday", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 13, "input": "Meeting with advisor on thursday", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 14, "input": "Complete tax filing by 31st march", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 15, "input": "Renew domain by 15th nov", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 16, "input": "Christmas shopping before 25 dec 5pm", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 17, "input": "Pay electric bill by tomorrow", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 18, "input": "Send proposal due friday 4pm", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 19, "input": "Submit draft deadline: tomorrow", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 20, "input": "Final submission until next monday", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 21, "input": "Sync with QA team tomorrow 10am", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 22, "input": "Send pitch deck by tomorrow 3pm", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 23, "input": "Release v1.2 by next tuesday", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 24, "input": "Finish design critique by friday morning", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 25, "input": "Team standup on monday", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 26, "input": "Write blog post by sunday", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 27, "input": "File GST return before 20th november", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 28, "input": "Fix login issue by tonight", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 29, "input": "Database migration before tomorrow 9am", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 30, "input": "Deliver assets due next friday", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 31, "input": "Urgent server crash fix asap", "expected_has_deadline": false, "expected_priority": 1, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 32, "input": "Critical payment gateway bug #bug", "expected_has_deadline": false, "expected_priority": 1, "expected_estimate_min": null, "expected_project": null, "expected_tags": ["bug"]}
+{"id": 33, "input": "P1 outage in production by tonight", "expected_has_deadline": true, "expected_priority": 1, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 34, "input": "Emergency security patch before EOD", "expected_has_deadline": true, "expected_priority": 1, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 35, "input": "Fix broken navbar asap by tomorrow", "expected_has_deadline": true, "expected_priority": 1, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 36, "input": "High priority investor update", "expected_has_deadline": false, "expected_priority": 2, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 37, "input": "Important client demo by tomorrow 2pm", "expected_has_deadline": true, "expected_priority": 2, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 38, "input": "P2 ticket review with team", "expected_has_deadline": false, "expected_priority": 2, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 39, "input": "Update privacy policy important", "expected_has_deadline": false, "expected_priority": 2, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 40, "input": "High priority release checklist by friday", "expected_has_deadline": true, "expected_priority": 2, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 41, "input": "Medium priority cleanup of old branch", "expected_has_deadline": false, "expected_priority": 3, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 42, "input": "Normal priority documentation review", "expected_has_deadline": false, "expected_priority": 3, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 43, "input": "P3 refactoring of utils module", "expected_has_deadline": false, "expected_priority": 3, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 44, "input": "Update README formatting normal priority", "expected_has_deadline": false, "expected_priority": 3, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 45, "input": "Check logs tomorrow medium priority", "expected_has_deadline": true, "expected_priority": 3, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 46, "input": "Low priority font exploration", "expected_has_deadline": false, "expected_priority": 4, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 47, "input": "Someday learn Rust", "expected_has_deadline": false, "expected_priority": 4, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 48, "input": "Trivial typo fix in footer", "expected_has_deadline": false, "expected_priority": 4, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 49, "input": "P4 explore new css framework", "expected_has_deadline": false, "expected_priority": 4, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 50, "input": "Clean up downloads folder someday", "expected_has_deadline": false, "expected_priority": 4, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 51, "input": "Urgent: renew SSL cert by tomorrow morning", "expected_has_deadline": true, "expected_priority": 1, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 52, "input": "Critical: fix auth token leak immediately", "expected_has_deadline": false, "expected_priority": 1, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 53, "input": "Important: complete audit report before next monday", "expected_has_deadline": true, "expected_priority": 2, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 54, "input": "P1: resolve deadlock in job queue", "expected_has_deadline": false, "expected_priority": 1, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 55, "input": "High priority: backup postgres database tonight", "expected_has_deadline": true, "expected_priority": 2, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 56, "input": "P4: re-organize bookmarks bar", "expected_has_deadline": false, "expected_priority": 4, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 57, "input": "Someday: write personal autobiography", "expected_has_deadline": false, "expected_priority": 4, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 58, "input": "Low priority: change button hover color", "expected_has_deadline": false, "expected_priority": 4, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 59, "input": "Urgent: reply to legal notice before EOD", "expected_has_deadline": true, "expected_priority": 1, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 60, "input": "Important: update terms of service", "expected_has_deadline": false, "expected_priority": 2, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 61, "input": "Quick sync with designer for 30 mins", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 30, "expected_project": null, "expected_tags": []}
+{"id": 62, "input": "Deep focus coding session 2h", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 120, "expected_project": null, "expected_tags": []}
+{"id": 63, "input": "Review pull request in 45 mins", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 45, "expected_project": null, "expected_tags": []}
+{"id": 64, "input": "Quick phone call half an hour", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 30, "expected_project": null, "expected_tags": []}
+{"id": 65, "input": "Write unit tests 1.5 hours", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 90, "expected_project": null, "expected_tags": []}
+{"id": 66, "input": "Weekly team sync 1h by tomorrow", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": 60, "expected_project": null, "expected_tags": []}
+{"id": 67, "input": "Lunch break 45 min", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 45, "expected_project": null, "expected_tags": []}
+{"id": 68, "input": "Setup development container 2 hours", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 120, "expected_project": null, "expected_tags": []}
+{"id": 69, "input": "Debugging memory leak 3h by tonight", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": 180, "expected_project": null, "expected_tags": []}
+{"id": 70, "input": "Gym workout 1 hour tomorrow morning", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": 60, "expected_project": null, "expected_tags": []}
+{"id": 71, "input": "Read research paper 2h", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 120, "expected_project": null, "expected_tags": []}
+{"id": 72, "input": "Customer support triage 30m by EOD", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": 30, "expected_project": null, "expected_tags": []}
+{"id": 73, "input": "Database schema design 4h", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 240, "expected_project": null, "expected_tags": []}
+{"id": 74, "input": "Write API documentation 2.5h", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 150, "expected_project": null, "expected_tags": []}
+{"id": 75, "input": "Conduct candidate interview 1h by tomorrow 3pm", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": 60, "expected_project": null, "expected_tags": []}
+{"id": 76, "input": "Proofread article half an hour", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 30, "expected_project": null, "expected_tags": []}
+{"id": 77, "input": "Performance profiling 2h before next week", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": 120, "expected_project": null, "expected_tags": []}
+{"id": 78, "input": "Refactor auth module 3 hours", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 180, "expected_project": null, "expected_tags": []}
+{"id": 79, "input": "Create slide deck 1.5h by friday", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": 90, "expected_project": null, "expected_tags": []}
+{"id": 80, "input": "Walk dog 30 mins", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 30, "expected_project": null, "expected_tags": []}
+{"id": 81, "input": "Urgent 30 min quick fix for bug", "expected_has_deadline": false, "expected_priority": 1, "expected_estimate_min": 30, "expected_project": null, "expected_tags": []}
+{"id": 82, "input": "Important 2h meeting with stakeholders by tomorrow", "expected_has_deadline": true, "expected_priority": 2, "expected_estimate_min": 120, "expected_project": null, "expected_tags": []}
+{"id": 83, "input": "Deep work 4h on compiler optimization", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 240, "expected_project": null, "expected_tags": []}
+{"id": 84, "input": "Review contracts 1h by EOD", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": 60, "expected_project": null, "expected_tags": []}
+{"id": 85, "input": "P1 outage investigation 2h", "expected_has_deadline": false, "expected_priority": 1, "expected_estimate_min": 120, "expected_project": null, "expected_tags": []}
+{"id": 86, "input": "Study dynamic programming 2h", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 120, "expected_project": null, "expected_tags": []}
+{"id": 87, "input": "Fix styling glitches 45 mins", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 45, "expected_project": null, "expected_tags": []}
+{"id": 88, "input": "Update dependencies 1h by tomorrow", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": 60, "expected_project": null, "expected_tags": []}
+{"id": 89, "input": "Record demo video 30 mins", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": 30, "expected_project": null, "expected_tags": []}
+{"id": 90, "input": "Test disaster recovery 3h before next monday", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": 180, "expected_project": null, "expected_tags": []}
+{"id": 91, "input": "Implement user onboarding in @alibi", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": "alibi", "expected_tags": []}
+{"id": 92, "input": "Refactor sync protocol in @alibi by tomorrow 5pm", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": "alibi", "expected_tags": []}
+{"id": 93, "input": "Design pricing page in @marketing", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": "marketing", "expected_tags": []}
+{"id": 94, "input": "Write literature review chapter in @thesis", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": "thesis", "expected_tags": []}
+{"id": 95, "input": "Fix broken build #ci #devops", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": ["ci", "devops"]}
+{"id": 96, "input": "Update landing page copy @marketing #design", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": "marketing", "expected_tags": ["design"]}
+{"id": 97, "input": "Add postgres indexes @alibi #database #perf", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": "alibi", "expected_tags": ["database", "perf"]}
+{"id": 98, "input": "Buy groceries #personal", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": ["personal"]}
+{"id": 99, "input": "Study for midterm exam @university #study", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": "university", "expected_tags": ["study"]}
+{"id": 100, "input": "File tax deduction proofs @finance #taxes by 31st march", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": "finance", "expected_tags": ["taxes"]}
+{"id": 101, "input": "Urgent bug in login flow @alibi #bug #auth", "expected_has_deadline": false, "expected_priority": 1, "expected_estimate_min": null, "expected_project": "alibi", "expected_tags": ["bug", "auth"]}
+{"id": 102, "input": "Write blog post on distributed systems @blog #writing", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": "blog", "expected_tags": ["writing"]}
+{"id": 103, "input": "Set up CI runner @infrastructure #devops by tomorrow", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": "infrastructure", "expected_tags": ["devops"]}
+{"id": 104, "input": "Doctor appointment #health tomorrow morning", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": ["health"]}
+{"id": 105, "input": "Schedule oil change #car", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": ["car"]}
+{"id": 106, "input": "Review sprint backlog in @alibi", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": "alibi", "expected_tags": []}
+{"id": 107, "input": "Clean up git history in @alibi #git", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": "alibi", "expected_tags": ["git"]}
+{"id": 108, "input": "Create Figma mockups @design #ui by friday", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": "design", "expected_tags": ["ui"]}
+{"id": 109, "input": "Prepare balance sheet @finance by EOD", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": "finance", "expected_tags": []}
+{"id": 110, "input": "Plan weekend trip #travel", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": ["travel"]}
+{"id": 111, "input": "Read 20 pages of book #reading", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": ["reading"]}
+{"id": 112, "input": "Fix sound driver on desktop #hardware", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": ["hardware"]}
+{"id": 113, "input": "Upgrade node to v22 #tooling", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": ["tooling"]}
+{"id": 114, "input": "Renew passport #government by next month", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": ["government"]}
+{"id": 115, "input": "Implement refresh token rotation @alibi #security", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": "alibi", "expected_tags": ["security"]}
+{"id": 116, "input": "Refactor task repository @alibi by tonight", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": "alibi", "expected_tags": []}
+{"id": 117, "input": "Review thesis draft with advisor @thesis on monday", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": "thesis", "expected_tags": []}
+{"id": 118, "input": "Setup Prometheus metrics @infrastructure #monitoring", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": "infrastructure", "expected_tags": ["monitoring"]}
+{"id": 119, "input": "Buy flight tickets #vacation", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": ["vacation"]}
+{"id": 120, "input": "Order new headphones #shopping", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": ["shopping"]}
+{"id": 121, "input": "Refactor database models to use modern typing", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 122, "input": "Read chapter 4 of operating systems book", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 123, "input": "Buy organic groceries from farmers market", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 124, "input": "Fix broken button style on settings screen", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 125, "input": "Clean and declutter physical desk", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 126, "input": "Think about system architecture for v2", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 127, "input": "Maybe sometime later we can look into GraphQL", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 128, "input": "Someday in the future learn how to play guitar", "expected_has_deadline": false, "expected_priority": 4, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 129, "input": "No rush at all just check when free", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 130, "input": "We might do this later if time permits", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 131, "input": "Not urgent just an idea for later", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 132, "input": "Casual brainstorm on product ideas", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 133, "input": "Consider moving to rust in the long term", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 134, "input": "Explore whether web workers make sense", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 135, "input": "Evaluate alternative css color palettes", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 136, "input": "Backup old photos from external hard drive", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 137, "input": "Organize digital notes in knowledge base", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 138, "input": "Look into ergonomic keyboard options", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 139, "input": "Contemplate life choices during coffee break", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 140, "input": "Review random bookmark from last year", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 141, "input": "Archive unused slack channels", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 142, "input": "Clean out old email subscriptions", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 143, "input": "Water the house plants", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 144, "input": "Check tire pressure on car", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 145, "input": "Replace smoke detector batteries", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 146, "input": "Clean refrigerator shelves", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 147, "input": "Organize spice cabinet in kitchen", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 148, "input": "Donate unused clothes to charity", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 149, "input": "Update resume and linkedin summary", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 150, "input": "Dust off the bookshelves", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 151, "input": "Sharpen kitchen knives", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 152, "input": "Sort through old receipts in shoe box", "expected_has_deadline": false, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 153, "input": "Send report kal shaam tak", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 154, "input": "Review PR by tomorrow pakka", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 155, "input": "Fix this bug asap bhai", "expected_has_deadline": false, "expected_priority": 1, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 156, "input": "Prepare invoice by EOD zaroor", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 157, "input": "Call electricity department kal subah", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 158, "input": "Team meeting agle hafte", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 159, "input": "Complete assignment before friday shaam", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}
+{"id": 160, "input": "Deploy production build by tonight", "expected_has_deadline": true, "expected_priority": null, "expected_estimate_min": null, "expected_project": null, "expected_tags": []}

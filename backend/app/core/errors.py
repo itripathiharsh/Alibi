@@ -51,6 +51,26 @@ class AppException(Exception):
         self.headers = headers or {}
 
 
+class ProblemException(AppException):
+    def __init__(
+        self,
+        status: int,
+        title: str,
+        detail: str | None = None,
+        code: str | None = None,
+        type_uri: str = "about:blank",
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        super().__init__(
+            title=title,
+            status_code=status,
+            detail=detail,
+            code=code,
+            type_uri=type_uri,
+            headers=headers,
+        )
+
+
 class NotFoundError(AppException):
     def __init__(self, detail: str = "Resource not found", code: str = "not_found"):
         super().__init__(
