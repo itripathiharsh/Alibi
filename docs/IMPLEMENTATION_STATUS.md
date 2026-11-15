@@ -1,14 +1,14 @@
 # Implementation Status
 
-_Last updated: 2026-11-13 by planning (no code yet)_
+_Last updated: 2026-11-15 by agent (M0 Task 2 complete)_
 
 ## Current milestone
-**M0 — Environment & architecture** · state: **Planning** · entry criteria: ✅ planning pack present, environment verified
+**M0 — Environment & architecture** · state: **In progress** · entry criteria: ✅ planning pack present, environment verified, Docker verified
 
 ## Milestones
 | Milestone | State | Started | Completed | Tag | Report |
 |-----------|-------|---------|-----------|-----|--------|
-| M0 Environment & architecture | Planning | 2026-11-13 | | | |
+| M0 Environment & architecture | In progress | 2026-11-13 | | | |
 | M1 Database & authentication | Not started | | | | |
 | M2 Task management (+ mobile shell) | Not started | | | | |
 | M2b Early hosted deployment (ADR-018/020) | Not started | | | | |
