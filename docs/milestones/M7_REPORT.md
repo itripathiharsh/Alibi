@@ -53,3 +53,4 @@
 ## 8. Documentation updated
 - `docs/IMPLEMENTATION_STATUS.md` updated to reflect M7 Complete.
 - `openapi.json` and `@alibi/api-client` regenerated with Vault and Assistant schemas.
+

@@ -1,9 +1,9 @@
 # Implementation Status
 
-_Last updated: 2026-11-16 by agent (Milestone M7 Complete — All Acceptance Criteria Verified)_
+_Last updated: 2026-11-16 by agent (Milestone M8 Complete — All Acceptance Criteria Verified)_
 
 ## Current milestone
-**M8 — Calendar & reminders** · state: **Planning / In progress** · entry criteria: ✅ M7 complete, vault ingestion, hybrid search, and grounded assistant verified
+**M9 — Reports & sharing** · state: **Planning / In progress** · entry criteria: ✅ M8 complete, calendar conflicts, reminders, and quiet hours verified
 
 ## Milestones
 | Milestone | State | Started | Completed | Tag | Report |
@@ -17,8 +17,8 @@ _Last updated: 2026-11-16 by agent (Milestone M7 Complete — All Acceptance Cri
 | M5 Personal Learning Engine | Complete | 2026-11-16 | 2026-11-16 | `m5-complete` | [M5 Report](milestones/M5_REPORT.md) |
 | M6 Scheduling (+ minimal calendar) | Complete | 2026-11-16 | 2026-11-16 | `m6-complete` | [M6 Report](milestones/M6_REPORT.md) |
 | M7 RAG & Knowledge Vault | Complete | 2026-11-16 | 2026-11-16 | `m7-complete` | [M7 Report](milestones/M7_REPORT.md) |
-| M8 Calendar & reminders | In progress | 2026-11-16 | | | |
-| M9 Reports & sharing | Not started | | | | |
+| M8 Calendar & reminders | Complete | 2026-11-16 | 2026-11-16 | `m8-complete` | [M8 Report](milestones/M8_REPORT.md) |
+| M9 Reports & sharing | In progress | 2026-11-16 | | | |
 | M10 Offline & sync | Not started | | | | |
 | M11 Hosted hardening | Not started | | | | |
 | M12 Integration & hardening | Not started | | | | |

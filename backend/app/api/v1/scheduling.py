@@ -9,8 +9,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AuthContext, get_auth_context, get_db
+from app.calendar_service.conflicts import CalendarConflictService
 from app.models.calendar import CalendarEvent, ScheduleRecommendation
 from app.scheduling.proposal_service import SchedulingProposalService
+from app.schemas.notification import ConflictDetectRequest, ConflictResponse
 from app.schemas.scheduling import (
     CalendarEventCreate,
     CalendarEventRead,
@@ -182,3 +184,30 @@ async def create_calendar_event(
         is_all_day=ev.is_all_day,
         task_id=ev.task_id,
     )
+
+
+@router.post("/conflicts", response_model=list[ConflictResponse])
+async def detect_calendar_conflicts(
+    body: ConflictDetectRequest,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[ConflictResponse]:
+    """Detect calendar overlaps, over-capacity days, and deadline violations (AC-M8-4)."""
+    service = CalendarConflictService(db)
+    conflicts = await service.detect_conflicts(
+        user_id=auth.user.id,
+        start_at=body.start_at,
+        end_at=body.end_at,
+        max_daily_minutes=body.max_daily_minutes,
+    )
+    return [
+        ConflictResponse(
+            conflict_type=c.conflict_type,
+            severity=c.severity,
+            description=c.description,
+            event_ids=c.event_ids,
+            task_id=c.task_id,
+            conflict_date=c.conflict_date,
+        )
+        for c in conflicts
+    ]

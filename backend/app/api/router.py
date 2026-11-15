@@ -10,6 +10,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.categories import router as categories_router
 from app.api.v1.evidence import router as evidence_router
 from app.api.v1.learning import router as learning_router
+from app.api.v1.notifications import router as notifications_router
 from app.api.v1.projects import router as projects_router
 from app.api.v1.scheduling import router as scheduling_router
 from app.api.v1.tags import router as tags_router
@@ -37,6 +38,7 @@ router.include_router(learning_router, prefix="/api/v1")
 router.include_router(scheduling_router, prefix="/api/v1")
 router.include_router(vault_router, prefix="/api/v1")
 router.include_router(assistant_router, prefix="/api/v1")
+router.include_router(notifications_router, prefix="/api/v1")
 
 
 class HealthLiveResponse(BaseModel):

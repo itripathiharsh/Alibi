@@ -1284,6 +1284,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/scheduling/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Detect Calendar Conflicts
+         * @description Detect calendar overlaps, over-capacity days, and deadline violations (AC-M8-4).
+         */
+        post: operations["detect_calendar_conflicts_api_v1_scheduling_conflicts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/vault/notes": {
         parameters: {
             query?: never;
@@ -1382,6 +1402,70 @@ export interface paths {
         get: operations["get_thread_messages_api_v1_assistant_threads__thread_id__messages_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notifications
+         * @description List in-app notifications for the current user.
+         */
+        get: operations["list_notifications_api_v1_notifications_get"];
+        put?: never;
+        /**
+         * Schedule Notification
+         * @description Schedule a notification with quiet hours suppression (AC-M8-3/5).
+         */
+        post: operations["schedule_notification_api_v1_notifications_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{notification_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss Notification
+         * @description Dismiss an in-app notification.
+         */
+        post: operations["dismiss_notification_api_v1_notifications__notification_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/deliver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deliver Notifications
+         * @description Deliver all scheduled notifications that are due as of now.
+         */
+        post: operations["deliver_notifications_api_v1_notifications_deliver_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1796,6 +1880,39 @@ export interface components {
             /** Completed Count */
             completed_count: number;
         };
+        /** ConflictDetectRequest */
+        ConflictDetectRequest: {
+            /**
+             * Start At
+             * Format: date-time
+             */
+            start_at: string;
+            /**
+             * End At
+             * Format: date-time
+             */
+            end_at: string;
+            /**
+             * Max Daily Minutes
+             * @default 480
+             */
+            max_daily_minutes: number;
+        };
+        /** ConflictResponse */
+        ConflictResponse: {
+            /** Conflict Type */
+            conflict_type: string;
+            /** Severity */
+            severity: string;
+            /** Description */
+            description: string;
+            /** Event Ids */
+            event_ids: string[];
+            /** Task Id */
+            task_id?: string | null;
+            /** Conflict Date */
+            conflict_date?: string | null;
+        };
         /** ConsistencyHeatmapItem */
         ConsistencyHeatmapItem: {
             /**
@@ -2116,6 +2233,64 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** NotificationCreateRequest */
+        NotificationCreateRequest: {
+            /**
+             * Kind
+             * @default task_reminder
+             */
+            kind: string;
+            /**
+             * Fire At
+             * Format: date-time
+             */
+            fire_at: string;
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /** Task Id */
+            task_id?: string | null;
+            /** Event Id */
+            event_id?: string | null;
+            /**
+             * Suppress In Quiet Hours
+             * @default true
+             */
+            suppress_in_quiet_hours: boolean;
+        };
+        /** NotificationResponse */
+        NotificationResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Task Id */
+            task_id: string | null;
+            /** Event Id */
+            event_id: string | null;
+            /**
+             * Fire At
+             * Format: date-time
+             */
+            fire_at: string;
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /** Status */
+            status: string;
+            /** Delivered At */
+            delivered_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** ProductivityScoreResponse */
         ProductivityScoreResponse: {
@@ -5249,6 +5424,39 @@ export interface operations {
             };
         };
     };
+    detect_calendar_conflicts_api_v1_scheduling_conflicts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConflictDetectRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConflictResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_notes_api_v1_vault_notes_get: {
         parameters: {
             query?: {
@@ -5437,6 +5645,124 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notifications_api_v1_notifications_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_notification_api_v1_notifications_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationResponse"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_notification_api_v1_notifications__notification_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deliver_notifications_api_v1_notifications_deliver_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationResponse"][];
                 };
             };
         };
