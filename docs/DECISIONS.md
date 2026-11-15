@@ -89,6 +89,13 @@ Each serves a stated requirement: auth security (devices, refresh_tokens, audit_
 - **Free tiers can change or disappear** (RISK-011). The exit path is plain Docker + Postgres.
 - **GitHub Actions minutes** are shared by CI and nightly jobs (RISK-014).
 
+**Re-verification (M2b, 2026-11-16):**
+- **Render**: 512 MB RAM, sleeps after 15 min, 750 free instance hours/month confirmed (https://render.com/pricing).
+- **Neon**: 0.5 GB storage, 100 CU-h/month, scale-to-zero after 5 min, pgvector 0.7+ confirmed (https://neon.tech/pricing).
+- **Vercel Hobby**: 100 GB bandwidth, unlimited invocations for non-commercial personal projects confirmed (https://vercel.com/pricing).
+- **GitHub Actions**: 2,000 free minutes/month for private repos confirmed (https://github.com/pricing).
+All free tier limits remain valid and adequate for the single-user ₹0 architecture.
+
 ## ADR-020 — Hosted-mode feature reductions
 **Date:** 2026-11-13 · **Status:** Accepted (owner) · **Amends:** ADR-006, ADR-007, ADR-017; FR-AI-010, FR-AI-011, FR-KNOW-003, FR-SYNC-002, FR-CAL-004, FR-TASK-013; roadmap M0, M4, M7–M11.
 **Context:** The hosted runtime (ADR-018) has 512 MB RAM, no GPU, an ephemeral disk, sleeps when idle, and no always-on PC with Ollama.

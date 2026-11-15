@@ -1,0 +1,32 @@
+# Render Blueprint for ALIBI (Hosted Mode ₹0 Stack)
+# References: ADR-018, ADR-020, docs/13_DEPLOYMENT_AND_INFRASTRUCTURE.md
+
+services:
+  - type: web
+    name: alibi-backend
+    runtime: docker
+    dockerfilePath: ./infrastructure/docker/backend.Dockerfile
+    plan: free
+    region: singapore
+    healthCheckPath: /health/ready
+    envVars:
+      - key: ALIBI_MODE
+        value: hosted
+      - key: ALIBI_ENV
+        value: cloud
+      - key: DATABASE_URL
+        sync: false
+      - key: ALIBI_SECRET_KEY
+        generateValue: true
+      - key: ALIBI_ENCRYPTION_KEY
+        generateValue: true
+      - key: DB_POOL_SIZE
+        value: "5"
+      - key: DB_MAX_OVERFLOW
+        value: "2"
+      - key: PORT
+        value: "8000"
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: AI_EXTERNAL_ENABLED
+        value: "false"

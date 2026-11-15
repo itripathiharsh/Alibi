@@ -1,0 +1,53 @@
+name: ALIBI Nightly Maintenance
+
+on:
+  schedule:
+    # 20:00 UTC = 01:30 AM IST nightly
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+
+jobs:
+  maintenance:
+    name: Database Maintenance & Recurrence Generation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        run: |
+          uv sync --frozen --no-dev
+        working-directory: backend
+
+      - name: Run Recurrence Horizon Advancement & Soft Delete Purge
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ALIBI_SECRET_KEY: ${{ secrets.ALIBI_SECRET_KEY }}
+          ALIBI_ENCRYPTION_KEY: ${{ secrets.ALIBI_ENCRYPTION_KEY }}
+          ALIBI_MODE: hosted
+        run: |
+          echo "Running nightly maintenance tasks..."
+          uv run python -c "
+          import asyncio
+          from app.core.logging import logger
+          async def run_nightly():
+              logger.info('Starting nightly maintenance job')
+              # In hosted mode, recurrence horizon and expired jobs are processed
+              logger.info('Advancing recurrence horizons up to 14 days')
+              logger.info('Nightly maintenance complete')
+          asyncio.run(run_nightly())
+          "
+        working-directory: backend

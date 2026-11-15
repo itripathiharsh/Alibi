@@ -44,6 +44,9 @@ ENV PATH="/app/.venv/bin:$PATH" \
 COPY --from=builder --chown=alibi:alibi /app/.venv /app/.venv
 COPY --from=builder --chown=alibi:alibi /app/app /app/app
 COPY --from=builder --chown=alibi:alibi /app/pyproject.toml /app/pyproject.toml
+COPY --chown=alibi:alibi backend/migrations /app/migrations
+COPY --chown=alibi:alibi backend/alembic.ini /app/alembic.ini
+COPY --chown=alibi:alibi infrastructure/docker/entrypoint.sh /app/entrypoint.sh
 
 USER alibi
 
@@ -53,5 +56,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=5s --timeout=3s --retries=5 --start-period=5s \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')" || exit 1
 
-# Default command runs the FastAPI server
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default command runs the entrypoint script
+CMD ["/bin/sh", "/app/entrypoint.sh"]

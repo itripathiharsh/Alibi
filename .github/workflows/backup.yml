@@ -1,0 +1,49 @@
+name: ALIBI Encrypted Database Backup
+
+on:
+  schedule:
+    # 20:30 UTC = 02:00 AM IST nightly
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    name: Encrypted PostgreSQL Backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL Client and age
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client age
+
+      - name: Perform Database Dump & Encryption
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AGE_PUBLIC_KEY: ${{ secrets.AGE_PUBLIC_KEY }}
+        run: |
+          mkdir -p backups
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          DUMP_FILE="backups/alibi_${TIMESTAMP}.dump"
+          ENC_FILE="backups/alibi_${TIMESTAMP}.dump.age"
+
+          echo "Dumping database schema and data..."
+          pg_dump "${DATABASE_URL}" -F c -f "${DUMP_FILE}"
+
+          echo "Encrypting backup with age public recipient..."
+          age -r "${AGE_PUBLIC_KEY}" -o "${ENC_FILE}" "${DUMP_FILE}"
+          rm -f "${DUMP_FILE}"
+
+          echo "Backup encrypted: ${ENC_FILE}"
+          echo "ENC_FILE=${ENC_FILE}" >> $GITHUB_ENV
+
+      - name: Upload Encrypted Backup Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: alibi-encrypted-backup
+          path: ${{ env.ENC_FILE }}
+          retention-days: 90
