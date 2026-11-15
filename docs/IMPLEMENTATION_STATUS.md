@@ -20,8 +20,8 @@ _Last updated: 2026-11-16 by agent (Milestone M9 Complete — All Acceptance Cri
 | M8 Calendar & reminders | Complete | 2026-11-16 | 2026-11-16 | `m8-complete` | [M8 Report](milestones/M8_REPORT.md) |
 | M9 Reports & sharing | Complete | 2026-11-16 | 2026-11-16 | `m9-complete` | [M9 Report](milestones/M9_REPORT.md) |
 | M10 Offline & sync | Complete | 2026-11-16 | 2026-11-16 | `m10-complete` | [M10 Report](milestones/M10_REPORT.md) |
-| M11 Hosted hardening | In progress | 2026-11-16 | | | |
-| M12 Integration & hardening | Not started | | | | |
+| M11 Hosted hardening | Complete | 2026-11-16 | 2026-11-16 | `m11-complete` | [M11 Report](milestones/M11_REPORT.md) |
+| M12 Integration & hardening | In progress | 2026-11-16 | | | |
 
 States: Not started · Planning · In progress · Blocked · In QA · Complete.
 

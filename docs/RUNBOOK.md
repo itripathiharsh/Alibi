@@ -102,3 +102,30 @@ The drill validates that:
 2. Update `ALIBI_SECRET_KEY` in Render environment settings.
 3. *Note*: Users will be required to re-authenticate on their devices as existing JWT signatures will be invalidated.
 
+---
+
+## 7. Provider Exit & Migration Procedure
+
+In accordance with ADR-018 and the Zero-Lockin constraint:
+
+### 7.1 Database Migration (Neon → Supabase / Self-Hosted Postgres)
+1. Dump complete database using custom format:
+   ```bash
+   pg_dump -h <neon_host> -U <user> -d <dbname> -F c -f alibi_migration.dump
+   ```
+2. Restore to target Postgres 16 instance with `pgvector`:
+   ```bash
+   pg_restore -h <target_host> -U <user> -d <target_db> --no-owner --no-privileges alibi_migration.dump
+   ```
+3. Update `DATABASE_URL` in backend environment and verify table row counts using `restore_drill`.
+
+### 7.2 Backend Migration (Render → Railway / Fly.io / Docker Host)
+1. The backend is packaged as a standard OCI container via `infrastructure/docker/backend.Dockerfile`.
+2. Set `ALIBI_MODE=hosted` and inject existing environment variables.
+3. Service starts identically across any standard container platform without code changes.
+
+### 7.3 Web Dashboard Migration (Vercel → Cloudflare Pages / Node.js)
+1. The web application builds as a standalone Node.js server via `infrastructure/docker/web.Dockerfile`.
+2. Can be run directly on any Node.js 22+ runtime or containerized behind standard Nginx reverse proxy.
+
+

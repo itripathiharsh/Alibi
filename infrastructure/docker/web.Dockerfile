@@ -13,6 +13,7 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/design-tokens ./packages/design-tokens
 COPY packages/domain-types ./packages/domain-types
 COPY packages/api-client ./packages/api-client
+COPY packages/sync-core ./packages/sync-core
 COPY apps/web ./apps/web
 COPY apps/mobile/package.json ./apps/mobile/package.json
 
