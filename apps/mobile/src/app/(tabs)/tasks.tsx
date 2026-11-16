@@ -53,6 +53,84 @@ interface RunningTimer {
   started_at: string;
 }
 
+function computeDeadlineIso(
+  dateChoice: "today" | "tomorrow" | "next_week" | "custom" | null,
+  customDate: string,
+  timeChoice: string | null,
+  customTime: string
+): string | null {
+  if (!dateChoice) return null;
+  const target = new Date();
+  if (dateChoice === "tomorrow") {
+    target.setDate(target.getDate() + 1);
+  } else if (dateChoice === "next_week") {
+    target.setDate(target.getDate() + 7);
+  } else if (dateChoice === "custom") {
+    if (!customDate.trim()) return null;
+    const parts = customDate.trim().split("-");
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+        target.setFullYear(year, month, day);
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
+  }
+
+  // Time
+  let hours = 23;
+  let minutes = 59;
+  if (timeChoice === "09:00") {
+    hours = 9;
+    minutes = 0;
+  } else if (timeChoice === "14:00") {
+    hours = 14;
+    minutes = 0;
+  } else if (timeChoice === "18:00") {
+    hours = 18;
+    minutes = 0;
+  } else if (timeChoice === "21:00") {
+    hours = 21;
+    minutes = 0;
+  } else if (timeChoice === "custom" && customTime.trim()) {
+    const tp = customTime.trim().split(":");
+    if (tp.length >= 2) {
+      hours = parseInt(tp[0], 10) || 0;
+      minutes = parseInt(tp[1], 10) || 0;
+    }
+  }
+
+  target.setHours(hours, minutes, 0, 0);
+  return target.toISOString();
+}
+
+function formatDeadlinePreview(
+  dateChoice: "today" | "tomorrow" | "next_week" | "custom" | null,
+  customDate: string,
+  timeChoice: string | null,
+  customTime: string
+): string {
+  if (!dateChoice) return "";
+  let dateLabel = "Today";
+  if (dateChoice === "tomorrow") dateLabel = "Tomorrow";
+  else if (dateChoice === "next_week") dateLabel = "Next Week";
+  else if (dateChoice === "custom") dateLabel = customDate.trim() || "Custom Date";
+
+  let timeLabel = "End of Day (23:59)";
+  if (timeChoice === "09:00") timeLabel = "9:00 AM";
+  else if (timeChoice === "14:00") timeLabel = "2:00 PM";
+  else if (timeChoice === "18:00") timeLabel = "6:00 PM";
+  else if (timeChoice === "21:00") timeLabel = "9:00 PM";
+  else if (timeChoice === "custom") timeLabel = customTime.trim() || "Custom Time";
+
+  return `${dateLabel} at ${timeLabel}`;
+}
+
 export default function TasksScreen() {
   const [activeView, setActiveView] = useState<(typeof VIEWS)[number]>("today");
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -64,6 +142,21 @@ export default function TasksScreen() {
   const [captureText, setCaptureText] = useState("");
   const [isCapturing, setIsCapturing] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [taskStatus, setTaskStatus] = useState<"pending" | "completed">("pending");
+  const [selectedDate, setSelectedDate] = useState<"today" | "tomorrow" | "next_week" | "custom" | null>(null);
+  const [customDateStr, setCustomDateStr] = useState("");
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [customTimeStr, setCustomTimeStr] = useState("");
+
+  const resetModal = () => {
+    setCaptureText("");
+    setTaskStatus("pending");
+    setSelectedDate(null);
+    setCustomDateStr("");
+    setSelectedTime(null);
+    setCustomTimeStr("");
+    setIsListening(false);
+  };
 
   const handleMicPress = async () => {
     if (isListening) {
@@ -154,13 +247,23 @@ export default function TasksScreen() {
         return;
       }
 
+      const deadlineIso = computeDeadlineIso(selectedDate, customDateStr, selectedTime, customTimeStr);
+      const payload: Record<string, any> = {
+        raw_input: captureText.trim(),
+        origin: isListening ? "voice" : "manual",
+        status: taskStatus,
+      };
+      if (deadlineIso) {
+        payload.deadline_at = deadlineIso;
+      }
+
       let res = await fetch(`${baseUrl}/api/v1/tasks/capture`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ raw_input: captureText.trim(), origin: isListening ? "voice" : "manual" }),
+        body: JSON.stringify(payload),
       });
 
       // If token expired, force re-authenticate and retry once
@@ -173,7 +276,7 @@ export default function TasksScreen() {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({ raw_input: captureText.trim(), origin: isListening ? "voice" : "manual" }),
+            body: JSON.stringify(payload),
           });
         }
       }
@@ -198,9 +301,8 @@ export default function TasksScreen() {
             ...prev,
           ]);
         }
-        setCaptureText("");
+        resetModal();
         setCaptureVisible(false);
-        setIsListening(false);
         fetchTasks();
       } else {
         const errJson = await res.json().catch(() => ({}));
@@ -475,50 +577,235 @@ export default function TasksScreen() {
               </View>
             )}
 
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.captureInput}
-                value={captureText}
-                onChangeText={setCaptureText}
-                placeholder="Type or dictate task... e.g. Finish report by tomorrow 5pm #work"
-                placeholderTextColor={theme.colors.text.secondary}
-                multiline
-                autoFocus
-              />
-              <Pressable
-                style={[styles.inputMicBtn, isListening && styles.inputMicBtnActive]}
-                onPress={handleMicPress}
-                accessibilityLabel="Activate speech dictation"
-              >
-                <Mic size={18} color={isListening ? "#090D16" : theme.colors.accent.amber} />
-              </Pressable>
-            </View>
-
-            {/* Quick Suggestions */}
-            <View style={styles.suggestionSection}>
-              <Text style={styles.suggestionHeader}>Quick Templates (Tap to fill):</Text>
-              <View style={styles.chipsRow}>
-                {[
-                  "Finish client report by tomorrow 5pm #work",
-                  "Call doctor at 2pm #urgent",
-                  "Review code changes tonight #dev",
-                  "Buy groceries today at 6pm #personal",
-                ].map((preset) => (
-                  <Pressable
-                    key={preset}
-                    style={styles.chip}
-                    onPress={() => setCaptureText(preset)}
-                  >
-                    <Text style={styles.chipText}>{preset}</Text>
-                  </Pressable>
-                ))}
+            <ScrollView
+              style={{ maxHeight: 420 }}
+              contentContainerStyle={{ gap: 14, paddingBottom: 6 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.captureInput}
+                  value={captureText}
+                  onChangeText={setCaptureText}
+                  placeholder="Type or dictate task... e.g. Finish report #work"
+                  placeholderTextColor={theme.colors.text.secondary}
+                  multiline
+                  autoFocus
+                />
+                <Pressable
+                  style={[styles.inputMicBtn, isListening && styles.inputMicBtnActive]}
+                  onPress={handleMicPress}
+                  accessibilityLabel="Activate speech dictation"
+                >
+                  <Mic size={18} color={isListening ? "#090D16" : theme.colors.accent.amber} />
+                </Pressable>
               </View>
-            </View>
+
+              {/* Status Selection (Optional, Pending / Completed) */}
+              <View style={styles.optionSection}>
+                <Text style={styles.optionSectionHeader}>Status (Optional):</Text>
+                <View style={styles.optionRow}>
+                  <Pressable
+                    style={[
+                      styles.statusOptionPill,
+                      taskStatus === "pending" && styles.statusOptionPillActivePending,
+                    ]}
+                    onPress={() => setTaskStatus("pending")}
+                  >
+                    <Circle
+                      size={13}
+                      color={taskStatus === "pending" ? "#F59E0B" : theme.colors.text.secondary}
+                    />
+                    <Text
+                      style={[
+                        styles.statusOptionText,
+                        taskStatus === "pending" && { color: "#F59E0B", fontWeight: "600" },
+                      ]}
+                    >
+                      Pending
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.statusOptionPill,
+                      taskStatus === "completed" && styles.statusOptionPillActiveCompleted,
+                    ]}
+                    onPress={() => setTaskStatus("completed")}
+                  >
+                    <CheckCircle2
+                      size={13}
+                      color={taskStatus === "completed" ? "#10B981" : theme.colors.text.secondary}
+                    />
+                    <Text
+                      style={[
+                        styles.statusOptionText,
+                        taskStatus === "completed" && { color: "#10B981", fontWeight: "600" },
+                      ]}
+                    >
+                      Completed
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Date Selection (Optional) */}
+              <View style={styles.optionSection}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={styles.optionSectionHeader}>Due Date (Optional):</Text>
+                  {selectedDate && (
+                    <Pressable
+                      onPress={() => {
+                        setSelectedDate(null);
+                        setSelectedTime(null);
+                        setCustomDateStr("");
+                        setCustomTimeStr("");
+                      }}
+                    >
+                      <Text style={styles.clearOptionText}>Clear Date</Text>
+                    </Pressable>
+                  )}
+                </View>
+                <View style={styles.optionRow}>
+                  {[
+                    { id: "today", label: "Today" },
+                    { id: "tomorrow", label: "Tomorrow" },
+                    { id: "next_week", label: "Next Week" },
+                    { id: "custom", label: "Custom Date..." },
+                  ].map((opt) => (
+                    <Pressable
+                      key={opt.id}
+                      style={[styles.datePill, selectedDate === opt.id && styles.datePillActive]}
+                      onPress={() =>
+                        setSelectedDate(selectedDate === opt.id ? null : (opt.id as any))
+                      }
+                    >
+                      <Calendar
+                        size={12}
+                        color={selectedDate === opt.id ? "#F59E0B" : theme.colors.text.secondary}
+                      />
+                      <Text
+                        style={[
+                          styles.datePillText,
+                          selectedDate === opt.id && styles.datePillTextActive,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {selectedDate === "custom" && (
+                  <TextInput
+                    style={styles.customInputSmall}
+                    value={customDateStr}
+                    onChangeText={setCustomDateStr}
+                    placeholder="YYYY-MM-DD (e.g. 2026-11-20)"
+                    placeholderTextColor={theme.colors.text.secondary}
+                  />
+                )}
+              </View>
+
+              {/* Time Selection (Optional, Appears when Date is Chosen) */}
+              {selectedDate && (
+                <View style={styles.optionSection}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <Text style={styles.optionSectionHeader}>Due Time (Optional):</Text>
+                    {selectedTime && (
+                      <Pressable
+                        onPress={() => {
+                          setSelectedTime(null);
+                          setCustomTimeStr("");
+                        }}
+                      >
+                        <Text style={styles.clearOptionText}>Clear Time</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                  <View style={styles.optionRow}>
+                    {[
+                      { id: "09:00", label: "Morning 9 AM" },
+                      { id: "14:00", label: "Afternoon 2 PM" },
+                      { id: "18:00", label: "Evening 6 PM" },
+                      { id: "21:00", label: "Night 9 PM" },
+                      { id: "custom", label: "Custom Time..." },
+                    ].map((tOpt) => (
+                      <Pressable
+                        key={tOpt.id}
+                        style={[styles.timePill, selectedTime === tOpt.id && styles.timePillActive]}
+                        onPress={() =>
+                          setSelectedTime(selectedTime === tOpt.id ? null : tOpt.id)
+                        }
+                      >
+                        <Clock
+                          size={12}
+                          color={selectedTime === tOpt.id ? "#38BDF8" : theme.colors.text.secondary}
+                        />
+                        <Text
+                          style={[
+                            styles.timePillText,
+                            selectedTime === tOpt.id && styles.timePillTextActive,
+                          ]}
+                        >
+                          {tOpt.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  {selectedTime === "custom" && (
+                    <TextInput
+                      style={styles.customInputSmall}
+                      value={customTimeStr}
+                      onChangeText={setCustomTimeStr}
+                      placeholder="HH:MM (24h, e.g. 17:30)"
+                      placeholderTextColor={theme.colors.text.secondary}
+                    />
+                  )}
+                </View>
+              )}
+
+              {/* Aligned Deadline Preview */}
+              {selectedDate && (
+                <View style={styles.alignedDeadlineBadge}>
+                  <Calendar size={13} color="#38BDF8" />
+                  <Text style={styles.alignedDeadlineText}>
+                    Target Deadline:{" "}
+                    {formatDeadlinePreview(
+                      selectedDate,
+                      customDateStr,
+                      selectedTime,
+                      customTimeStr
+                    )}
+                  </Text>
+                </View>
+              )}
+
+              {/* Quick Suggestions */}
+              <View style={styles.suggestionSection}>
+                <Text style={styles.suggestionHeader}>Quick Templates (Tap to fill):</Text>
+                <View style={styles.chipsRow}>
+                  {[
+                    "Finish client report by tomorrow 5pm #work",
+                    "Call doctor at 2pm #urgent",
+                    "Review code changes tonight #dev",
+                    "Buy groceries today at 6pm #personal",
+                  ].map((preset) => (
+                    <Pressable
+                      key={preset}
+                      style={styles.chip}
+                      onPress={() => setCaptureText(preset)}
+                    >
+                      <Text style={styles.chipText}>{preset}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            </ScrollView>
 
             <View style={styles.modalActions}>
               <Pressable
                 style={styles.cancelBtn}
-                onPress={() => { stopSpeechRecognition(); setCaptureVisible(false); setIsListening(false); }}
+                onPress={() => { stopSpeechRecognition(); resetModal(); setCaptureVisible(false); }}
               >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </Pressable>
@@ -528,7 +815,7 @@ export default function TasksScreen() {
                 onPress={() => { stopSpeechRecognition(); setIsListening(false); handleCapture(); }}
               >
                 <Text style={styles.confirmBtnText}>
-                  {isCapturing ? "Capturing..." : "Save Task"}
+                  {isCapturing ? "Saving..." : taskStatus === "completed" ? "Save Completed Task" : "Save Task"}
                 </Text>
               </Pressable>
             </View>
@@ -796,5 +1083,124 @@ const styles = StyleSheet.create({
     color: "#090D16",
     fontSize: 14,
     fontWeight: "700",
+  },
+  optionSection: {
+    gap: 8,
+  },
+  optionSectionHeader: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: theme.colors.text.secondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  optionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  statusOptionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: theme.colors.background.base,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+  },
+  statusOptionPillActivePending: {
+    borderColor: theme.colors.accent.amber,
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+  },
+  statusOptionPillActiveCompleted: {
+    borderColor: theme.colors.accent.emerald,
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+  },
+  statusOptionText: {
+    fontSize: 13,
+    color: theme.colors.text.secondary,
+    fontWeight: "500",
+  },
+  datePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 7,
+    backgroundColor: theme.colors.background.base,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+  },
+  datePillActive: {
+    borderColor: theme.colors.accent.amber,
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+  },
+  datePillText: {
+    fontSize: 12,
+    color: theme.colors.text.secondary,
+    fontWeight: "500",
+  },
+  datePillTextActive: {
+    color: theme.colors.accent.amber,
+    fontWeight: "600",
+  },
+  timePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 7,
+    backgroundColor: theme.colors.background.base,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+  },
+  timePillActive: {
+    borderColor: "#38BDF8",
+    backgroundColor: "rgba(56, 189, 248, 0.12)",
+  },
+  timePillText: {
+    fontSize: 12,
+    color: theme.colors.text.secondary,
+    fontWeight: "500",
+  },
+  timePillTextActive: {
+    color: "#38BDF8",
+    fontWeight: "600",
+  },
+  customInputSmall: {
+    backgroundColor: theme.colors.background.base,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+    color: theme.colors.text.primary,
+    fontSize: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 4,
+  },
+  alignedDeadlineBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(56, 189, 248, 0.1)",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(56, 189, 248, 0.25)",
+  },
+  alignedDeadlineText: {
+    fontSize: 12,
+    color: "#38BDF8",
+    fontWeight: "500",
+  },
+  clearOptionText: {
+    fontSize: 11,
+    color: theme.colors.accent.amber,
+    fontWeight: "500",
   },
 });
