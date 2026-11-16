@@ -11,10 +11,12 @@ export const theme = {
     surface: {
       card: dark.surface,
       surface2: dark.surface2,
+      elevated: dark.surface2,
     },
     text: {
       primary: dark.text,
       secondary: dark.textMuted,
+      muted: dark.textMuted,
     },
     border: {
       subtle: dark.border,

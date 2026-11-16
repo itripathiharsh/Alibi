@@ -23,6 +23,9 @@ import {
   Award,
   TrendingUp,
   BarChart2,
+  Cpu,
+  Settings,
+  ChevronRight,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
@@ -77,6 +80,10 @@ export default function DashboardScreen() {
   const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [timeDist, setTimeDist] = useState<TimeDistItem[]>([]);
   const [estVsActual, setEstVsActual] = useState<EstVsActualItem[]>([]);
+  const [learningProfile, setLearningProfile] = useState<{
+    maturity_level?: string;
+    total_observations?: number;
+  } | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -94,12 +101,13 @@ export default function DashboardScreen() {
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const baseUrl = getServerUrl();
-      const [sumRes, scoreRes, trendRes, distRes, evaRes] = await Promise.all([
+      const [sumRes, scoreRes, trendRes, distRes, evaRes, learnRes] = await Promise.all([
         fetch(`${baseUrl}/api/v1/analytics/summary?period=${period}`, { headers }),
         fetch(`${baseUrl}/api/v1/analytics/productivity-score?period=${period}`, { headers }),
         fetch(`${baseUrl}/api/v1/analytics/charts/completion-trend?period=${period}`, { headers }),
         fetch(`${baseUrl}/api/v1/analytics/charts/time-distribution?period=${period}`, { headers }),
         fetch(`${baseUrl}/api/v1/analytics/charts/est-vs-actual?period=${period}`, { headers }),
+        fetch(`${baseUrl}/api/v1/learning/profile`, { headers }).catch(() => null),
       ]);
 
       if (sumRes.ok) setSummary(await sumRes.json());
@@ -107,6 +115,7 @@ export default function DashboardScreen() {
       if (trendRes.ok) setTrend(await trendRes.json());
       if (distRes.ok) setTimeDist(await distRes.json());
       if (evaRes.ok) setEstVsActual(await evaRes.json());
+      if (learnRes && learnRes.ok) setLearningProfile(await learnRes.json());
     } catch {
       // Fallback gracefully on network error
     } finally {
@@ -340,8 +349,37 @@ export default function DashboardScreen() {
         )}
       </View>
 
-      {/* Backend LAN Connectivity Card */}
-      <View style={styles.lanCard}>
+      {/* Personal Learning Engine (PLE) Card */}
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Cpu size={16} color="#818CF8" />
+          <Text style={styles.sectionTitle}>Personal Learning Engine (PLE)</Text>
+          <View style={styles.pleBadge}>
+            <Text style={styles.pleBadgeText}>
+              {learningProfile?.maturity_level ? `Level: ${learningProfile.maturity_level}` : "Maturity: L0 Cold"}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.pleDesc}>
+          ALIBI continuously learns your estimation bias and habit routines from every completed task and time session. All ML weights remain private.
+        </Text>
+        <View style={styles.pleFeaturesRow}>
+          <View style={styles.pleFeature}>
+            <Target size={13} color={theme.colors.accent.amber} />
+            <Text style={styles.pleFeatureText}>Duration Bias Learning: Active</Text>
+          </View>
+          <View style={styles.pleFeature}>
+            <Clock size={13} color={theme.colors.accent.emerald} />
+            <Text style={styles.pleFeatureText}>Habit Routine Detector: Active</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Backend & Cloud Connectivity Access Button */}
+      <Pressable
+        style={({ pressed }) => [styles.lanCard, pressed && { opacity: 0.85 }]}
+        onPress={() => router.push("/settings")}
+      >
         <View style={styles.lanHeader}>
           <View style={styles.lanTitleRow}>
             {pingResult?.success ? (
@@ -349,26 +387,35 @@ export default function DashboardScreen() {
             ) : (
               <WifiOff size={18} color={theme.colors.accent.amber} />
             )}
-            <Text style={styles.lanTitle}>Backend Health</Text>
+            <View>
+              <Text style={styles.lanTitle}>Backend &amp; Cloud Connection</Text>
+              <Text style={styles.lanEndpoint}>{serverUrl}</Text>
+            </View>
           </View>
-          <View
-            style={[
-              styles.statusPill,
-              pingResult?.success ? styles.statusPillSuccess : styles.statusPillIdle,
-            ]}
-          >
-            <Text
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <View
               style={[
-                styles.statusPillText,
-                pingResult?.success ? styles.statusTextSuccess : styles.statusTextIdle,
+                styles.statusPill,
+                pingResult?.success ? styles.statusPillSuccess : styles.statusPillIdle,
               ]}
             >
-              {pingResult?.success ? "Connected" : "Disconnected"}
-            </Text>
+              <Text
+                style={[
+                  styles.statusPillText,
+                  pingResult?.success ? styles.statusTextSuccess : styles.statusTextIdle,
+                ]}
+              >
+                {pingResult?.success ? "Connected" : "Disconnected"}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={theme.colors.text.muted} />
           </View>
         </View>
-        <Text style={styles.lanEndpoint}>{serverUrl}</Text>
-      </View>
+        <View style={styles.openSettingsHint}>
+          <Settings size={12} color={theme.colors.accent.amber} />
+          <Text style={styles.openSettingsText}>Tap here to open Settings, Cloud Sync &amp; Account</Text>
+        </View>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -662,5 +709,54 @@ const styles = StyleSheet.create({
   },
   statusTextIdle: {
     color: theme.colors.accent.amber,
+  },
+  pleBadge: {
+    backgroundColor: "rgba(129, 140, 248, 0.15)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginLeft: "auto",
+  },
+  pleBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#818CF8",
+  },
+  pleDesc: {
+    fontSize: 11,
+    color: theme.colors.text.secondary,
+    lineHeight: 16,
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  pleFeaturesRow: {
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.05)",
+    paddingTop: 8,
+  },
+  pleFeature: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  pleFeatureText: {
+    fontSize: 11,
+    color: theme.colors.text.primary,
+    fontWeight: "500",
+  },
+  openSettingsHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.05)",
+  },
+  openSettingsText: {
+    fontSize: 11,
+    color: theme.colors.accent.amber,
+    fontWeight: "600",
   },
 });
