@@ -14,15 +14,16 @@ export interface ServerMeta {
   responseTimeMs: number;
 }
 
-// Candidate server URLs for physical device (127.0.0.1 via ADB reverse), Wi-Fi LAN, and Android emulator
+// Candidate server URLs for cloud backend, physical device (127.0.0.1 via ADB reverse), and Wi-Fi LAN
 export const CANDIDATE_SERVER_URLS = [
+  "https://alibi-backend-ykrh.onrender.com",
   "http://127.0.0.1:8000",
   "http://192.168.1.37:8000",
   "http://10.0.2.2:8000",
 ];
 
 // In-memory server URL store
-let activeServerUrl = "http://127.0.0.1:8000";
+let activeServerUrl = "https://alibi-backend-ykrh.onrender.com";
 
 export function getServerUrl(): string {
   return activeServerUrl;

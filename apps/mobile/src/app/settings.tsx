@@ -84,22 +84,22 @@ export default function SettingsScreen() {
         <Text style={styles.presetLabel}>Quick Presets:</Text>
         <View style={styles.presetRow}>
           <Pressable
+            style={[styles.presetBtn, styles.presetBtnCloud]}
+            onPress={() => applyPreset("https://alibi-backend-ykrh.onrender.com")}
+          >
+            <Text style={[styles.presetBtnText, styles.presetBtnTextCloud]}>Cloud 24/7 (Render)</Text>
+          </Pressable>
+          <Pressable
             style={styles.presetBtn}
             onPress={() => applyPreset("http://127.0.0.1:8000")}
           >
-            <Text style={styles.presetBtnText}>Localhost (USB)</Text>
+            <Text style={styles.presetBtnText}>Local USB</Text>
           </Pressable>
           <Pressable
             style={styles.presetBtn}
             onPress={() => applyPreset("http://192.168.1.37:8000")}
           >
             <Text style={styles.presetBtnText}>Wi-Fi LAN</Text>
-          </Pressable>
-          <Pressable
-            style={styles.presetBtn}
-            onPress={() => applyPreset("http://10.0.2.2:8000")}
-          >
-            <Text style={styles.presetBtnText}>Emulator</Text>
           </Pressable>
         </View>
       </View>
@@ -287,6 +287,14 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
     fontSize: 11,
     fontWeight: "600",
+  },
+  presetBtnCloud: {
+    backgroundColor: "rgba(245, 158, 11, 0.15)",
+    borderColor: "rgba(245, 158, 11, 0.4)",
+  },
+  presetBtnTextCloud: {
+    color: theme.colors.accent.amber,
+    fontWeight: "700",
   },
   saveBtn: {
     backgroundColor: theme.colors.accent.amber,

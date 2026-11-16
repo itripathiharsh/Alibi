@@ -36,9 +36,10 @@ RUN groupadd -g 1000 alibi && \
     useradd -u 1000 -g alibi -s /bin/sh -m alibi
 
 ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app:$PYTHONPATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    ALIBI_MODE=local
+    ALIBI_MODE=hosted
 
 # Copy virtualenv and code from builder
 COPY --from=builder --chown=alibi:alibi /app/.venv /app/.venv
@@ -48,13 +49,15 @@ COPY --chown=alibi:alibi backend/migrations /app/migrations
 COPY --chown=alibi:alibi backend/alembic.ini /app/alembic.ini
 COPY --chown=alibi:alibi infrastructure/docker/entrypoint.sh /app/entrypoint.sh
 
+RUN chmod +x /app/entrypoint.sh
+
 USER alibi
 
 EXPOSE 8000
 
-# Health check using standard library urllib
-HEALTHCHECK --interval=5s --timeout=3s --retries=5 --start-period=5s \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live')" || exit 1
+# Health check using standard library urllib and dynamic PORT
+HEALTHCHECK --interval=5s --timeout=3s --retries=5 --start-period=10s \
+    CMD python -c "import urllib.request, os; p = os.environ.get('PORT', '8000'); urllib.request.urlopen(f'http://localhost:{p}/health/live')" || exit 1
 
 # Default command runs the entrypoint script
 CMD ["/bin/sh", "/app/entrypoint.sh"]
