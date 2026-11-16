@@ -7,17 +7,27 @@
     "scheme": "alibi",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "icon": "./assets/icon_square_transparent.png",
     "splash": {
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#090D16"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.alibi.app"
+      "bundleIdentifier": "com.alibi.app",
+      "icon": "./assets/playstore-icon.png"
     },
     "android": {
       "package": "com.alibi.app",
-      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"]
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon_mark.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "plugins": [
       "expo-router"
@@ -27,4 +37,3 @@
     }
   }
 }
-

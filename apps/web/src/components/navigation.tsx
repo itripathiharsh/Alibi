@@ -23,10 +23,12 @@ export function Navigation() {
         className="hidden lg:flex flex-col w-64 border-r border-border bg-surface p-4 fixed left-0 top-0 bottom-0 z-30"
         aria-label="Main Navigation"
       >
-        <div className="flex items-center gap-2 mb-8 px-2 py-2">
-          <div className="w-8 h-8 rounded-control bg-primary flex items-center justify-center text-white font-bold text-sm tracking-wider">
-            AL
-          </div>
+        <div className="flex items-center gap-3 mb-8 px-2 py-2">
+          <img
+            src="/icon.png"
+            alt="ALIBI Logo"
+            className="w-8 h-8 object-contain"
+          />
           <span className="font-bold text-lg text-text tracking-tight">ALIBI</span>
           <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-primary/10 text-primary ml-auto">
             v1

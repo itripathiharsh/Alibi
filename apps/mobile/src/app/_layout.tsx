@@ -1,7 +1,7 @@
 import React from "react";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, Image } from "react-native";
 import { User, Shield } from "lucide-react-native";
 import theme from "../lib/theme";
 
@@ -32,9 +32,11 @@ export default function RootLayout() {
           options={{
             headerTitle: () => (
               <View style={styles.brandContainer}>
-                <View style={styles.logoBadge}>
-                  <Shield size={16} color={theme.colors.accent.amber} />
-                </View>
+                <Image
+                  source={require("../../assets/icon_mark.png")}
+                  style={styles.headerLogo}
+                  resizeMode="contain"
+                />
                 <Text style={styles.brandTitle}>ALIBI</Text>
                 <View style={styles.versionBadge}>
                   <Text style={styles.versionText}>M0</Text>
@@ -70,6 +72,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  headerLogo: {
+    width: 24,
+    height: 24,
   },
   logoBadge: {
     width: 28,

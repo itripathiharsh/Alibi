@@ -9,6 +9,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { getServerUrl, pingServer, setServerUrl } from "../lib/config";
@@ -63,10 +64,11 @@ export default function MobileLoginScreen() {
     >
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoText}>A</Text>
-          </View>
-          <Text style={styles.title}>ALIBI Mobile</Text>
+          <Image
+            source={require("../../assets/logo_dark.png")}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           <Text style={styles.subtitle}>Sign in with your server credentials</Text>
         </View>
 
@@ -158,19 +160,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 24,
   },
-  logoBadge: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: "#2563EB",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  logoText: {
-    color: "#FFFFFF",
-    fontSize: 26,
-    fontWeight: "bold",
+  logoImage: {
+    width: 220,
+    height: 56,
+    marginBottom: 8,
   },
   title: {
     fontSize: 24,
