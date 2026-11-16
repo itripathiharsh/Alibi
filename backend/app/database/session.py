@@ -22,6 +22,9 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         pool_kwargs: dict[str, Any] = {}
+        connect_args: dict[str, Any] = {}
+        if "pooler.supabase.com" in settings.database_url or "supabase" in settings.database_url:
+            connect_args["statement_cache_size"] = 0
         if settings.alibi_env == "test":
             from sqlalchemy import pool
 
@@ -31,6 +34,7 @@ def get_engine() -> AsyncEngine:
             echo=False,
             future=True,
             pool_pre_ping=True,
+            connect_args=connect_args,
             **pool_kwargs,
         )
     return _engine

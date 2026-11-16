@@ -8,7 +8,7 @@ services:
     dockerfilePath: ./infrastructure/docker/backend.Dockerfile
     plan: free
     region: singapore
-    healthCheckPath: /health/ready
+    healthCheckPath: /health/live
     envVars:
       - key: ALIBI_MODE
         value: hosted

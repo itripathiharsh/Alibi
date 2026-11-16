@@ -55,9 +55,5 @@ USER alibi
 
 EXPOSE 8000
 
-# Health check using standard library urllib and dynamic PORT
-HEALTHCHECK --interval=5s --timeout=3s --retries=5 --start-period=10s \
-    CMD python -c "import urllib.request, os; p = os.environ.get('PORT', '8000'); urllib.request.urlopen(f'http://localhost:{p}/health/live')" || exit 1
-
 # Default command runs the entrypoint script
 CMD ["/bin/sh", "/app/entrypoint.sh"]
