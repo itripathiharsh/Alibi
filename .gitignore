@@ -25,5 +25,6 @@ coverage/
 *.tsbuildinfo
 *.log
 *.gguf
-models/
+/models/
+!backend/app/models/
 .DS_Store
