@@ -175,7 +175,7 @@ dependencies {
 }
 
 // Transpile modern JS (optional chaining ?., nullish coalescing ??, etc.) for JavaScriptCore
-tasks.matching { it.name.startsWith("createBundle") || (it.name.contains("merge") && it.name.endsWith("Assets")) }.configureEach { t ->
+tasks.matching { it.name.startsWith("createBundle") || it.name == "mergeDebugAssets" }.configureEach { t ->
     t.doLast {
         println "[build.gradle] Transpiling index.android.bundle with Babel for JavaScriptCore compatibility..."
         exec {
