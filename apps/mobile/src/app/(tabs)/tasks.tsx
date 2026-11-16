@@ -65,25 +65,35 @@ export default function TasksScreen() {
   const fetchTasks = useCallback(async () => {
     try {
       await autoDetectServer();
-      const token = (await getAccessToken()) || (await ensureAuthenticated());
+      let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
       if (!token) return;
 
-      const res = await fetch(`${baseUrl}/api/v1/tasks?view=${activeView}`, {
+      let res = await fetch(`${baseUrl}/api/v1/tasks?view=${activeView}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (res.status === 401) {
+        token = await ensureAuthenticated(true);
+        if (token) {
+          res = await fetch(`${baseUrl}/api/v1/tasks?view=${activeView}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        }
+      }
       if (res.ok) {
         const data = await res.json();
         setTasks(data);
       }
 
       // Check running timer
-      const timerRes = await fetch(`${baseUrl}/api/v1/time-entries/running`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (timerRes.ok) {
-        const timerData = await timerRes.json();
-        setRunningTimer(timerData);
+      if (token) {
+        const timerRes = await fetch(`${baseUrl}/api/v1/time-entries/running`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (timerRes.ok) {
+          const timerData = await timerRes.json();
+          setRunningTimer(timerData);
+        }
       }
     } catch {
       // Degrade gracefully
@@ -101,7 +111,7 @@ export default function TasksScreen() {
     setIsCapturing(true);
     try {
       await autoDetectServer();
-      const token = (await getAccessToken()) || (await ensureAuthenticated());
+      let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
       if (!token) {
         Alert.alert("Authentication", "Connecting to your ALIBI account...");
@@ -109,7 +119,7 @@ export default function TasksScreen() {
         return;
       }
 
-      const res = await fetch(`${baseUrl}/api/v1/tasks/capture`, {
+      let res = await fetch(`${baseUrl}/api/v1/tasks/capture`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -117,6 +127,22 @@ export default function TasksScreen() {
         },
         body: JSON.stringify({ raw_input: captureText.trim(), origin: isVoiceMode ? "voice" : "manual" }),
       });
+
+      // If token expired, force re-authenticate and retry once
+      if (res.status === 401) {
+        token = await ensureAuthenticated(true);
+        if (token) {
+          res = await fetch(`${baseUrl}/api/v1/tasks/capture`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ raw_input: captureText.trim(), origin: isVoiceMode ? "voice" : "manual" }),
+          });
+        }
+      }
+
       if (res.ok) {
         setCaptureText("");
         setCaptureVisible(false);
@@ -136,9 +162,11 @@ export default function TasksScreen() {
   const handleStatusToggle = async (task: TaskItem) => {
     const nextStatus = task.status === "completed" ? "pending" : "completed";
     try {
-      const token = await getAccessToken();
+      let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
-      const res = await fetch(`${baseUrl}/api/v1/tasks/${task.id}/status`, {
+      if (!token) return;
+
+      let res = await fetch(`${baseUrl}/api/v1/tasks/${task.id}/status`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -146,6 +174,21 @@ export default function TasksScreen() {
         },
         body: JSON.stringify({ status: nextStatus }),
       });
+
+      if (res.status === 401) {
+        token = await ensureAuthenticated(true);
+        if (token) {
+          res = await fetch(`${baseUrl}/api/v1/tasks/${task.id}/status`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ status: nextStatus }),
+          });
+        }
+      }
+
       if (res.ok) {
         fetchTasks();
       }
@@ -156,12 +199,13 @@ export default function TasksScreen() {
 
   const handleTimerAction = async (task: TaskItem) => {
     try {
-      const token = await getAccessToken();
+      let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
+      if (!token) return;
 
       if (runningTimer && runningTimer.task_id === task.id) {
         // Stop timer
-        const res = await fetch(`${baseUrl}/api/v1/time-entries/${runningTimer.id}/stop`, {
+        let res = await fetch(`${baseUrl}/api/v1/time-entries/${runningTimer.id}/stop`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -169,13 +213,26 @@ export default function TasksScreen() {
           },
           body: JSON.stringify({}),
         });
+        if (res.status === 401) {
+          token = await ensureAuthenticated(true);
+          if (token) {
+            res = await fetch(`${baseUrl}/api/v1/time-entries/${runningTimer.id}/stop`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({}),
+            });
+          }
+        }
         if (res.ok) {
           setRunningTimer(null);
           fetchTasks();
         }
       } else {
         // Start timer
-        const res = await fetch(`${baseUrl}/api/v1/time-entries/start`, {
+        let res = await fetch(`${baseUrl}/api/v1/time-entries/start`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -183,12 +240,25 @@ export default function TasksScreen() {
           },
           body: JSON.stringify({ task_id: task.id }),
         });
+        if (res.status === 401) {
+          token = await ensureAuthenticated(true);
+          if (token) {
+            res = await fetch(`${baseUrl}/api/v1/time-entries/start`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ task_id: task.id }),
+            });
+          }
+        }
         if (res.ok) {
           const entry = await res.json();
           setRunningTimer(entry);
           fetchTasks();
         } else {
-          const errData = await res.json();
+          const errData = await res.json().catch(() => ({}));
           Alert.alert("Timer Error", errData.detail || "Failed to start timer.");
         }
       }

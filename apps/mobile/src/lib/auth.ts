@@ -134,14 +134,61 @@ export async function logoutMobile(): Promise<void> {
   await clearAuthData();
 }
 
+function decodeBase64(input: string): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+  let str = input.replace(/=+$/, "");
+  let output = "";
+  if (str.length % 4 === 1) {
+    throw new Error("Invalid base64 string");
+  }
+  for (let bc = 0, bs = 0, buffer, idx = 0; (buffer = str.charAt(idx++)); ) {
+    const charIdx = chars.indexOf(buffer);
+    if (~charIdx) {
+      bs = bc % 4 ? bs * 64 + charIdx : charIdx;
+      if (bc++ % 4) {
+        output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)));
+      }
+    }
+  }
+  return output;
+}
+
+function isJwtExpired(token: string): boolean {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return true;
+    let base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    while (base64.length % 4) {
+      base64 += "=";
+    }
+    const jsonStr = decodeBase64(base64);
+    const payload = JSON.parse(jsonStr);
+    if (payload.exp && Date.now() >= payload.exp * 1000 - 30000) {
+      return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Ensures a valid access token is available.
- * If no token exists, attempts auto-sign-in with the initialized owner account.
+ * If expired or missing, refreshes or auto-sign-ins with the initialized owner account.
  */
-export async function ensureAuthenticated(): Promise<string | null> {
+export async function ensureAuthenticated(forceRefresh: boolean = false): Promise<string | null> {
   const existingToken = await getAccessToken();
-  if (existingToken) return existingToken;
+  if (existingToken && !forceRefresh && !isJwtExpired(existingToken)) {
+    return existingToken;
+  }
 
+  // Try refreshing with existing refresh token first
+  if (existingToken) {
+    const refreshed = await refreshMobileTokens();
+    if (refreshed) return refreshed;
+  }
+
+  // Otherwise, auto sign-in with owner account
   try {
     const res = await loginMobile("owner@alibi.local", "AlibiOwner2026!", "Android Phone");
     if (res.success) {
