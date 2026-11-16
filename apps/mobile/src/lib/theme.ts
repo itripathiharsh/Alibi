@@ -1,30 +1,38 @@
 import tokens from "@alibi/design-tokens";
 
-const dark = tokens.colors.dark;
+const light = tokens.colors.light;
 
 export const theme = {
   colors: {
-    ...dark,
+    ...light,
     background: {
-      base: dark.bg,
+      base: "#F8FAFC",
     },
     surface: {
-      card: dark.surface,
-      surface2: dark.surface2,
-      elevated: dark.surface2,
+      card: "#FFFFFF",
+      surface2: "#F1F5F9",
+      elevated: "#FFFFFF",
     },
     text: {
-      primary: dark.text,
-      secondary: dark.textMuted,
-      muted: dark.textMuted,
+      primary: "#0F172A",
+      secondary: "#64748B",
+      muted: "#94A3B8",
     },
     border: {
-      subtle: dark.border,
+      subtle: "#E2E8F0",
     },
     accent: {
-      amber: dark.warning,
-      emerald: dark.success,
-      primary: dark.primary,
+      amber: "#F97316",
+      emerald: "#10B981",
+      primary: "#F97316",
+      blue: "#0EA5E9",
+      purple: "#8B5CF6",
+    },
+    category: {
+      work: "#F97316",
+      academic: "#2563EB",
+      personal: "#10B981",
+      general: "#64748B",
     },
   },
   spacing: tokens.spacing,
