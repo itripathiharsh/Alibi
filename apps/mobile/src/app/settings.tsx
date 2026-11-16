@@ -11,24 +11,38 @@ import {
 import { useRouter } from "expo-router";
 import { AlertCircle, ArrowLeft, Check, LogOut, Server, Wifi } from "lucide-react-native";
 import theme from "../lib/theme";
-import { getServerUrl, setServerUrl, pingServer, type ServerMeta } from "../lib/config";
-import { logoutMobile } from "../lib/auth";
+import { getServerUrl, setServerUrl, pingServer, autoDetectServer, type ServerMeta } from "../lib/config";
+import { logoutMobile, getUserProfile, type MobileUserProfile } from "../lib/auth";
 
 export default function SettingsScreen() {
   const router = useRouter();
   const [urlInput, setUrlInput] = useState(getServerUrl());
   const [testing, setTesting] = useState(false);
+  const [userProfile, setUserProfile] = useState<MobileUserProfile | null>(null);
   const [result, setResult] = useState<{
     success: boolean;
     data?: ServerMeta;
     error?: string;
   } | null>(null);
 
+  React.useEffect(() => {
+    getUserProfile().then(setUserProfile);
+  }, []);
+
   const handleTestAndSave = async () => {
     setTesting(true);
     const cleanedUrl = setServerUrl(urlInput);
     setUrlInput(cleanedUrl);
     const res = await pingServer(cleanedUrl);
+    setResult(res);
+    setTesting(false);
+  };
+
+  const handleAutoDetect = async () => {
+    setTesting(true);
+    const best = await autoDetectServer();
+    setUrlInput(best);
+    const res = await pingServer(best);
     setResult(res);
     setTesting(false);
   };
@@ -71,34 +85,49 @@ export default function SettingsScreen() {
         <View style={styles.presetRow}>
           <Pressable
             style={styles.presetBtn}
-            onPress={() => applyPreset("http://10.0.2.2:8000")}
+            onPress={() => applyPreset("http://127.0.0.1:8000")}
           >
-            <Text style={styles.presetBtnText}>Android Emulator</Text>
+            <Text style={styles.presetBtnText}>Localhost (USB)</Text>
           </Pressable>
           <Pressable
             style={styles.presetBtn}
-            onPress={() => applyPreset("http://127.0.0.1:8000")}
+            onPress={() => applyPreset("http://192.168.1.37:8000")}
           >
-            <Text style={styles.presetBtnText}>Localhost</Text>
+            <Text style={styles.presetBtnText}>Wi-Fi LAN</Text>
+          </Pressable>
+          <Pressable
+            style={styles.presetBtn}
+            onPress={() => applyPreset("http://10.0.2.2:8000")}
+          >
+            <Text style={styles.presetBtnText}>Emulator</Text>
           </Pressable>
         </View>
       </View>
 
       {/* Action Buttons */}
-      <Pressable
-        style={[styles.saveBtn, testing && styles.saveBtnDisabled]}
-        onPress={handleTestAndSave}
-        disabled={testing}
-      >
-        {testing ? (
-          <ActivityIndicator size="small" color="#090D16" />
-        ) : (
-          <>
-            <Wifi size={16} color="#090D16" />
-            <Text style={styles.saveBtnText}>Test & Save Server URL</Text>
-          </>
-        )}
-      </Pressable>
+      <View style={{ gap: 8 }}>
+        <Pressable
+          style={[styles.saveBtn, testing && styles.saveBtnDisabled]}
+          onPress={handleTestAndSave}
+          disabled={testing}
+        >
+          {testing ? (
+            <ActivityIndicator size="small" color="#090D16" />
+          ) : (
+            <>
+              <Wifi size={16} color="#090D16" />
+              <Text style={styles.saveBtnText}>Test & Save Server URL</Text>
+            </>
+          )}
+        </Pressable>
+        <Pressable
+          style={[styles.autoDetectBtn, testing && styles.saveBtnDisabled]}
+          onPress={handleAutoDetect}
+          disabled={testing}
+        >
+          <Text style={styles.autoDetectBtnText}>Auto-Detect Best Connection</Text>
+        </Pressable>
+      </View>
 
       {/* Test Feedback Box */}
       {result && (
@@ -275,6 +304,20 @@ const styles = StyleSheet.create({
     color: "#090D16",
     fontSize: 13,
     fontWeight: "700",
+  },
+  autoDetectBtn: {
+    backgroundColor: theme.colors.surface.card,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+  },
+  autoDetectBtnText: {
+    color: theme.colors.accent.amber,
+    fontSize: 13,
+    fontWeight: "600",
   },
   resultCard: {
     borderRadius: 10,

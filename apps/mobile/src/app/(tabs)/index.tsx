@@ -25,8 +25,8 @@ import {
   BarChart2,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
-import { getAccessToken } from "../../lib/auth";
-import { getServerUrl, pingServer, type ServerMeta } from "../../lib/config";
+import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
+import { getServerUrl, pingServer, autoDetectServer, type ServerMeta } from "../../lib/config";
 
 type Period = "daily" | "weekly" | "monthly";
 
@@ -89,7 +89,7 @@ export default function DashboardScreen() {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const token = await getAccessToken();
+      const token = (await getAccessToken()) || (await ensureAuthenticated());
       const headers: Record<string, string> = { Accept: "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -116,7 +116,9 @@ export default function DashboardScreen() {
   }, [period]);
 
   const checkConnection = async () => {
-    const res = await pingServer();
+    const detectedUrl = await autoDetectServer();
+    setServerUrlState(detectedUrl);
+    const res = await pingServer(detectedUrl);
     setPingResult(res);
   };
 

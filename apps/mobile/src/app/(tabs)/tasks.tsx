@@ -22,10 +22,12 @@ import {
   X,
   CheckCircle2,
   Circle,
+  Mic,
+  MicOff,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
-import { getAccessToken } from "../../lib/auth";
-import { getServerUrl } from "../../lib/config";
+import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
+import { getServerUrl, autoDetectServer } from "../../lib/config";
 
 const VIEWS = ["today", "upcoming", "backlog", "completed"] as const;
 
@@ -58,10 +60,12 @@ export default function TasksScreen() {
   const [captureVisible, setCaptureVisible] = useState(false);
   const [captureText, setCaptureText] = useState("");
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
 
   const fetchTasks = useCallback(async () => {
     try {
-      const token = await getAccessToken();
+      await autoDetectServer();
+      const token = (await getAccessToken()) || (await ensureAuthenticated());
       const baseUrl = getServerUrl();
       if (!token) return;
 
@@ -96,25 +100,34 @@ export default function TasksScreen() {
     if (!captureText.trim() || isCapturing) return;
     setIsCapturing(true);
     try {
-      const token = await getAccessToken();
+      await autoDetectServer();
+      const token = (await getAccessToken()) || (await ensureAuthenticated());
       const baseUrl = getServerUrl();
+      if (!token) {
+        Alert.alert("Authentication", "Connecting to your ALIBI account...");
+        setIsCapturing(false);
+        return;
+      }
+
       const res = await fetch(`${baseUrl}/api/v1/tasks/capture`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ raw_input: captureText.trim(), origin: "manual" }),
+        body: JSON.stringify({ raw_input: captureText.trim(), origin: isVoiceMode ? "voice" : "manual" }),
       });
       if (res.ok) {
         setCaptureText("");
         setCaptureVisible(false);
+        setIsVoiceMode(false);
         fetchTasks();
       } else {
-        Alert.alert("Capture Error", "Failed to parse and capture task.");
+        const errJson = await res.json().catch(() => ({}));
+        Alert.alert("Capture Error", errJson.detail || "Failed to parse and capture task.");
       }
     } catch (err: unknown) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Failed to capture task.");
+      Alert.alert("Network Error", err instanceof Error ? err.message : "Failed to capture task. Check server connectivity.");
     } finally {
       setIsCapturing(false);
     }
@@ -324,25 +337,92 @@ export default function TasksScreen() {
                 <Sparkles size={18} color={theme.colors.accent.amber} />
                 <Text style={styles.modalTitle}>Quick Capture</Text>
               </View>
-              <Pressable onPress={() => setCaptureVisible(false)}>
+              <Pressable onPress={() => { setCaptureVisible(false); setIsVoiceMode(false); }}>
                 <X size={20} color={theme.colors.text.secondary} />
               </Pressable>
             </View>
 
-            <TextInput
-              style={styles.captureInput}
-              value={captureText}
-              onChangeText={setCaptureText}
-              placeholder="e.g. Finish report by tomorrow 5pm #work @alibi"
-              placeholderTextColor={theme.colors.text.secondary}
-              multiline
-              autoFocus
-            />
+            {/* Mode Switcher: Text vs Voice */}
+            <View style={styles.modeToggleRow}>
+              <Pressable
+                style={[styles.modeToggleBtn, !isVoiceMode && styles.modeToggleBtnActive]}
+                onPress={() => setIsVoiceMode(false)}
+              >
+                <Text style={[styles.modeToggleText, !isVoiceMode && styles.modeToggleTextActive]}>
+                  Text Input
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modeToggleBtn, isVoiceMode && styles.modeToggleBtnActive]}
+                onPress={() => setIsVoiceMode(true)}
+              >
+                <Mic size={14} color={isVoiceMode ? "#090D16" : theme.colors.accent.amber} />
+                <Text style={[styles.modeToggleText, isVoiceMode && styles.modeToggleTextActive]}>
+                  Speech & Dictation
+                </Text>
+              </Pressable>
+            </View>
+
+            {isVoiceMode && (
+              <View style={styles.voiceBanner}>
+                <View style={styles.voiceIconCircle}>
+                  <Mic size={24} color={theme.colors.accent.amber} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.voiceBannerTitle}>Speech Dictation Active</Text>
+                  <Text style={styles.voiceBannerSubtitle}>
+                    Dictate your task naturally using your keyboard's microphone, or choose a common voice template below.
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.captureInput}
+                value={captureText}
+                onChangeText={setCaptureText}
+                placeholder={isVoiceMode ? "Dictate or tap a template: e.g. Finish report by tomorrow 5pm #work" : "e.g. Finish report by tomorrow 5pm #work @alibi"}
+                placeholderTextColor={theme.colors.text.secondary}
+                multiline
+                autoFocus
+              />
+              <Pressable
+                style={[styles.inputMicBtn, isVoiceMode && styles.inputMicBtnActive]}
+                onPress={() => setIsVoiceMode(!isVoiceMode)}
+                accessibilityLabel="Toggle voice speech dictation"
+              >
+                <Mic size={18} color={isVoiceMode ? "#090D16" : theme.colors.accent.amber} />
+              </Pressable>
+            </View>
+
+            {/* Voice suggestion chips */}
+            {isVoiceMode && (
+              <View style={styles.suggestionSection}>
+                <Text style={styles.suggestionHeader}>Quick Speech Templates:</Text>
+                <View style={styles.chipsRow}>
+                  {[
+                    "Finish client report by tomorrow 5pm #work",
+                    "Call doctor at 2pm #urgent",
+                    "Review code changes tonight #dev",
+                    "Buy groceries today at 6pm #personal",
+                  ].map((preset) => (
+                    <Pressable
+                      key={preset}
+                      style={styles.chip}
+                      onPress={() => setCaptureText(preset)}
+                    >
+                      <Text style={styles.chipText}>{preset}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
 
             <View style={styles.modalActions}>
               <Pressable
                 style={styles.cancelBtn}
-                onPress={() => setCaptureVisible(false)}
+                onPress={() => { setCaptureVisible(false); setIsVoiceMode(false); }}
               >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </Pressable>
@@ -524,16 +604,115 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: theme.colors.text.primary,
   },
+  modeToggleRow: {
+    flexDirection: "row",
+    backgroundColor: theme.colors.background.base,
+    borderRadius: 8,
+    padding: 3,
+    gap: 4,
+  },
+  modeToggleBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 6,
+  },
+  modeToggleBtnActive: {
+    backgroundColor: theme.colors.accent.amber,
+  },
+  modeToggleText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: theme.colors.text.secondary,
+  },
+  modeToggleTextActive: {
+    color: "#090D16",
+    fontWeight: "700",
+  },
+  voiceBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(245, 158, 11, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.25)",
+    borderRadius: 10,
+    padding: 10,
+    gap: 10,
+  },
+  voiceIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(245, 158, 11, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  voiceBannerTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.colors.accent.amber,
+  },
+  voiceBannerSubtitle: {
+    fontSize: 11,
+    color: theme.colors.text.secondary,
+    lineHeight: 15,
+  },
+  inputContainer: {
+    position: "relative",
+  },
   captureInput: {
     backgroundColor: theme.colors.background.base,
     borderRadius: 10,
     padding: 12,
+    paddingRight: 44,
     color: theme.colors.text.primary,
     fontSize: 14,
     borderWidth: 1,
     borderColor: theme.colors.border.subtle,
     minHeight: 80,
     textAlignVertical: "top",
+  },
+  inputMicBtn: {
+    position: "absolute",
+    right: 10,
+    bottom: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(245, 158, 11, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inputMicBtnActive: {
+    backgroundColor: theme.colors.accent.amber,
+  },
+  suggestionSection: {
+    gap: 6,
+  },
+  suggestionHeader: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: theme.colors.text.secondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  chipsRow: {
+    gap: 6,
+  },
+  chip: {
+    backgroundColor: theme.colors.background.base,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+  },
+  chipText: {
+    color: theme.colors.text.primary,
+    fontSize: 12,
   },
   modalActions: {
     flexDirection: "row",

@@ -1,12 +1,21 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Pressable, StyleSheet, Text, View, Image } from "react-native";
 import { User, Shield } from "lucide-react-native";
 import theme from "../lib/theme";
+import { autoDetectServer } from "../lib/config";
+import { ensureAuthenticated } from "../lib/auth";
 
 export default function RootLayout() {
   const router = useRouter();
+
+  useEffect(() => {
+    // Proactively connect to backend and ensure authenticated session
+    autoDetectServer().then(() => {
+      ensureAuthenticated();
+    });
+  }, []);
 
   return (
     <>
@@ -46,11 +55,12 @@ export default function RootLayout() {
             headerRight: () => (
               <Pressable
                 onPress={() => router.push("/settings" as const)}
-                style={styles.avatarButton}
+                style={({ pressed }) => [styles.avatarButton, pressed && { opacity: 0.7 }]}
+                hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
                 accessibilityRole="button"
                 accessibilityLabel="Open settings and server configuration"
               >
-                <User size={18} color={theme.colors.text.primary} />
+                <User size={20} color={theme.colors.accent.amber} />
               </Pressable>
             ),
           }}
@@ -60,6 +70,13 @@ export default function RootLayout() {
           options={{
             presentation: "modal",
             headerTitle: "Settings & Connectivity",
+          }}
+        />
+        <Stack.Screen
+          name="login"
+          options={{
+            presentation: "modal",
+            headerTitle: "Sign In",
           }}
         />
       </Stack>

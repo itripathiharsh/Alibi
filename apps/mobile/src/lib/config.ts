@@ -14,8 +14,15 @@ export interface ServerMeta {
   responseTimeMs: number;
 }
 
-// In-memory server URL store (persisted via SecureStore from Milestone M1 onwards)
-let activeServerUrl = "http://10.0.2.2:8000";
+// Candidate server URLs for physical device (127.0.0.1 via ADB reverse), Wi-Fi LAN, and Android emulator
+export const CANDIDATE_SERVER_URLS = [
+  "http://127.0.0.1:8000",
+  "http://192.168.1.37:8000",
+  "http://10.0.2.2:8000",
+];
+
+// In-memory server URL store
+let activeServerUrl = "http://127.0.0.1:8000";
 
 export function getServerUrl(): string {
   return activeServerUrl;
@@ -25,6 +32,24 @@ export function setServerUrl(url: string): string {
   // Normalize URL - strip trailing slash
   const trimmed = url.trim().replace(/\/+$/, "");
   activeServerUrl = trimmed;
+  return activeServerUrl;
+}
+
+export async function autoDetectServer(): Promise<string> {
+  // First check if current active URL works
+  const currentCheck = await pingServer(activeServerUrl);
+  if (currentCheck.success) {
+    return activeServerUrl;
+  }
+  // Try candidates in order
+  for (const candidate of CANDIDATE_SERVER_URLS) {
+    if (candidate === activeServerUrl) continue;
+    const res = await pingServer(candidate);
+    if (res.success) {
+      setServerUrl(candidate);
+      return candidate;
+    }
+  }
   return activeServerUrl;
 }
 

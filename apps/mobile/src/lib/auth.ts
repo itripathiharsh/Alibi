@@ -134,3 +134,23 @@ export async function logoutMobile(): Promise<void> {
   await clearAuthData();
 }
 
+/**
+ * Ensures a valid access token is available.
+ * If no token exists, attempts auto-sign-in with the initialized owner account.
+ */
+export async function ensureAuthenticated(): Promise<string | null> {
+  const existingToken = await getAccessToken();
+  if (existingToken) return existingToken;
+
+  try {
+    const res = await loginMobile("owner@alibi.local", "AlibiOwner2026!", "Android Phone");
+    if (res.success) {
+      return await getAccessToken();
+    }
+  } catch {
+    // Best-effort auto sign-in
+  }
+  return null;
+}
+
+
