@@ -51,6 +51,56 @@ if (!Promise.allSettled) {
   };
 }
 
+if (!Array.prototype.findLastIndex) {
+  Array.prototype.findLastIndex = function (predicate, thisArg) {
+    if (this == null) {
+      throw new TypeError('Array.prototype.findLastIndex called on null or undefined');
+    }
+    if (typeof predicate !== 'function') {
+      throw new TypeError('predicate must be a function');
+    }
+    var list = Object(this);
+    var length = Number(list.length) || 0;
+    for (var i = length - 1; i >= 0; i--) {
+      if (predicate.call(thisArg, list[i], i, list)) {
+        return i;
+      }
+    }
+    return -1;
+  };
+}
+
+if (!Array.prototype.findLast) {
+  Array.prototype.findLast = function (predicate, thisArg) {
+    if (this == null) {
+      throw new TypeError('Array.prototype.findLast called on null or undefined');
+    }
+    if (typeof predicate !== 'function') {
+      throw new TypeError('predicate must be a function');
+    }
+    var list = Object(this);
+    var length = Number(list.length) || 0;
+    for (var i = length - 1; i >= 0; i--) {
+      if (predicate.call(thisArg, list[i], i, list)) {
+        return list[i];
+      }
+    }
+    return undefined;
+  };
+}
+
+if (!Array.prototype.toReversed) {
+  Array.prototype.toReversed = function () {
+    return Array.from(this).reverse();
+  };
+}
+
+if (!Array.prototype.toSorted) {
+  Array.prototype.toSorted = function (compareFn) {
+    return Array.from(this).sort(compareFn);
+  };
+}
+
 if (typeof globalThis.AggregateError === 'undefined') {
   function AggregateError(errors, message) {
     var err = new Error(message);

@@ -96,12 +96,15 @@ class TaskRepository(BaseRepository[Task]):
             # Today in user tz: deadline_at AT TIME ZONE tz has date == local_today
             # OR deadline_at < now (overdue)
             # OR status == 'in_progress'
+            # OR unscheduled today tasks created today with no deadline (doc 05 §3)
             stmt = stmt.where(
                 Task.status.in_(open_statuses),
                 or_(
                     Task.status == "in_progress",
                     func.date(func.timezone(tz_name, Task.deadline_at)) == local_today,
                     Task.deadline_at.is_not(None) & (Task.deadline_at < now),
+                    Task.deadline_at.is_(None)
+                    & (func.date(func.timezone(tz_name, Task.created_at)) == local_today),
                 ),
             ).order_by(
                 # In progress first, then overdue/deadline ascending, then priority

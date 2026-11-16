@@ -9,6 +9,8 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Linking,
+  Platform,
 } from "react-native";
 import {
   CheckSquare,
@@ -60,7 +62,21 @@ export default function TasksScreen() {
   const [captureVisible, setCaptureVisible] = useState(false);
   const [captureText, setCaptureText] = useState("");
   const [isCapturing, setIsCapturing] = useState(false);
-  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+
+  const handleMicPress = async () => {
+    setIsListening(true);
+    if (Platform.OS === "android") {
+      try {
+        await Linking.sendIntent("android.speech.action.RECOGNIZE_SPEECH", [
+          { key: "android.speech.extra.LANGUAGE_MODEL", value: "free_form" },
+          { key: "android.speech.extra.PROMPT", value: "Dictate task title, deadline or tags..." },
+        ]);
+      } catch {
+        // Fallback: user can dictate directly using keyboard's microphone
+      }
+    }
+  };
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -125,7 +141,7 @@ export default function TasksScreen() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ raw_input: captureText.trim(), origin: isVoiceMode ? "voice" : "manual" }),
+        body: JSON.stringify({ raw_input: captureText.trim(), origin: isListening ? "voice" : "manual" }),
       });
 
       // If token expired, force re-authenticate and retry once
@@ -138,15 +154,34 @@ export default function TasksScreen() {
               "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({ raw_input: captureText.trim(), origin: isVoiceMode ? "voice" : "manual" }),
+            body: JSON.stringify({ raw_input: captureText.trim(), origin: isListening ? "voice" : "manual" }),
           });
         }
       }
 
       if (res.ok) {
+        const result = await res.json();
+        const capturedTask = result.task;
+        if (capturedTask) {
+          setTasks((prev) => [
+            {
+              id: capturedTask.id,
+              title: capturedTask.title,
+              status: capturedTask.status || "pending",
+              priority: capturedTask.priority,
+              deadline_at: capturedTask.deadline_at,
+              estimate_user_min: capturedTask.estimate_user_min,
+              actual_min: capturedTask.actual_min || 0,
+              reschedule_count: capturedTask.reschedule_count || 0,
+              tags: capturedTask.tags || [],
+              subtasks: capturedTask.subtasks || [],
+            },
+            ...prev,
+          ]);
+        }
         setCaptureText("");
         setCaptureVisible(false);
-        setIsVoiceMode(false);
+        setIsListening(false);
         fetchTasks();
       } else {
         const errJson = await res.json().catch(() => ({}));
@@ -407,43 +442,17 @@ export default function TasksScreen() {
                 <Sparkles size={18} color={theme.colors.accent.amber} />
                 <Text style={styles.modalTitle}>Quick Capture</Text>
               </View>
-              <Pressable onPress={() => { setCaptureVisible(false); setIsVoiceMode(false); }}>
+              <Pressable onPress={() => { setCaptureVisible(false); setIsListening(false); }}>
                 <X size={20} color={theme.colors.text.secondary} />
               </Pressable>
             </View>
 
-            {/* Mode Switcher: Text vs Voice */}
-            <View style={styles.modeToggleRow}>
-              <Pressable
-                style={[styles.modeToggleBtn, !isVoiceMode && styles.modeToggleBtnActive]}
-                onPress={() => setIsVoiceMode(false)}
-              >
-                <Text style={[styles.modeToggleText, !isVoiceMode && styles.modeToggleTextActive]}>
-                  Text Input
+            {isListening && (
+              <View style={styles.listeningHintRow}>
+                <Mic size={14} color={theme.colors.accent.amber} />
+                <Text style={styles.listeningHintText}>
+                  Listening active: Speak now or use Gboard mic 🎙️
                 </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modeToggleBtn, isVoiceMode && styles.modeToggleBtnActive]}
-                onPress={() => setIsVoiceMode(true)}
-              >
-                <Mic size={14} color={isVoiceMode ? "#090D16" : theme.colors.accent.amber} />
-                <Text style={[styles.modeToggleText, isVoiceMode && styles.modeToggleTextActive]}>
-                  Speech & Dictation
-                </Text>
-              </Pressable>
-            </View>
-
-            {isVoiceMode && (
-              <View style={styles.voiceBanner}>
-                <View style={styles.voiceIconCircle}>
-                  <Mic size={24} color={theme.colors.accent.amber} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.voiceBannerTitle}>Speech Dictation Active</Text>
-                  <Text style={styles.voiceBannerSubtitle}>
-                    Dictate your task naturally using your keyboard's microphone, or choose a common voice template below.
-                  </Text>
-                </View>
               </View>
             )}
 
@@ -452,47 +461,45 @@ export default function TasksScreen() {
                 style={styles.captureInput}
                 value={captureText}
                 onChangeText={setCaptureText}
-                placeholder={isVoiceMode ? "Dictate or tap a template: e.g. Finish report by tomorrow 5pm #work" : "e.g. Finish report by tomorrow 5pm #work @alibi"}
+                placeholder="Type or dictate task... e.g. Finish report by tomorrow 5pm #work"
                 placeholderTextColor={theme.colors.text.secondary}
                 multiline
                 autoFocus
               />
               <Pressable
-                style={[styles.inputMicBtn, isVoiceMode && styles.inputMicBtnActive]}
-                onPress={() => setIsVoiceMode(!isVoiceMode)}
-                accessibilityLabel="Toggle voice speech dictation"
+                style={[styles.inputMicBtn, isListening && styles.inputMicBtnActive]}
+                onPress={handleMicPress}
+                accessibilityLabel="Activate speech dictation"
               >
-                <Mic size={18} color={isVoiceMode ? "#090D16" : theme.colors.accent.amber} />
+                <Mic size={18} color={isListening ? "#090D16" : theme.colors.accent.amber} />
               </Pressable>
             </View>
 
-            {/* Voice suggestion chips */}
-            {isVoiceMode && (
-              <View style={styles.suggestionSection}>
-                <Text style={styles.suggestionHeader}>Quick Speech Templates:</Text>
-                <View style={styles.chipsRow}>
-                  {[
-                    "Finish client report by tomorrow 5pm #work",
-                    "Call doctor at 2pm #urgent",
-                    "Review code changes tonight #dev",
-                    "Buy groceries today at 6pm #personal",
-                  ].map((preset) => (
-                    <Pressable
-                      key={preset}
-                      style={styles.chip}
-                      onPress={() => setCaptureText(preset)}
-                    >
-                      <Text style={styles.chipText}>{preset}</Text>
-                    </Pressable>
-                  ))}
-                </View>
+            {/* Quick Suggestions */}
+            <View style={styles.suggestionSection}>
+              <Text style={styles.suggestionHeader}>Quick Templates (Tap to fill):</Text>
+              <View style={styles.chipsRow}>
+                {[
+                  "Finish client report by tomorrow 5pm #work",
+                  "Call doctor at 2pm #urgent",
+                  "Review code changes tonight #dev",
+                  "Buy groceries today at 6pm #personal",
+                ].map((preset) => (
+                  <Pressable
+                    key={preset}
+                    style={styles.chip}
+                    onPress={() => setCaptureText(preset)}
+                  >
+                    <Text style={styles.chipText}>{preset}</Text>
+                  </Pressable>
+                ))}
               </View>
-            )}
+            </View>
 
             <View style={styles.modalActions}>
               <Pressable
                 style={styles.cancelBtn}
-                onPress={() => { setCaptureVisible(false); setIsVoiceMode(false); }}
+                onPress={() => { setCaptureVisible(false); setIsListening(false); }}
               >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </Pressable>
@@ -674,61 +681,21 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: theme.colors.text.primary,
   },
-  modeToggleRow: {
-    flexDirection: "row",
-    backgroundColor: theme.colors.background.base,
-    borderRadius: 8,
-    padding: 3,
-    gap: 4,
-  },
-  modeToggleBtn: {
-    flex: 1,
+  listeningHintRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 6,
-  },
-  modeToggleBtnActive: {
-    backgroundColor: theme.colors.accent.amber,
-  },
-  modeToggleText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: theme.colors.text.secondary,
-  },
-  modeToggleTextActive: {
-    color: "#090D16",
-    fontWeight: "700",
-  },
-  voiceBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(245, 158, 11, 0.08)",
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
     borderWidth: 1,
-    borderColor: "rgba(245, 158, 11, 0.25)",
-    borderRadius: 10,
-    padding: 10,
-    gap: 10,
+    borderColor: "rgba(245, 158, 11, 0.3)",
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    gap: 8,
   },
-  voiceIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(245, 158, 11, 0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  voiceBannerTitle: {
-    fontSize: 13,
-    fontWeight: "700",
+  listeningHintText: {
+    fontSize: 12,
     color: theme.colors.accent.amber,
-  },
-  voiceBannerSubtitle: {
-    fontSize: 11,
-    color: theme.colors.text.secondary,
-    lineHeight: 15,
+    fontWeight: "600",
   },
   inputContainer: {
     position: "relative",
