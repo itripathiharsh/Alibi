@@ -173,3 +173,13 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Transpile modern JS (optional chaining ?., nullish coalescing ??, etc.) for JavaScriptCore
+tasks.matching { it.name.startsWith("createBundle") || (it.name.contains("merge") && it.name.endsWith("Assets")) }.configureEach { t ->
+    t.doLast {
+        println "[build.gradle] Transpiling index.android.bundle with Babel for JavaScriptCore compatibility..."
+        exec {
+            commandLine "node", file("${projectDir}/../../transpile_bundle_gradle.js").absolutePath
+        }
+    }
+}
