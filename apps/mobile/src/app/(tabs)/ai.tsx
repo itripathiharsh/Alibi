@@ -29,6 +29,7 @@ import {
 import theme from "../../lib/theme";
 import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
 import { getServerUrl, autoDetectServer } from "../../lib/config";
+import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 
 interface Message {
   id: string;
@@ -68,27 +69,40 @@ export default function AIScreen() {
   }, []);
 
   const handleVoiceDictation = async () => {
-    if (Platform.OS === "android") {
-      try {
-        setIsVoiceMode(true);
-        await Linking.sendIntent("android.speech.action.RECOGNIZE_SPEECH", [
-          { key: "android.speech.extra.LANGUAGE_MODEL", value: "free_form" },
-          { key: "android.speech.extra.PROMPT", value: "Ask your ALIBI Assistant..." },
-        ]);
-      } catch (err) {
-        Alert.alert(
-          "Voice Input",
-          "Speech recognition service is not responding or needs microphone permissions. You can also type your question."
-        );
-      } finally {
-        setTimeout(() => setIsVoiceMode(false), 3000);
-      }
-    } else {
-      setIsVoiceMode(!isVoiceMode);
+    if (isVoiceMode) {
+      await stopSpeechRecognition();
+      setIsVoiceMode(false);
+      return;
+    }
+
+    const baseText = inputText.trim();
+    setIsVoiceMode(true);
+    const ok = await startSpeechRecognition({
+      onStart: () => setIsVoiceMode(true),
+      onResults: (text, isFinal) => {
+        const combined = baseText ? `${baseText} ${text}` : text;
+        setInputText(combined);
+        if (isFinal) {
+          setIsVoiceMode(false);
+        }
+      },
+      onError: (err) => {
+        setIsVoiceMode(false);
+        Alert.alert("Voice Input", err);
+      },
+      onEnd: () => {
+        setIsVoiceMode(false);
+      },
+    });
+
+    if (!ok) {
+      setIsVoiceMode(false);
     }
   };
 
   const handleSend = async (textToSend?: string) => {
+    stopSpeechRecognition();
+    setIsVoiceMode(false);
     const text = (textToSend || inputText).trim();
     if (!text || isLoading) return;
 

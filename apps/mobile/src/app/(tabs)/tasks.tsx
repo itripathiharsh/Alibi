@@ -30,6 +30,7 @@ import {
 import theme from "../../lib/theme";
 import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
 import { getServerUrl, autoDetectServer } from "../../lib/config";
+import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 
 const VIEWS = ["today", "upcoming", "backlog", "completed"] as const;
 
@@ -65,16 +66,34 @@ export default function TasksScreen() {
   const [isListening, setIsListening] = useState(false);
 
   const handleMicPress = async () => {
+    if (isListening) {
+      await stopSpeechRecognition();
+      setIsListening(false);
+      return;
+    }
+
+    const baseText = captureText.trim();
     setIsListening(true);
-    if (Platform.OS === "android") {
-      try {
-        await Linking.sendIntent("android.speech.action.RECOGNIZE_SPEECH", [
-          { key: "android.speech.extra.LANGUAGE_MODEL", value: "free_form" },
-          { key: "android.speech.extra.PROMPT", value: "Dictate task title, deadline or tags..." },
-        ]);
-      } catch {
-        // Fallback: user can dictate directly using keyboard's microphone
-      }
+    const ok = await startSpeechRecognition({
+      onStart: () => setIsListening(true),
+      onResults: (text, isFinal) => {
+        const combined = baseText ? `${baseText} ${text}` : text;
+        setCaptureText(combined);
+        if (isFinal) {
+          setIsListening(false);
+        }
+      },
+      onError: (err) => {
+        setIsListening(false);
+        Alert.alert("Voice Input", err);
+      },
+      onEnd: () => {
+        setIsListening(false);
+      },
+    });
+
+    if (!ok) {
+      setIsListening(false);
     }
   };
 
@@ -442,7 +461,7 @@ export default function TasksScreen() {
                 <Sparkles size={18} color={theme.colors.accent.amber} />
                 <Text style={styles.modalTitle}>Quick Capture</Text>
               </View>
-              <Pressable onPress={() => { setCaptureVisible(false); setIsListening(false); }}>
+              <Pressable onPress={() => { stopSpeechRecognition(); setCaptureVisible(false); setIsListening(false); }}>
                 <X size={20} color={theme.colors.text.secondary} />
               </Pressable>
             </View>
@@ -451,7 +470,7 @@ export default function TasksScreen() {
               <View style={styles.listeningHintRow}>
                 <Mic size={14} color={theme.colors.accent.amber} />
                 <Text style={styles.listeningHintText}>
-                  Listening active: Speak now or use Gboard mic 🎙️
+                  Listening in real-time: Speak now... 🎙️
                 </Text>
               </View>
             )}
@@ -499,14 +518,14 @@ export default function TasksScreen() {
             <View style={styles.modalActions}>
               <Pressable
                 style={styles.cancelBtn}
-                onPress={() => { setCaptureVisible(false); setIsListening(false); }}
+                onPress={() => { stopSpeechRecognition(); setCaptureVisible(false); setIsListening(false); }}
               >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </Pressable>
               <Pressable
                 style={[styles.confirmBtn, !captureText.trim() && { opacity: 0.5 }]}
                 disabled={!captureText.trim() || isCapturing}
-                onPress={handleCapture}
+                onPress={() => { stopSpeechRecognition(); setIsListening(false); handleCapture(); }}
               >
                 <Text style={styles.confirmBtnText}>
                   {isCapturing ? "Capturing..." : "Save Task"}
