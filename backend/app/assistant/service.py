@@ -4,6 +4,7 @@ Coordinates intent routing, SQL tools, hybrid vault retrieval, context assembly,
 grounding validation, and deterministic fallbacks.
 """
 
+import logging
 import uuid
 from typing import Any
 
@@ -18,6 +19,8 @@ from app.assistant.validator import (
 from app.core.time import utc_now
 from app.models.vault import ChatMessage, ChatThread
 from app.vault.search import VaultSearchService
+
+logger = logging.getLogger("alibi.assistant.service")
 
 
 class AssistantService:
@@ -118,6 +121,10 @@ class AssistantService:
 
         # 2. Intent Routing
         plan = route_intent(clean_msg)
+        # Pre-fetch pending tasks for greeting and breakdown intents
+        if ("GREETING" in plan.intents or "BREAKDOWN" in plan.intents) and "PENDING_OVERDUE" not in plan.intents:
+            plan.intents.append("PENDING_OVERDUE")
+
         tools = AssistantSQLTools(self.session, user_id=user_id)
         tool_results_list: list[dict[str, Any]] = []
         allowed_numbers: set[float] = set()
@@ -156,28 +163,30 @@ class AssistantService:
                     }
                 )
 
-        # 3. Vault Search
-        search_svc = VaultSearchService(self.session)
-        vault_items = await search_svc.search(
-            user_id=user_id,
-            query=clean_msg,
-            mode="hybrid",
-            start_date=plan.start_date,
-            end_date=plan.end_date,
-            limit=8,
-        )
-        vault_sources = [
-            {
-                "note_id": str(v.note_id),
-                "title": v.title,
-                "snippet": v.snippet,
-                "source_type": v.source_type,
-                "occurred_on": v.occurred_on.isoformat(),
-                "score": v.score,
-            }
-            for v in vault_items
-        ]
-        allowed_numbers.add(float(len(vault_sources)))
+        # 3. Vault Search (if requested or general semantic search)
+        vault_sources: list[dict[str, Any]] = []
+        if "VAULT_SEARCH" in plan.intents or plan.needs_semantic:
+            search_svc = VaultSearchService(self.session)
+            vault_items = await search_svc.search(
+                user_id=user_id,
+                query=clean_msg,
+                mode="hybrid",
+                start_date=plan.start_date,
+                end_date=plan.end_date,
+                limit=8,
+            )
+            vault_sources = [
+                {
+                    "note_id": str(v.note_id),
+                    "title": v.title,
+                    "snippet": v.snippet,
+                    "source_type": v.source_type,
+                    "occurred_on": v.occurred_on.isoformat(),
+                    "score": v.score,
+                }
+                for v in vault_items
+            ]
+            allowed_numbers.add(float(len(vault_sources)))
 
         # 4. Generate Answer via deterministic path (R11, ADR-020, AC-RAG-7)
         # Guarantees 0% fabricated facts, numbers, or citations.
@@ -185,9 +194,52 @@ class AssistantService:
             tool_results=tool_results_list,
             vault_sources=vault_sources,
             query=clean_msg,
+            intents=plan.intents,
         )
+        provider_name = "deterministic_alibi"
+        model_name = "grounded_v1"
 
-        # 5. Record Assistant Message
+        # 5. Optional LLM Synthesis with Grounding Validation if provider available (doc 08 §3)
+        if (sources or tool_results_list) and not any(i in plan.intents for i in ["GREETING", "CAPABILITIES"]):
+            try:
+                from app.ai.gateway import AIGateway
+                from app.ai.types import LLMRequest, Message, Operation
+                from app.assistant.validator import GroundingValidator
+
+                gateway = AIGateway(self.session)
+                context_lines = []
+                for s in sources:
+                    context_lines.append(f"[{s['alias']}] {s.get('title', '')}: {s.get('snippet', '')}")
+                context_str = "\n".join(context_lines)
+
+                system_prompt = (
+                    "You are ALIBI Grounded Assistant. Answer the user strictly using the provided context facts labeled [S1], [S2]... "
+                    "Cite every factual statement with the exact citation tag [S#]. "
+                    "Never invent, assume, or extrapolate numbers, dates, or details. "
+                    "If the answer is not in the context, state clearly that you don't have records about that."
+                )
+                user_prompt = f"Context:\n{context_str}\n\nQuestion: {clean_msg}"
+                llm_req = LLMRequest(
+                    operation=Operation.RAG_ANSWER,
+                    messages=[
+                        Message(role="system", content=system_prompt),
+                        Message(role="user", content=user_prompt),
+                    ],
+                    timeout_s=15,
+                )
+                llm_res = await gateway.complete(llm_req, user_id=user_id)
+                if llm_res.ok and llm_res.data:
+                    valid_aliases = {s["alias"] for s in sources}
+                    validator = GroundingValidator(valid_aliases, allowed_numbers)
+                    val_res = validator.validate(str(llm_res.data))
+                    if val_res.is_valid:
+                        answer_text = str(llm_res.data)
+                        provider_name = llm_res.provider
+                        model_name = llm_res.model
+            except Exception as e:
+                logger.debug("LLM synthesis skipped or fallback used: %s", e)
+
+        # 6. Record Assistant Message
         assistant_msg = ChatMessage(
             thread_id=thread.id,
             user_id=user_id,
@@ -195,8 +247,8 @@ class AssistantService:
             content=answer_text,
             sources=sources,
             tool_calls=executed_tool_calls,
-            provider="deterministic_alibi",
-            model="grounded_v1",
+            provider=provider_name,
+            model=model_name,
         )
         self.session.add(assistant_msg)
         thread.updated_at = utc_now()

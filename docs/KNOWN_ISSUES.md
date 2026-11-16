@@ -7,6 +7,7 @@ IDs: `KI-###` for defects/limitations, `RISK-###` for planning risks. Every S1/S
 |----|----------|------|---------|----------|-----------|-------|--------|
 | KI-001 | S3 (Minor) | Tooling (Windows) | Windows Application Control (os error 4551) blocks unsigned `.venv/Scripts/*.exe` wrappers | M0 | Invoke tools via `python -m <module>` (handled automatically in `make.ps1`) | Agent | Mitigated |
 | KI-002 | S3 (Minor) | Build (Web) | Next.js standalone build attempts NTFS symlinks requiring elevated developer mode on Windows | M0 | Guarded with `BUILD_STANDALONE=true` so Windows local dev exports cleanly while Docker builds standalone | Agent | Mitigated |
+| KI-003 | S2 (Major) | Assistant (RAG) | Chatbot returned 'no records' fallback due to task status mismatch ('draft'/'active') and missing conversational / priority intent patterns | Post-M12 | Fixed in `intent.py`, `tools.py`, `validator.py`, and `service.py` to route greetings, help, priorities, and tasks with live SQL counts | Agent | Resolved |
 
 ## Risk register (planning)
 | ID | Risk | Likelihood | Impact | Mitigation | Trigger to re-evaluate |

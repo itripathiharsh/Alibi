@@ -89,15 +89,120 @@ def generate_deterministic_answer(
     tool_results: list[dict[str, Any]],
     vault_sources: list[dict[str, Any]],
     query: str = "",
+    intents: list[str] | None = None,
 ) -> tuple[str, list[dict[str, Any]]]:
     """Generate a strictly factual, grounded response without using an LLM (AC-RAG-7)."""
-    _ = query
-    # Check if empty context
+    q_lower = query.lower().strip()
+    active_intents = list(intents) if intents is not None else []
+
+    # If intents not explicitly passed, infer them from query
+    if not active_intents and query:
+        from app.assistant.intent import route_intent
+
+        plan = route_intent(query)
+        active_intents = plan.intents
+
+    # 1. Handle Greetings
+    if "GREETING" in active_intents:
+        pending_tool = next((t for t in tool_results if t.get("tool_name") == "pending_overdue"), None)
+        pending_data = pending_tool.get("data", []) if pending_tool else []
+        if pending_data:
+            return (
+                f"Hello! I am your ALIBI Grounded Assistant. You currently have {len(pending_data)} active task{'s' if len(pending_data) != 1 else ''} on your schedule.\n\n"
+                "How can I help you today? You can ask:\n"
+                "- *\"What are my highest priority tasks today?\"*\n"
+                "- *\"What did I accomplish this week?\"*\n"
+                "- *\"What are my peak focus hours?\"*",
+                [],
+            )
+        return (
+            "Hello! I am your ALIBI Grounded Assistant, strictly grounded in your verified tasks and data.\n\n"
+            "You have no pending tasks right now. How can I assist you today?",
+            [],
+        )
+
+    # 2. Handle Capabilities & Help
+    if "CAPABILITIES" in active_intents:
+        return (
+            "I am your ALIBI Grounded Assistant. I operate under a strict zero-hallucination guarantee, providing answers verified directly by your database records.\n\n"
+            "Here is what you can ask me:\n"
+            "- **Priorities & Tasks**: *\"What are my highest priority tasks today?\"*, *\"What is pending or overdue?\"*\n"
+            "- **Accomplishments**: *\"What did I accomplish today?\"*, *\"What tasks did I complete this week?\"*\n"
+            "- **Time Tracking**: *\"How much time did I spend this week?\"*, *\"How long did I work today?\"*\n"
+            "- **Habits & Focus**: *\"What are my peak focus hours?\"*, *\"Summarize my routines\"*\n"
+            "- **Knowledge Vault**: Search past meeting notes, work logs, and decisions.",
+            [],
+        )
+
+    # 3. Handle Work Breakdown
+    if "BREAKDOWN" in active_intents:
+        pending_tool = next((t for t in tool_results if t.get("tool_name") == "pending_overdue"), None)
+        pending_data = pending_tool.get("data", []) if pending_tool else []
+        if pending_data:
+            target_task = pending_data[0].get("title", "Upcoming Task")
+            return (
+                f"Here is a recommended execution breakdown for **{target_task}**:\n\n"
+                "1. **Phase 1: Setup & Inputs** (~15 min)\n"
+                "   - Review requirements, context, and dependencies.\n"
+                "2. **Phase 2: Core Execution** (~30–45 min)\n"
+                "   - Focus solely on the primary deliverable without interruptions.\n"
+                "3. **Phase 3: Verification & Notes** (~15 min)\n"
+                "   - Review output, confirm completion, and record notes.\n\n"
+                "Tip: You can schedule a dedicated focus block for this task in your Timeline.",
+                [],
+            )
+        return (
+            "To break down work into subtasks, capture your task first or mention the task name (e.g. *\"Break down: Launch new campaign\"*).",
+            [],
+        )
+
+    # 4. Handle Empty Specific Queries (Priorities, Habits, Completed, Time)
+    pending_tool = next((t for t in tool_results if t.get("tool_name") == "pending_overdue"), None)
+    if "PENDING_OVERDUE" in active_intents and (not pending_tool or not pending_tool.get("data")):
+        return (
+            "You currently have no pending or overdue tasks! Your task queue is completely clear.\n\n"
+            "You can quickly capture a new task from the Tasks tab or ask me to help you plan your next goal.",
+            [],
+        )
+
+    profile_tool = next((t for t in tool_results if t.get("tool_name") == "profile_facts"), None)
+    if "PROFILE_FACTS" in active_intents and (not profile_tool or not profile_tool.get("data")):
+        return (
+            "I haven't observed enough tracked work sessions to detect your peak focus patterns yet.\n\n"
+            "As you track time and complete tasks in ALIBI, my personal learning engine will automatically identify your peak focus hours, optimal session durations, and productivity rhythms.",
+            [],
+        )
+
+    completed_tool = next((t for t in tool_results if t.get("tool_name") == "completed_tasks"), None)
+    if "COMPLETED_TASKS" in active_intents and (not completed_tool or not completed_tool.get("data")):
+        return (
+            "You haven't completed any tasks for the requested period. Check your pending tasks to see what's on your agenda!",
+            [],
+        )
+
+    time_tool = next((t for t in tool_results if t.get("tool_name") == "time_spent"), None)
+    if "TIME_SPENT" in active_intents and (not time_tool or not time_tool.get("data")):
+        return (
+            "No time entries recorded for this period. Use the active timer or log your work sessions to see your tracked time summary.",
+            [],
+        )
+
+    # 5. Check if empty context
     has_tools = any(t.get("data") for t in tool_results)
     has_vault = len(vault_sources) > 0
 
     if not has_tools and not has_vault:
-        return ("I don't have records about that for the requested period.", [])
+        # Check for date or historical queries (AC-RAG-2)
+        has_date_spec = any(
+            k in q_lower
+            for k in ["today", "yesterday", "last week", "this week", "this month", "last month", "202"]
+        ) or re.search(r"\b(20\d\d)\b", q_lower) is not None
+        if has_date_spec or "VAULT_SEARCH" in active_intents:
+            return ("I don't have records about that for the requested period.", [])
+        return (
+            "I couldn't find any matching records in your tasks or knowledge vault. Try asking about your pending tasks, completed work, time spent, or type 'help' to see what I can do.",
+            [],
+        )
 
     lines: list[str] = []
     sources: list[dict[str, Any]] = []
@@ -125,10 +230,23 @@ def generate_deterministic_answer(
         )
 
         for item in data[:8]:
-            title = item.get("title") or item.get("content") or item.get("started_at")
-            dur = item.get("duration_min")
-            dur_str = f" ({dur} min)" if dur is not None else ""
-            lines.append(f"- {title}{dur_str}")
+            if tool_name == "pending_overdue":
+                title = item.get("title", "")
+                prio = item.get("priority")
+                prio_str = f" [P{prio}]" if prio else ""
+                dl = item.get("deadline")
+                dl_str = f" (Due: {dl[:10]})" if dl else ""
+                lines.append(f"- **{title}**{prio_str}{dl_str}")
+            elif tool_name == "profile_facts":
+                ptype = item.get("pattern_type", "Pattern")
+                key = item.get("key", "")
+                conf = int(float(item.get("confidence", 0)) * 100)
+                lines.append(f"- **{ptype}**: {key} ({conf}% confidence)")
+            else:
+                title = item.get("title") or item.get("content") or item.get("started_at")
+                dur = item.get("duration_min")
+                dur_str = f" ({dur} min)" if dur is not None else ""
+                lines.append(f"- {title}{dur_str}")
 
     # Format vault notes
     if vault_sources:

@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Linking,
 } from "react-native";
 import {
   Sparkles,
@@ -65,6 +66,27 @@ export default function AIScreen() {
     // Proactively detect server on mount
     autoDetectServer().catch(() => {});
   }, []);
+
+  const handleVoiceDictation = async () => {
+    if (Platform.OS === "android") {
+      try {
+        setIsVoiceMode(true);
+        await Linking.sendIntent("android.speech.action.RECOGNIZE_SPEECH", [
+          { key: "android.speech.extra.LANGUAGE_MODEL", value: "free_form" },
+          { key: "android.speech.extra.PROMPT", value: "Ask your ALIBI Assistant..." },
+        ]);
+      } catch (err) {
+        Alert.alert(
+          "Voice Input",
+          "Speech recognition service is not responding or needs microphone permissions. You can also type your question."
+        );
+      } finally {
+        setTimeout(() => setIsVoiceMode(false), 3000);
+      }
+    } else {
+      setIsVoiceMode(!isVoiceMode);
+    }
+  };
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
@@ -310,7 +332,8 @@ export default function AIScreen() {
       <View style={styles.inputContainer}>
         <Pressable
           style={[styles.voiceBtn, isVoiceMode && styles.voiceBtnActive]}
-          onPress={() => setIsVoiceMode(!isVoiceMode)}
+          onPress={handleVoiceDictation}
+          accessibilityLabel="Dictate question"
           hitSlop={8}
         >
           {isVoiceMode ? (

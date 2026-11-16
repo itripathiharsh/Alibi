@@ -28,6 +28,9 @@ def parse_date_range(text: str, ref_date: date | None = None) -> tuple[date | No
     if "yesterday" in t:
         y = today - timedelta(days=1)
         return (y, y)
+    if "tomorrow" in t:
+        tom = today + timedelta(days=1)
+        return (tom, tom)
     if "last week" in t:
         # Previous Monday to Sunday
         days_since_monday = today.weekday()
@@ -53,6 +56,12 @@ def parse_date_range(text: str, ref_date: date | None = None) -> tuple[date | No
         count = int(days_match.group(1))
         return (today - timedelta(days=count), today)
 
+    # Check for explicit calendar year (e.g. 2021, 2024)
+    year_match = re.search(r"\b(20\d\d)\b", t)
+    if year_match:
+        yr = int(year_match.group(1))
+        return (date(yr, 1, 1), date(yr, 12, 31))
+
     return (None, None)
 
 
@@ -64,32 +73,132 @@ def route_intent(query: str, ref_date: date | None = None) -> IntentPlan:
     plan.start_date = start_date
     plan.end_date = end_date
 
-    # 1. Accomplishments / completed tasks
+    # 1. Greetings (conversational intent)
+    if re.search(r"^(hi|hello|hey|howdy|good morning|good afternoon|good evening|yo|sup|greetings)\b", q):
+        plan.intents.append("GREETING")
+
+    # 2. Capabilities & Help
     if any(
         k in q
-        for k in ["accomplish", "complete", "finished", "what did i do", "what did i work on"]
+        for k in [
+            "what can you do",
+            "help",
+            "who are you",
+            "what are your capabilities",
+            "how do you work",
+            "how does this work",
+            "what are you",
+            "guide me",
+            "commands",
+        ]
+    ):
+        plan.intents.append("CAPABILITIES")
+
+    # 3. Work Breakdown / Subtasks
+    if any(
+        k in q
+        for k in [
+            "break down",
+            "breakdown",
+            "subtasks",
+            "decompose",
+            "steps for",
+            "split task",
+        ]
+    ):
+        plan.intents.append("BREAKDOWN")
+
+    # 4. Accomplishments / completed tasks
+    if any(
+        k in q
+        for k in [
+            "accomplish",
+            "complete",
+            "completed",
+            "finished",
+            "what did i do",
+            "what did i work on",
+            "done",
+            "what did i finish",
+            "achieved",
+            "what have i done",
+            "what i did",
+        ]
     ):
         plan.intents.append("COMPLETED_TASKS")
 
-    # 2. Time spent / hours
-    if any(k in q for k in ["time spent", "how much time", "how long", "hours", "minutes"]):
+    # 5. Time spent / hours
+    if any(
+        k in q
+        for k in [
+            "time spent",
+            "how much time",
+            "how long",
+            "hours",
+            "minutes",
+            "tracked",
+            "time logged",
+            "duration",
+        ]
+    ):
         plan.intents.append("TIME_SPENT")
 
-    # 3. Pending / Overdue
-    if any(k in q for k in ["pending", "overdue", "due", "upcoming", "what's next"]):
+    # 6. Pending / Overdue / Highest Priority Tasks / Agenda
+    if any(
+        k in q
+        for k in [
+            "pending",
+            "overdue",
+            "due",
+            "upcoming",
+            "what's next",
+            "whats next",
+            "task",
+            "tasks",
+            "priority",
+            "priorities",
+            "highest priority",
+            "todo",
+            "to do",
+            "to-do",
+            "what should i do",
+            "what do i have",
+            "my day",
+            "plan my day",
+            "agenda",
+            "what to work on",
+            "schedule",
+        ]
+    ):
         plan.intents.append("PENDING_OVERDUE")
 
-    # 4. Work logs
-    if any(k in q for k in ["work log", "daily log", "journal"]):
+    # 7. Work logs
+    if any(k in q for k in ["work log", "work logs", "daily log", "daily logs", "journal", "logs"]):
         plan.intents.append("WORK_LOGS")
 
-    # 5. Routines / habits
-    if any(k in q for k in ["routine", "habit", "pattern", "typical day"]):
+    # 8. Routines / habits / peak focus
+    if any(
+        k in q
+        for k in [
+            "routine",
+            "routines",
+            "habit",
+            "habits",
+            "pattern",
+            "patterns",
+            "typical day",
+            "peak focus",
+            "peak hours",
+            "focus hours",
+            "focus time",
+            "productivity",
+        ]
+    ):
         plan.intents.append("PROFILE_FACTS")
 
-    # 6. Notes / knowledge / default vault search
+    # 9. Notes / knowledge / default vault search
     if not plan.intents or any(
-        k in q for k in ["note", "decision", "document", "what was", "tell me about"]
+        k in q for k in ["note", "notes", "decision", "decisions", "document", "documents", "what was", "tell me about"]
     ):
         plan.intents.append("VAULT_SEARCH")
         plan.needs_semantic = True

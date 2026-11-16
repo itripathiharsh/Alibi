@@ -143,10 +143,10 @@ class AssistantSQLTools:
             select(Task)
             .where(
                 Task.user_id == self.user_id,
-                Task.status.in_(["draft", "active"]),
+                Task.status.in_(["pending", "in_progress"]),
                 Task.deleted_at.is_(None),
             )
-            .order_by(Task.deadline_at.asc().nulls_last())
+            .order_by(Task.priority.asc().nulls_last(), Task.deadline_at.asc().nulls_last())
         )
         res = await self.session.execute(stmt)
         tasks = res.scalars().all()
@@ -161,14 +161,24 @@ class AssistantSQLTools:
                 "title": t.title,
                 "deadline": t.deadline_at.isoformat() if t.deadline_at else None,
                 "priority": t.priority,
+                "status": t.status,
+                "estimate_min": t.estimate_final_min or t.estimate_user_min or 0,
             }
+            if t.priority is not None:
+                numbers.append(t.priority)
+            if item["estimate_min"]:
+                numbers.append(item["estimate_min"])
+
             if t.deadline_at and t.deadline_at.date() < ref_date:
                 overdue.append(item)
             else:
                 pending.append(item)
 
         numbers.extend([len(overdue), len(pending)])
-        summary = f"{len(overdue)} overdue tasks and {len(pending)} pending tasks"
+        if len(tasks) == 0:
+            summary = "0 pending tasks"
+        else:
+            summary = f"{len(overdue)} overdue tasks and {len(pending)} pending tasks ({len(tasks)} total open)"
         return ToolResult(
             tool_name="pending_overdue",
             summary=summary,

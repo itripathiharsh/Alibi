@@ -88,7 +88,7 @@ class ReportFactBuilder:
             .outerjoin(Category, Task.category_id == Category.id)
             .where(
                 Task.user_id == user_id,
-                Task.status.in_(["draft", "active"]),
+                Task.status.in_(["pending", "in_progress"]),
                 Task.deleted_at.is_(None),
                 scope_condition,
             )
