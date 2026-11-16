@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   Activity, ArrowRight, BarChart3, Brain, CalendarDays, Check,
-  ChevronRight, CirclePlay, Home, Layers3, Leaf, LockKeyhole, Menu,
+  ChevronRight, CirclePlay, Download, Home, Layers3, Leaf, LockKeyhole, Menu,
   Mic, Monitor, Shield, Sparkles, WifiOff, X,
 } from "lucide-react";
+
+const ANDROID_APK_URL = "https://github.com/itripathiharsh/Alibi/raw/refs/heads/main/apk/ALIBI-0.1.0.apk";
 
 const steps = [
   { icon: Mic, title: "Capture", text: "Add tasks by text or voice. ALIBI helps extract key details for you to review.", color: "orange" },
@@ -81,11 +83,11 @@ export default function HowItWorksPage() {
           <Link href="/" onClick={closeMenu}>Home</Link>
           <Link href="/features" onClick={closeMenu}>Features</Link>
           <Link href="/how-it-works" className="how-active" onClick={closeMenu}>How it Works</Link>
-          <Link href="/#why-alibi" onClick={closeMenu}>Why ALIBI</Link>
-          <Link href="/#docs" onClick={closeMenu}>Docs</Link>
-          <div className="mobile-nav-actions"><Link href="/login" className="nav-download" onClick={closeMenu}><Monitor size={17} /> Open ALIBI</Link><Link href="/login" className="nav-start" onClick={closeMenu}>Get Started</Link></div>
+          <Link href="/why-alibi" onClick={closeMenu}>Why ALIBI</Link>
+          <Link href="/docs" onClick={closeMenu}>Docs</Link>
+          <div className="mobile-nav-actions"><Link href="/login" className="nav-download" onClick={closeMenu}><Monitor size={17} /> Open ALIBI</Link><a href={ANDROID_APK_URL} className="nav-download nav-android" download="ALIBI-0.1.0.apk" onClick={closeMenu}><Download size={17} /> Download Android</a><Link href="/login" className="nav-start" onClick={closeMenu}>Get Started</Link></div>
         </nav>
-        <div className="header-actions"><Link href="/login" className="nav-download"><Monitor size={17} /> Open ALIBI</Link><Link href="/login" className="nav-start">Get Started</Link></div>
+        <div className="header-actions"><Link href="/login" className="nav-download"><Monitor size={17} /> Open ALIBI</Link><a href={ANDROID_APK_URL} className="nav-download nav-android" download="ALIBI-0.1.0.apk"><Download size={17} /> Download Android</a><Link href="/login" className="nav-start">Get Started</Link></div>
         <button className="menu-toggle" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
       </header>
 
@@ -118,3 +120,4 @@ export default function HowItWorksPage() {
 function ZapIcon() {
   return <Activity size={23} />;
 }
+

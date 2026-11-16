@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
-  BarChart3, Brain, CalendarDays, Check, ChevronRight, Layers3, Menu,
+  BarChart3, Brain, CalendarDays, Check, ChevronRight, Download, Layers3, Menu,
   Leaf, LockKeyhole, Mic, MessageSquare, MonitorSmartphone, Plus,
   ShieldCheck, WifiOff, X, type LucideIcon,
 } from "lucide-react";
+
+const ANDROID_APK_URL = "https://github.com/itripathiharsh/Alibi/raw/refs/heads/main/apk/ALIBI-0.1.0.apk";
 
 type FeatureItem = { icon: LucideIcon; tone: string; title: string; body: string };
 const leftFeatures: FeatureItem[] = [
@@ -89,11 +91,11 @@ export default function FeaturesPage() {
           <Link href="/" onClick={closeMenu}>Home</Link>
           <Link href="/features" className="feature-active" onClick={closeMenu}>Features</Link>
           <Link href="/how-it-works" onClick={closeMenu}>How it Works</Link>
-          <Link href="/#why-alibi" onClick={closeMenu}>Why ALIBI</Link>
-          <Link href="/#docs" onClick={closeMenu}>Docs</Link>
-          <div className="mobile-nav-actions"><Link href="/login" className="nav-download" onClick={closeMenu}><MonitorSmartphone size={17} /> Open ALIBI</Link><Link href="/login" className="nav-start" onClick={closeMenu}>Get Started</Link></div>
+          <Link href="/why-alibi" onClick={closeMenu}>Why ALIBI</Link>
+          <Link href="/docs" onClick={closeMenu}>Docs</Link>
+          <div className="mobile-nav-actions"><Link href="/login" className="nav-download" onClick={closeMenu}><MonitorSmartphone size={17} /> Open ALIBI</Link><a href={ANDROID_APK_URL} className="nav-download nav-android" download="ALIBI-0.1.0.apk" onClick={closeMenu}><Download size={17} /> Download Android</a><Link href="/login" className="nav-start" onClick={closeMenu}>Get Started</Link></div>
         </nav>
-        <div className="header-actions"><Link href="/login" className="nav-download"><MonitorSmartphone size={17} /> Open ALIBI</Link><Link href="/login" className="nav-start">Get Started</Link></div>
+        <div className="header-actions"><Link href="/login" className="nav-download"><MonitorSmartphone size={17} /> Open ALIBI</Link><a href={ANDROID_APK_URL} className="nav-download nav-android" download="ALIBI-0.1.0.apk"><Download size={17} /> Download Android</a><Link href="/login" className="nav-start">Get Started</Link></div>
         <button className="menu-toggle" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
       </header>
 
@@ -120,5 +122,6 @@ export default function FeaturesPage() {
     </div>
   );
 }
+
 
 

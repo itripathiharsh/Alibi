@@ -1,7 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight, BarChart3, CalendarDays, Check, ChevronRight, CirclePlay, Folder, Layers3, LockKeyhole, Menu, Mic, Monitor, Shield, Sparkles, WifiOff, X, Zap } from "lucide-react";
+import { ArrowRight, BarChart3, CalendarDays, Check, ChevronRight, CirclePlay, Download, Folder, Layers3, LockKeyhole, Menu, Mic, Monitor, Shield, Smartphone, Sparkles, WifiOff, X, Zap } from "lucide-react";
+
+const ANDROID_APK_URL = "https://github.com/itripathiharsh/Alibi/raw/refs/heads/main/apk/ALIBI-0.1.0.apk";
 
 const workflow = [
   { icon: Mic, title: "Capture", detail: "Tasks by text or voice" },
@@ -60,6 +62,37 @@ function ProductPhones() {
   );
 }
 
+function AndroidDownload() {
+  const [selectedDay, setSelectedDay] = useState("Tue");
+  const [done, setDone] = useState<number[]>([]);
+  const toggleTask = (index: number) => setDone((current) => current.includes(index) ? current.filter((item) => item !== index) : [...current, index]);
+  const tasks = ["Review today’s priorities", "Make room for focused work", "Reflect on the week"];
+  return <section className="android-download-section" id="android-download" aria-labelledby="android-download-title">
+    <div className="android-download-copy">
+      <span className="android-download-eyebrow"><Smartphone size={15} /> ALIBI FOR ANDROID</span>
+      <h2 id="android-download-title">A clearer day,<br /><em>wherever you are.</em></h2>
+      <p>Capture thoughts, shape your plan and keep moving—even when you’re offline. Your work stays yours, with every important choice in your hands.</p>
+      <div className="android-download-actions">
+        <a href={ANDROID_APK_URL} className="android-download-button" download="ALIBI-0.1.0.apk"><Download size={18} /> Download Android APK <ArrowRight size={17} /></a>
+        <Link href="/login" className="android-open-link"><Monitor size={17} /> Open ALIBI on desktop</Link>
+      </div>
+      <div className="android-download-notes"><span><WifiOff size={15} /> Works offline</span><i /><span><LockKeyhole size={15} /> Private by default</span></div>
+    </div>
+    <div className="android-download-art" aria-label="Interactive 3D preview of the ALIBI Android app">
+      <div className="android-art-orbit orbit-one" /><div className="android-art-orbit orbit-two" />
+      <div className="android-float-card"><span className="android-card-dot" />YOUR DAY, IN VIEW <b>Make room for focus</b></div>
+      <div className="android-render-phone"><div className="android-render-buttons" /><div className="android-render-frame"><div className="android-render-island" /><div className="android-render-screen">
+        <div className="android-render-status"><span>9:41</span><span>••• ◖</span></div>
+        <small className="android-render-overline">YOUR DAY, IN VIEW</small><h3>Good afternoon <i>✦</i></h3><p>A little clarity goes a long way.</p>
+        <div className="android-render-days" role="group" aria-label="Preview day selector">{["Mon", "Tue", "Wed", "Thu", "Fri"].map((day, index) => <button key={day} className={selectedDay === day ? "selected" : ""} onClick={() => setSelectedDay(day)}><span>{day}</span><b>{16 + index}</b></button>)}</div>
+        <div className="android-render-plan"><div className="android-render-plan-head"><b>Today’s focus</b><span>Take it one step at a time</span></div>{tasks.map((task, index) => <button key={task} className={done.includes(index) ? "checked" : ""} onClick={() => toggleTask(index)}><i>{done.includes(index) ? <Check size={11} /> : null}</i><span><b>{task}</b><small>{["Professional", "Planning", "Personal"][index]}</small></span><em className={"task-dot dot-" + index} /></button>)}</div>
+        <div className="android-render-tabbar"><b>Today</b><span>Plan</span><span>Insights</span></div>
+      </div></div></div>
+      <span className="android-art-caption"><span /> A small preview of your day</span>
+    </div>
+  </section>;
+}
+
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
@@ -68,10 +101,10 @@ export default function Home() {
       <header className="landing-header">
         <Link href="/" className="brand" aria-label="ALIBI home"><img src="/logo-site.png" alt="ALIBI" /></Link>
         <nav className={"landing-nav " + (menuOpen ? "open" : "")} aria-label="Main navigation">
-          <Link href="/features" onClick={closeMenu}>Features</Link><Link href="/how-it-works" onClick={closeMenu}>How it Works</Link><a href="#why-alibi" onClick={closeMenu}>Why ALIBI</a><a href="#docs" onClick={closeMenu}>Docs</a>
-          <div className="mobile-nav-actions"><Link href="/login" className="nav-download" onClick={closeMenu}><Monitor size={17} /> Open ALIBI</Link><Link href="/login" className="nav-start" onClick={closeMenu}>Get Started</Link></div>
+          <Link href="/features" onClick={closeMenu}>Features</Link><Link href="/how-it-works" onClick={closeMenu}>How it Works</Link><Link href="/why-alibi" onClick={closeMenu}>Why ALIBI</Link><Link href="/docs" onClick={closeMenu}>Docs</Link>
+          <div className="mobile-nav-actions"><Link href="/login" className="nav-download" onClick={closeMenu}><Monitor size={17} /> Open ALIBI</Link><a href={ANDROID_APK_URL} className="nav-download nav-android" download="ALIBI-0.1.0.apk" onClick={closeMenu}><Download size={17} /> Download Android</a><Link href="/login" className="nav-start" onClick={closeMenu}>Get Started</Link></div>
         </nav>
-        <div className="header-actions"><Link href="/login" className="nav-download"><Monitor size={17} /> Open ALIBI</Link><Link href="/login" className="nav-start">Get Started</Link></div>
+        <div className="header-actions"><Link href="/login" className="nav-download"><Monitor size={17} /> Open ALIBI</Link><a href={ANDROID_APK_URL} className="nav-download nav-android" download="ALIBI-0.1.0.apk"><Download size={17} /> Download Android</a><Link href="/login" className="nav-start">Get Started</Link></div>
         <button className="menu-toggle" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
       </header>
       <main id="top">
@@ -88,6 +121,7 @@ export default function Home() {
         <section id="how-it-works" className="workflow-strip" aria-label="The ALIBI workflow">
           {workflow.map(({ icon: Icon, title, detail }) => <a href="#features" className="workflow-step" key={title}><Icon className="workflow-icon" strokeWidth={1.8} /><b>{title}</b><span>{detail}</span></a>)}
         </section>
+        <AndroidDownload />
         <section id="features" className="below-fold-section"><div className="section-heading"><span className="eyebrow">A calmer way to move forward</span><h2>Everything connected.<br /><em>Nothing made up.</em></h2><p>ALIBI brings your tasks, time, plans and patterns together, while keeping every important decision in your hands.</p></div>
           <div className="feature-grid">
             <article className="feature-card"><div className="feature-icon orange"><Mic /></div><h3>Capture what matters</h3><p>Start with a thought, a task or a voice note. Review what ALIBI understood before it updates your plan.</p><a href="#how-it-works">Explore task capture <ArrowRight size={16} /></a></article>
@@ -98,8 +132,24 @@ export default function Home() {
         <section id="why-alibi" className="privacy-band"><div className="privacy-icon"><LockKeyhole /></div><div><span className="eyebrow">Your life stays yours</span><h2>Private by design.<br /><em>Useful by understanding.</em></h2><p>ALIBI is built around personal control. Your plans remain proposals until you choose what to accept, and your data stays private by default.</p></div><Link href="/login" className="button-secondary">Get started <ArrowRight size={18} /></Link></section>
         <section id="docs" className="closing-section"><div><span className="eyebrow">Make space for what matters</span><h2>Bring your day<br />into focus.</h2></div><Link href="/login" className="button-primary">Get Started Free <ArrowRight size={20} /></Link></section>
       </main>
-      <footer className="landing-footer"><a href="#top" className="footer-brand">ALIBI <span>Personal productivity, with perspective.</span></a><div><Link href="/features">Features</Link><a href="#why-alibi">Privacy</a><Link href="/login">Sign in</Link></div><span className="footer-note">Your life. Your work. Your intelligence.</span></footer>
+      <footer id="site-footer" className="landing-footer">
+        <div className="footer-inner">
+          <div className="footer-main">
+            <Link href="/" className="footer-brand" aria-label="ALIBI by HVT home"><img src="/logo-footer.png" alt="ALIBI by HVT" /></Link>
+            <p>Personal productivity, adaptive planning and work intelligence — in one private space.</p>
+          </div>
+          <nav className="footer-links" aria-label="Footer navigation">
+            <div><b>Explore</b><Link href="/features">Features</Link><Link href="/how-it-works">How it Works</Link></div>
+            <div><b>About ALIBI</b><Link href="/why-alibi">Why ALIBI</Link><Link href="/docs">Documentation</Link></div>
+            <div><b>Your workspace</b><Link href="/login">Get Started</Link><Link href="/login">Sign in</Link></div>
+          </nav>
+          <div className="footer-bottom"><span>ALIBI · Personal productivity, with perspective.</span><span>Local-first · Private by default</span></div>
+        </div>
+      </footer>
     </div>
   );
 }
+
+
+
 

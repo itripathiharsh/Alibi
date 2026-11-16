@@ -5,7 +5,7 @@ import { AvatarMenu } from "@/components/avatar-menu";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  if (pathname === "/" || pathname === "/features" || pathname === "/how-it-works") return <>{children}</>;
+  if (pathname === "/" || pathname === "/features" || pathname === "/how-it-works" || pathname === "/why-alibi" || pathname === "/docs") return <>{children}</>;
   return <div className="min-h-screen flex flex-col">
     <Navigation />
     <header className="lg:pl-64 h-16 border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-20 flex items-center justify-between px-4 lg:px-8">
@@ -15,6 +15,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <main className="lg:pl-64 flex-1 p-4 lg:p-8 pb-24 lg:pb-8 max-w-7xl w-full mx-auto">{children}</main>
   </div>;
 }
+
 
 
 

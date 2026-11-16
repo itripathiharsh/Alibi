@@ -10,6 +10,8 @@
 .header-actions { display:flex; align-items:center; gap:14px; }
 .nav-download,.nav-start { min-height:50px; border-radius:14px; display:inline-flex; align-items:center; justify-content:center; gap:9px; padding:0 22px; white-space:nowrap; }
 .nav-download { border:1px solid #c8d1dc; background:#fff; }
+.nav-android { border-color:#ffd0b4; color:#a7471b!important; background:#fff8f3; }
+.nav-android:hover { border-color:#ff9e68; background:#fff0e5; }
 .nav-start,.button-primary { color:#fff!important; background:#09283a; box-shadow:0 8px 20px #0b2d401b; transition:transform .2s,box-shadow .2s,background .2s; }
 .nav-start:hover,.button-primary:hover { background:#123e55; transform:translateY(-2px); box-shadow:0 12px 26px #0b2d4030; }
 .menu-toggle,.mobile-nav-actions { display:none; }
@@ -106,3 +108,121 @@ html {scroll-behavior:smooth}
 
 
 
+/* Home page continuation: match the product pages' restrained surfaces and navy panels. */
+.below-fold-section { max-width:1450px; margin:82px auto 38px; padding:48px clamp(24px,5vw,64px); border:1px solid #e8edf1; border-radius:26px; background:linear-gradient(145deg,#f8fafc,#fff 58%); }
+.section-heading { max-width:760px; }
+.section-heading .eyebrow { color:#8994a2; }
+.section-heading h2 { font-size:clamp(34px,4.2vw,50px); margin:14px 0 10px; }
+.section-heading p { max-width:680px; font-size:16px; margin:0; }
+.feature-grid { margin-top:30px; gap:15px; }
+.feature-card { min-height:210px; border-color:#e2e8ee; border-radius:19px; padding:23px; background:#fff; box-shadow:0 5px 16px #11283a08; }
+.feature-card:hover { transform:perspective(900px) translateY(-3px) rotateX(.5deg); border-color:#f1b18d; box-shadow:0 13px 25px #11283a12; }
+.feature-card h3 { font-size:17px; margin:16px 0 7px; }
+.feature-card p { min-height:68px; font-size:13px; line-height:1.55; }
+.feature-card a { font-size:12px; }
+.privacy-band { max-width:1450px; margin:0 auto 36px; padding:34px clamp(24px,5vw,64px); border:1px solid #18384d; border-radius:22px; color:#fff; background:linear-gradient(110deg,#0b1d2c,#10283c); }
+.privacy-band .eyebrow { color:#ffad7a; }
+.privacy-band h2 { font-size:clamp(30px,3.6vw,43px); margin:12px 0 8px; }
+.privacy-band h2 em { color:#ff803e; }
+.privacy-band p { color:#d0dbe4; font-size:14px; }
+.privacy-icon { color:#fff; background:#ffffff10; border:1px solid #ffffff24; box-shadow:none; }
+.privacy-band .button-secondary { border:0; color:#0b293c; background:#fff; }
+.closing-section { max-width:1450px; margin:0 auto 42px; padding:23px clamp(24px,5vw,64px); border:1px solid #e6ebef; border-radius:20px; background:#f7f9fb; }
+.closing-section h2 { font-size:clamp(28px,3.5vw,38px); margin:10px 0 0; }
+@media (max-width:760px) {
+  .below-fold-section { margin:55px 16px 24px; padding:29px 20px; border-radius:21px; }
+  .section-heading h2 { font-size:36px; }
+  .feature-grid { margin-top:23px; }
+  .feature-card { min-height:0; padding:20px; }
+  .privacy-band { margin:0 16px 22px; padding:25px 20px; }
+  .closing-section { margin:0 16px 28px; padding:20px; }
+  .closing-section h2 { font-size:34px; }
+}
+
+/* Homepage footer: give the supplied wordmark a quiet, legible home. */
+.landing-footer { max-width:none; margin:56px 0 0; padding:0; display:block; border-top:1px solid #e6ebef; background:linear-gradient(180deg,#fff 0%,#f7f9fb 100%); }
+.landing-footer .footer-inner { max-width:1450px; margin:0 auto; padding:38px 5% 22px; display:grid; grid-template-columns:minmax(300px,1fr) minmax(0,1.3fr); gap:28px 56px; font-size:inherit; font-weight:400; }
+.landing-footer .footer-main { min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:10px; }
+.landing-footer .footer-brand { display:inline-flex; align-items:center; line-height:0; }
+.landing-footer .footer-brand img { width:320px; height:112px; display:block; object-fit:cover; object-position:center; }
+.landing-footer .footer-main p { max-width:330px; margin:0; color:#6c7887; font-size:13px; line-height:1.6; }
+.landing-footer .footer-links { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:22px; align-items:start; padding:17px 0 4px; }
+.landing-footer .footer-links>div { display:grid; justify-items:start; align-content:start; gap:11px; }
+.landing-footer .footer-links b { margin-bottom:2px; color:#132b3d; font-size:13px; }
+.landing-footer .footer-links a { color:#647283; font-size:13px; transition:color .18s ease,transform .18s ease; }
+.landing-footer .footer-links a:hover { color:#e86d32; transform:translateX(2px); }
+.landing-footer .footer-bottom { grid-column:1/-1; display:flex; justify-content:space-between; gap:18px; padding-top:17px; border-top:1px solid #e2e8ed; color:#86919f; font-size:11px; }
+@media(max-width:760px) {
+  .landing-footer { margin-top:38px; }
+  .landing-footer .footer-inner { padding:24px 22px 18px; grid-template-columns:1fr; gap:18px; }
+  .landing-footer .footer-brand img { width:280px; height:98px; }
+  .landing-footer .footer-main p { font-size:12px; }
+  .landing-footer .footer-links { padding:3px 0 12px; gap:12px; }
+  .landing-footer .footer-links>div { gap:9px; }
+  .landing-footer .footer-links b,.landing-footer .footer-links a { font-size:12px; }
+  .landing-footer .footer-bottom { flex-direction:column; gap:7px; padding-top:14px; font-size:10px; }
+}
+
+/* Android download feature: one cohesive dark panel with a code-built, interactive 3D phone. */
+.android-download-section { max-width:1450px; min-height:510px; margin:50px auto 0; padding:54px clamp(28px,5vw,72px); border-radius:28px; color:#fff; background:radial-gradient(ellipse at 75% 48%,#1c4055 0%,transparent 38%),linear-gradient(115deg,#0a1e2d 0%,#0c293c 58%,#102f44 100%); display:grid; grid-template-columns:minmax(0,1fr) minmax(380px,.9fr); align-items:center; gap:28px; position:relative; overflow:hidden; isolation:isolate; }
+.android-download-section:before { content:""; position:absolute; inset:0; z-index:-1; opacity:.18; background-image:radial-gradient(#a8c6d7 0.7px,transparent 0.7px); background-size:21px 21px; mask-image:linear-gradient(90deg,transparent 15%,#000 100%); }
+.android-download-copy { max-width:590px; position:relative; z-index:2; }
+.android-download-eyebrow { display:inline-flex; align-items:center; gap:8px; color:#ffad7a; font-size:11px; font-weight:750; letter-spacing:.16em; }
+.android-download-copy h2 { margin:17px 0 13px; color:#fff; font-size:clamp(40px,5vw,62px); line-height:1.04; letter-spacing:-.055em; }
+.android-download-copy h2 em { color:#ff8950; font-style:normal; }
+.android-download-copy>p { max-width:525px; margin:0; color:#c4d1dc; font-size:16px; line-height:1.7; }
+.android-download-actions { display:flex; flex-wrap:wrap; align-items:center; gap:13px; margin-top:28px; }
+.android-download-button { min-height:54px; padding:0 18px; border-radius:14px; display:inline-flex; align-items:center; justify-content:center; gap:10px; background:#ff7b3d; color:#102437!important; font-size:14px; font-weight:750; box-shadow:0 10px 24px #f47d3b38; transition:transform .2s,background .2s,box-shadow .2s; }
+.android-download-button:hover { background:#ff9867; transform:translateY(-2px); box-shadow:0 14px 28px #f47d3b46; }
+.android-open-link { min-height:48px; padding:0 13px; display:inline-flex; align-items:center; gap:8px; color:#e4edf3!important; font-size:13px; font-weight:650; }
+.android-open-link:hover { color:#ffad7a!important; }
+.android-download-notes { display:flex; align-items:center; gap:13px; margin-top:23px; color:#b8c8d4; font-size:12px; }
+.android-download-notes span { display:inline-flex; align-items:center; gap:7px; }
+.android-download-notes svg { color:#ff9a63; }
+.android-download-notes i { width:3px; height:3px; border-radius:50%; background:#6c8495; }
+.android-download-art { min-height:390px; position:relative; display:grid; place-items:center; perspective:1100px; }
+.android-art-orbit { position:absolute; border:1px solid #a7c2d438; border-radius:50%; pointer-events:none; }
+.orbit-one { width:430px; height:300px; transform:rotate(-24deg); }
+.orbit-two { width:340px; height:400px; transform:rotate(32deg); border-color:#ff9b6040; }
+.android-render-phone { width:246px; height:420px; position:relative; z-index:1; padding:7px; border:1px solid #94a1ab; border-radius:37px; background:linear-gradient(145deg,#273746,#070d13 35%,#293b4a 68%,#070d13); box-shadow:0 40px 65px #020b1370,inset 0 0 0 1px #ffffff5c; transform:rotateY(-15deg) rotateX(4deg) rotateZ(4deg); transform-style:preserve-3d; animation:android-phone-drift 6.5s ease-in-out infinite; transition:transform .35s cubic-bezier(.2,.75,.25,1),box-shadow .35s; }
+.android-download-art:hover .android-render-phone { transform:rotateY(-5deg) rotateX(1deg) rotateZ(0deg) translateY(-5px) scale(1.025); box-shadow:0 48px 75px #020b1380,inset 0 0 0 1px #ffffff70; }
+.android-render-frame { height:100%; padding:4px; border-radius:31px; background:#060b10; }
+.android-render-island { position:absolute; z-index:2; top:14px; left:50%; width:66px; height:17px; transform:translateX(-50%); border-radius:20px; background:#060b10; }
+.android-render-screen { height:100%; position:relative; overflow:hidden; padding:20px 13px 13px; border-radius:27px; color:#102437; background:linear-gradient(160deg,#fff 0%,#f7f9fc 100%); }
+.android-render-status { display:flex; justify-content:space-between; padding:0 5px; font-size:8px; font-weight:750; }
+.android-render-overline { display:block; margin:22px 0 5px; color:#8995a3; font-size:7px; font-weight:750; letter-spacing:.12em; }
+.android-render-screen h3 { margin:0; font-size:17px; letter-spacing:-.04em; }
+.android-render-screen h3 i { color:#f47d3b; font-style:normal; }
+.android-render-screen>p { margin:4px 0 13px; color:#748294; font-size:9px; }
+.android-render-days { display:grid; grid-template-columns:repeat(5,1fr); gap:5px; }
+.android-render-days button { min-width:0; padding:7px 1px; display:grid; gap:4px; border:1px solid #edf0f4; border-radius:9px; background:#fff; color:#758293; font-size:7px; cursor:pointer; transition:transform .2s,background .2s,color .2s; }
+.android-render-days button b { color:#142b3e; font-size:10px; }
+.android-render-days button.selected { color:#fff; background:#102c40; border-color:#102c40; transform:translateY(-2px); }
+.android-render-days button.selected b { color:#fff; }
+.android-render-plan { margin-top:13px; padding:11px 10px 4px; border:1px solid #edf0f4; border-radius:14px; background:#fff; box-shadow:0 7px 18px #1930440b; }
+.android-render-plan-head { display:grid; gap:3px; padding:0 1px 8px; border-bottom:1px solid #edf0f4; }
+.android-render-plan-head b { font-size:10px; }.android-render-plan-head span { color:#8390a0; font-size:7px; }
+.android-render-plan>button { width:100%; min-height:55px; display:flex; align-items:center; gap:7px; padding:7px 1px; text-align:left; border:0; border-bottom:1px solid #f0f2f5; background:transparent; cursor:pointer; color:#152a3b; }
+.android-render-plan>button:last-child { border-bottom:0; }
+.android-render-plan>button>i { width:15px; height:15px; flex:none; display:grid; place-items:center; border:1.3px solid #8190a0; border-radius:4px; color:#fff; }
+.android-render-plan>button.checked>i { border-color:#163b52; background:#163b52; }
+.android-render-plan>button>span { min-width:0; flex:1; display:grid; gap:4px; }
+.android-render-plan>button>span b { overflow:hidden; color:#193044; font-size:8px; white-space:nowrap; text-overflow:ellipsis; }
+.android-render-plan>button>span small { color:#8995a3; font-size:7px; }
+.android-render-plan>button.checked>span b { color:#8995a3; text-decoration:line-through; }
+.android-render-plan>button>em { width:6px; height:6px; flex:none; border-radius:50%; background:#f47d3b; }
+.android-render-tabbar { position:absolute; right:14px; bottom:9px; left:14px; display:flex; justify-content:space-around; padding-top:8px; border-top:1px solid #edf0f4; color:#8995a3; background:#fff; font-size:7px; }
+.android-render-tabbar b { color:#173e54; }
+.android-render-buttons { position:absolute; top:100px; left:-3px; width:3px; height:62px; border-radius:4px 0 0 4px; background:#76818b; box-shadow:0 77px 0 #76818b; }
+.android-float-card { position:absolute; z-index:2; top:42px; right:-4px; width:185px; padding:13px 15px; display:grid; gap:6px; border:1px solid #ffffffa1; border-radius:15px; color:#8290a0; background:#ffffffed; box-shadow:0 16px 38px #06172430; font-size:8px; font-weight:750; letter-spacing:.07em; transform:rotate(5deg); animation:android-card-drift 5.2s ease-in-out infinite; }
+.android-float-card b { color:#132b3d; font-size:12px; letter-spacing:-.02em; }
+.android-card-dot,.android-art-caption>span { width:7px; height:7px; border-radius:50%; background:#f47d3b; box-shadow:0 0 0 4px #f47d3b20; }
+.android-art-caption { position:absolute; right:16%; bottom:2px; display:inline-flex; align-items:center; gap:9px; color:#c2d0da; font-size:10px; }
+@keyframes android-phone-drift { 0%,100% {translate:0 0} 50% {translate:0 -10px} }
+@keyframes android-card-drift { 0%,100% {translate:0 0} 50% {translate:0 -7px} }
+@media(max-width:1500px) { .landing-header,.feature-header,.how-header,.why-header,.docs-header {gap:22px}.landing-header .brand img,.feature-header .brand img,.how-header .brand img,.why-header .brand img,.docs-header .brand img {width:220px}.landing-header .landing-nav,.feature-header .landing-nav,.how-header .landing-nav,.why-header .landing-nav,.docs-header .landing-nav {gap:clamp(15px,1.6vw,24px)}.landing-header .header-actions,.feature-header .header-actions,.how-header .header-actions,.why-header .header-actions,.docs-header .header-actions {gap:8px}.landing-header .nav-download,.landing-header .nav-start,.feature-header .nav-download,.feature-header .nav-start,.how-header .nav-download,.how-header .nav-start,.why-header .nav-download,.why-header .nav-start,.docs-header .nav-download,.docs-header .nav-start {padding:0 11px;font-size:13px} }
+@media(max-width:1050px) and (min-width:851px) { .landing-header .brand img,.feature-header .brand img,.how-header .brand img,.why-header .brand img,.docs-header .brand img {width:175px}.landing-header,.feature-header,.how-header,.why-header,.docs-header {gap:14px}.landing-header .landing-nav,.feature-header .landing-nav,.how-header .landing-nav,.why-header .landing-nav,.docs-header .landing-nav {gap:12px}.landing-header .header-actions,.feature-header .header-actions,.how-header .header-actions,.why-header .header-actions,.docs-header .header-actions {gap:5px}.landing-header .nav-download,.landing-header .nav-start,.feature-header .nav-download,.feature-header .nav-start,.how-header .nav-download,.how-header .nav-start,.why-header .nav-download,.why-header .nav-start,.docs-header .nav-download,.docs-header .nav-start {min-height:40px;padding:0 8px;font-size:11px;gap:5px}.landing-header .nav-download svg,.feature-header .nav-download svg,.how-header .nav-download svg,.why-header .nav-download svg,.docs-header .nav-download svg {width:14px} }
+@media(max-width:880px) { .mobile-nav-actions .nav-start {grid-column:2;grid-row:1}.mobile-nav-actions .nav-android {grid-column:1/-1;grid-row:2} }
+@media(max-width:760px) { .android-download-section {min-height:0;margin:34px 16px 0;padding:34px 23px 24px;grid-template-columns:1fr;gap:8px;border-radius:23px}.android-download-copy h2 {font-size:42px}.android-download-copy>p {font-size:14px;line-height:1.65}.android-download-actions {gap:6px;margin-top:20px}.android-download-button {min-height:50px;padding:0 13px;font-size:12px;gap:7px}.android-open-link {font-size:11px}.android-download-notes {font-size:10px;gap:9px;margin-top:17px}.android-download-art {min-height:365px;margin-top:8px}.android-render-phone {transform:rotateY(-12deg) rotateX(3deg) rotateZ(3deg) scale(.88)}.android-download-art:hover .android-render-phone {transform:rotateY(-5deg) rotateZ(0deg) translateY(-3px) scale(.9)}.android-art-caption {right:calc(50% - 105px);bottom:0;white-space:nowrap}.android-float-card {right:calc(50% - 166px);top:31px} }
+@media(max-width:390px) { .android-download-section {padding:29px 18px 22px}.android-download-copy h2 {font-size:36px}.android-download-actions {align-items:stretch;flex-direction:column}.android-download-button {width:100%}.android-open-link {justify-content:center}.android-download-art {transform:scale(.91);margin:-2px -14px -15px} }
+@media(prefers-reduced-motion:reduce) { .android-download-section *, .android-download-section *::before, .android-download-section *::after {animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important} }
