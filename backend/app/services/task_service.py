@@ -73,6 +73,8 @@ class TaskService:
         captured_at: datetime | None = None,
         category_hint: uuid.UUID | None = None,
         task_id: uuid.UUID | None = None,
+        status: str | None = None,
+        deadline_at: datetime | None = None,
     ) -> tuple[Task, AIExtraction | None]:
         """Capture task from natural language text.
         AC-M2-1: Persists task with raw input before parsing; parsing failure leaves task intact.
@@ -82,6 +84,9 @@ class TaskService:
         if not workspace:
             raise NotFoundError("Default workspace not found.")
 
+        initial_status = status if status in ("pending", "completed") else "pending"
+        initial_completed_at = now if initial_status == "completed" else None
+
         # Step 1: Persist initial task with raw_input (AC-M2-1 guarantee)
         task = Task(
             id=task_id or uuid.uuid4(),
@@ -90,7 +95,11 @@ class TaskService:
             category_id=category_hint,
             title=raw_input.strip()[:200] or "Untitled Task",
             raw_input=raw_input,
-            status="pending",
+            status=initial_status,
+            completed_at=initial_completed_at,
+            deadline_at=deadline_at,
+            deadline_kind="hard" if deadline_at else None,
+            deadline_source="user" if deadline_at else None,
             origin=origin,
             parse_status="pending",
             created_at=now,
@@ -111,9 +120,20 @@ class TaskService:
 
             # Update task fields with grounded results
             task.title = grounded.title
-            task.deadline_at = grounded.deadline_at
-            task.deadline_kind = grounded.deadline_kind
-            task.deadline_source = "extraction" if grounded.deadline_at else None
+            if deadline_at is not None:
+                task.deadline_at = deadline_at
+                task.deadline_kind = "hard"
+                task.deadline_source = "user"
+            else:
+                task.deadline_at = grounded.deadline_at
+                task.deadline_kind = grounded.deadline_kind
+                task.deadline_source = "extraction" if grounded.deadline_at else None
+
+            if status is not None:
+                task.status = status
+                if status == "completed":
+                    task.completed_at = now
+
             task.priority = grounded.priority
             task.estimate_user_min = grounded.estimate_min
             task.estimate_final_min = grounded.estimate_min

@@ -41,6 +41,8 @@ class TaskCaptureRequest(BaseModel):
     captured_at: datetime | None = None
     category_hint: uuid.UUID | None = None
     id: uuid.UUID | None = None
+    status: str | None = Field(None, pattern="^(pending|completed)$")
+    deadline_at: datetime | None = None
 
 
 class TaskExtractionProposalResponse(BaseModel):

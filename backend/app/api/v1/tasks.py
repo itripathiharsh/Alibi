@@ -72,6 +72,8 @@ async def capture_task(
         captured_at=data.captured_at,
         category_hint=data.category_hint,
         task_id=data.id,
+        status=data.status,
+        deadline_at=data.deadline_at,
     )
     enriched = await _enrich_task_response(task, db, auth.user_id)
     extraction_dto = (
