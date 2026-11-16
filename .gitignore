@@ -18,6 +18,8 @@ dist/
 build/
 .gradle/
 *.apk
+!apk/*.apk
+!apk/**/*.apk
 android/app/build/
 apps/mobile/android/app/build/
 apps/mobile/android/.gradle/
