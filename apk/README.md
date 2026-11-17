@@ -7,11 +7,11 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **File**: [`ALIBI-0.1.0.apk`](./ALIBI-0.1.0.apk)
 - **Direct Download Link**: [Download ALIBI-0.1.0.apk (Raw)](https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk)
 - **Version**: `0.1.0`
-- **Build Date**: November 17, 2026
+- **Build Date**: November 18, 2026
 - **Variant**: Android release APK, Hermes
 - **Signing**: Signed with the repository's current Android debug keystore. This is installable for direct distribution/testing, but it is not a Play Store production signature.
-- **SHA-256**: `DA80BC13F557B4161437192D8ADF73587B060ADB64F5F186F2234C9E2F257F80`
-- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified with `apksigner`.
+- **SHA-256**: `1EE0D4A0BBF932FA586B66137FEC9E73DCE6ED54C58246C0A601C3618716830C`
+- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified with `apksigner`; Expo Notifications and Android notification permissions are present. Device delivery has not yet been verified.
 
 ---
 
@@ -43,6 +43,13 @@ This directory hosts the official compiled Android application package (`.apk`) 
    - Native Android `SpeechRecognizer` real-time dictation without external cloud dependencies.
    - Optional `Pending` / `Completed` status toggle.
    - Deadline date presets (`Today`, `Tomorrow`, `Next Week`, `Custom`) + aligned time presets (`Morning 9 AM`, `Afternoon 2 PM`, `Evening 6 PM`, `Night 9 PM`, `Custom`).
+6. **Individual task time tracking**:
+   - Start and stop a separate timer on each task; different tasks may be tracked concurrently.
+   - Each task displays its own live elapsed time and persists actual minutes separately.
+   - Optional private Android reminder after two hours; stopping a timer cancels only its reminder.
+   - Insights adds per-task recorded minutes, evidence-based task scores, and a 365-day activity heatmap.
+7. **Faster entry to the app**:
+   - Signup form and authenticated app shell render without host discovery or setup-status waits. The first server operation can still wait for a sleeping free-tier host to wake.
 
 ---
 
