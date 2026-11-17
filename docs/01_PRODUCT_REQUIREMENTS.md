@@ -6,21 +6,24 @@ Every requirement ID appears in `16_REQUIREMENTS_TRACEABILITY.md` with its miles
 Priority: **M** = must (release-blocking), **S** = should, **C** = could/later.
 
 ## 1. Product summary
-ALIBI is a personal productivity system for individual accounts (Android + responsive web) that captures tasks by text/voice,
-classifies and schedules them, tracks real time spent, learns the user's patterns, answers questions over the user's
-own history (RAG), and produces factual reports that can be safely shared.
+ALIBI pairs a private personal productivity app for individuals with an organization web portal for owners and team leads.
+The Android app captures tasks, schedules work, tracks time and learns the user's patterns. The web portal manages an organization
+and reports professional-only activity from members who explicitly consented to join.
 
 Core loop: Capture → Organize → Schedule → Execute → Learn → Analyze → Report.
 
-**Owner amendments 2026-11-13 (ADR-018/020):** runs for ₹0 on free hosted services (no always-on PC). Android is the full client; **web is a dashboard** (analytics, reports/sharing, task lists with simple edits, vault search, settings). AI is opt-in cloud (off by default); Ollama is dev/local only. Requirements changed by this are marked "(ADR-020)".
+**Owner amendments 2026-11-17 (ADR-024):** the public marketing/landing pages remain unchanged. The web product is an organization workspace for owners and team leads; individual users use Android for personal ALIBI features. Members join by invitation and explicitly consent to professional activity reporting. Parent access is a future, separately consented capability. AI is opt-in cloud (off by default); Ollama is dev/local only.
 
 ### Users
-- **Account holder** (self-service sign-up): full access to their own data and devices.
+- **Individual account holder** (self-service sign-up): full access to their own data and devices in the Android app.
+- **Organization owner**: creates an organization, invites people, manages team-lead access and sees consented professional-only reporting.
+- **Team lead**: views professional-only work and SQL-grounded metrics for organization members.
+- **Organization member**: uses the Android app for personal ALIBI features and can accept/revoke professional activity sharing for an organization through the invitation/sharing web flow.
 - **Service operator**: configures and operates the ALIBI server; has no product-level access to account data through the client.
 - **Share recipient** (unauthenticated, link-based): read-only access to one report snapshot, professional scope by default.
 
 ### Out of scope for v1 (explicitly)
-iOS app; multi-user teams; collaborative editing; Notion-like document editor; Google Calendar two-way sync (one-way import is **C**);
+iOS app; parent/guardian portal (future, explicit consent required); collaborative editing; Notion-like document editor; Google Calendar two-way sync (one-way import is **C**);
 email/Slack integrations; payments; push notifications via a paid service; psychological inference.
 
 ## 2. Functional requirements
@@ -35,6 +38,16 @@ email/Slack integrations; payments; push notifications via a paid service; psych
 | FR-AUTH-005 | Password change invalidates all refresh tokens except current | M |
 | FR-AUTH-006 | Login rate limiting (5 failures / 15 min / IP+email) | M |
 | FR-AUTH-007 | Public self-sign-up creates an isolated account, default workspace and system categories; duplicate emails are rejected and signup attempts are rate limited | M |
+
+### 2.1a Organizations & professional reporting (ORG)
+| ID | Req | P |
+|----|-----|---|
+| FR-ORG-001 | An account can create an organization and become its owner; organization membership is separate from personal ownership of records | M |
+| FR-ORG-002 | Owners and team leads can create expiring, revocable invitation links for member or team-lead roles | M |
+| FR-ORG-003 | A member must explicitly accept professional-only activity sharing before joining; consent is versioned, visible, and revocable | M |
+| FR-ORG-004 | Owners and team leads can see only consented members; authorization is enforced by role in the backend | M |
+| FR-ORG-005 | Organization dashboards show SQL-derived professional-only productivity score, task activity, time and category breakdowns; exclude personal, academic, learning, uncategorized tasks, notes and attachments | M |
+| FR-ORG-006 | Members can leave an organization or revoke consent; access to their live activity ends immediately and the event is audit-logged | M |
 
 ### 2.2 Task management (TASK)
 | ID | Req | P |

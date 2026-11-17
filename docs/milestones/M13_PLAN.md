@@ -1,10 +1,10 @@
-# M13 Plan — Mobile app visual refresh
+# M13 Plan — Personal Android refresh and organization web portal
 
-- Scope: Rework Android visuals and implement account sign-up/login flows across Android and web, matching the owner's supplied screens and preserving account-level data isolation.
-- Requirement IDs: FR-AUTH-001..007, FR-TASK-001..020, FR-CAL-001..007, FR-DASH-001..006, FR-LEARN-005..009, FR-KNOW-001..004, FR-REP-001..005.
-- Entry: M12/v1.0 release is complete; owner approved six tabs and public self-signup (ADR-022/023). Auth API changes are in scope; no schema or sync-protocol changes are planned.
-- Read first: `docs/05_UI_UX_GUIDELINES.md`, `docs/14_TESTING_AND_ACCEPTANCE.md`, `docs/16_REQUIREMENTS_TRACEABILITY.md`, ADR-020, and existing mobile screen/API code.
-- Tasks: establish shared mobile visual tokens and branded header/backdrop; restyle existing Home, Tasks, Calendar, Insights, AI assistant and Settings screens; add API-backed Vault and Profile tabs; retain assistant access from Vault; add rate-limited signup API and web/mobile signup forms; verify user scoping; update UI guidance and ADRs; update status and known issues.
+- Scope: Refresh personal Android and replace authenticated web dashboard with an organization portal for owners/team leads. Public marketing/landing routes remain unchanged.
+- Requirement IDs: FR-AUTH-001..007, FR-ORG-001..006, FR-TASK-001..020, FR-CAL-001..007, FR-DASH-001..006, FR-LEARN-005..009, FR-KNOW-001..004, FR-REP-001..005.
+- Entry: M12/v1.0 release is complete; owner approved six tabs, public self-signup, and organization reporting with professional-only consent (ADR-022/023/024). Schema changes are in scope; no sync-protocol or dependency changes are planned.
+- Read first: docs 01–05, 10, 12, 14, 16; ADR-020/022/023/024; existing mobile and web routes, analytics, reports, auth and API contracts.
+- Tasks: retain mobile visual refresh and isolated signup; add reversible org/membership/invitation/consent schema; add real role-protected APIs and professional-only SQL analytics; redesign authenticated web nav/pages for Overview, People, Insights and Settings; add public web invite acceptance with consent and self-service revoke/leave; retain public landing design; update docs and API client.
 - Acceptance criteria:
   - AC-M13-1 Six requested destinations render in the requested order with a clear selected state and accessible labels.
   - AC-M13-2 Home, task lists, calendar, and insights continue using existing authenticated API data and existing actions.
@@ -14,6 +14,11 @@
   - AC-M13-6 Light mobile surfaces, typography, iconography, spacing, and shared card treatment align with the supplied references; controls meet 48 dp targets and reduced motion/contrast guidance.
   - AC-M13-7 Settings/logout and login remain navigable and visually consistent; no schema, sync, provider, or dependency changes.
   - AC-M13-8 Any visitor can create an isolated account from web or Android; duplicate email is handled safely; signup creates only that account's default workspace and categories; protected data remains scoped to the authenticated user.
-- Risks: screenshots contain example numbers/records; these must not be copied as production data. Public signup has no email verification and uses process-local rate limiting. Android visual QA may reveal layout and touch-target issues; keep M13 in progress until reviewed.
-- Test plan: run the mobile typecheck and Android export/build; manually inspect all six screens and capture/event sheets on an Android emulator/device. (Tests are not added or run under current session instructions.)
+- AC-M13-9 Owner can create organizations and role-scoped, expiring invitation links.
+- AC-M13-10 Invite acceptance requires explicit, versioned professional-only sharing consent; member can revoke/leave.
+- AC-M13-11 Organization views require active role membership and use live SQL data filtered to consented professional records.
+- AC-M13-12 No private or non-professional record details are disclosed; productivity scores are recomputed from professional-only tasks.
+- AC-M13-13 Public landing pages remain unchanged; authenticated web routes show the organization portal and block individual-only accounts.
+- Risks: screenshots contain example numbers/records; never copy them as production data. Signup still has no email verification and uses process-local rate limiting. Organization reporting adds cross-account access and consent risks; keep M13 in progress until automated isolation tests and manual review pass.
+- Test plan: mobile/web typechecks, backend lint/types, migration upgrade/downgrade, organization API and two-account consent/IDOR tests, Android build, and manual web/mobile review.
 - Exit gate: acceptance criteria reviewed; all routes and existing data/actions retained; status and known issues updated; report written after evidence is available. Do not mark complete without test evidence.

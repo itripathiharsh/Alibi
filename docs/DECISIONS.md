@@ -188,3 +188,27 @@ No schema migration is needed: users already have unique case-insensitive emails
 
 ### Owner approval
 Owner explicitly selected “Allow multiple self-signups” on 2026-11-17.
+
+## ADR-024 — Organization web portal and consented professional reporting
+- Status: Accepted (owner)
+- Date: 2026-11-17
+- Requirement IDs affected: FR-ORG-001..006, FR-AUTH-007, FR-SHARE-004..005, FR-DASH-001..006
+- Supersedes: ADR-020 web dashboard scope; ADR-023 statement that report links are the only cross-account disclosure path.
+
+### Context
+The owner changed the web product direction. The public landing pages remain the marketing site. Individuals use Android for the full personal ALIBI experience. Web is for organization owners and team leads to manage members and review professional activity.
+
+### Decision
+1. Preserve public landing routes and their content/design.
+2. Add organizations, owner/team-lead/member roles, invitation links, and a versioned member consent record. Membership is separate from ownership of personal data.
+3. Joining an organization requires explicit consent to share the Professional category. Only consenting members appear in organization views. Members can leave/revoke; live access ends immediately.
+4. Managers may see professional task titles/status, dates, project/category labels, time entries, and professional-only productivity metrics. Never expose descriptions, notes, attachments, or any personal, academic, learning, or uncategorized data.
+5. All organization metrics are computed from SQL and filtered by both active consent and `sharing_class='professional'` in backend queries. Team leads can only see organizations where their membership role grants access.
+6. No parent/guardian access in this change. The consent model should support a future separate scope grant without enabling it now.
+7. No new paid service or dependency. Invitations use high-entropy, expiring, revocable links with hashed tokens; delivery is user-managed.
+
+### Consequences
+Schema migration and new organization APIs are required. Public organization signups and invitations must not expose existing personal records. This explicitly authorizes sharing only the professional data types listed above, after member acceptance; no historical task data is shared before consent. Landing pages stay unchanged; authenticated web navigation and pages become an organization portal.
+
+### Owner approval
+The owner requested this product model on 2026-11-17, including professional-only reporting for owners/team leads and future parent access only on consent.

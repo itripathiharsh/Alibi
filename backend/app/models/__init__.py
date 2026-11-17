@@ -17,6 +17,7 @@ from app.models.learning import (
     TaskPrediction,
 )
 from app.models.notification import Notification
+from app.models.organization import Organization, OrganizationInvite, OrganizationMembership
 from app.models.project import Project
 from app.models.recurrence_rule import RecurrenceRule
 from app.models.refresh_token import RefreshToken
@@ -65,6 +66,9 @@ __all__ = [
     "TaskPrediction",
     "MLModel",
     "Notification",
+    "Organization",
+    "OrganizationMembership",
+    "OrganizationInvite",
     "Note",
     "NoteEmbedding",
     "ChatThread",

@@ -22,6 +22,7 @@ Threats (STRIDE-lite):
 - Web: refresh token in `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` cookie; CSRF: SameSite + `Origin` check on cookie-auth endpoints.
 - Mobile: tokens in expo-secure-store (Android Keystore-backed).
 - Multiple individual accounts may self-register through `/auth/signup`; `/auth/setup` remains limited to an empty database. Both flows create a private workspace and default categories for that account.
+- Organization membership is separate from account ownership. Invite acceptance requires explicit versioned consent to professional-only reporting. Consent revocation/leave immediately removes read access; all role and membership decisions are checked in the backend.
 - Signup is rate limited by client IP using the existing in-process sliding-window limiter. Email verification is not implemented; protect the public endpoint with TLS in hosted mode and monitor abuse.
 
 ## 3. Transport
@@ -38,6 +39,8 @@ Threats (STRIDE-lite):
 
 ## 5. Authorization
 - Every repository query includes `user_id = :current_user` (base class enforces; raw SQL helpers require it). Tokens carry exactly one user subject; clients never select or supply the owner ID for protected operations.
+- Organization analytics must join membership → user-owned records and enforce active membership, role, consent, and `category.sharing_class='professional'` in SQL. Client-side filtering is never a security boundary.
+- Organization reporting excludes task descriptions, raw input, notes, evidence, personal, academic, learning, uncategorized and pre-consent records. No broad member-data export is allowed.
 - Share viewer endpoints use only `report_shares.shared_facts` — never query live tables.
 - Generated IDOR test: for each route, a second user's resource ID returns 404.
 
@@ -46,6 +49,8 @@ Threats (STRIDE-lite):
 - External AI disabled by default; enabling shows exactly which providers/operations may receive which categories.
 - Personal category `external_ai_allowed=false` by default.
 - Sharing excludes personal, academic, learning and uncategorised data by default (professional only).
+- Organization membership does not share historical records until the member accepts the invite and records consent. Professional-only access is revocable; owner/team-lead view events are audit-logged.
+- Parent/guardian access remains disabled until a separately approved consent model exists.
 - Learning never infers psychological states (doc 07 §10).
 - Logs: structlog redaction for headers (authorization, cookie), body fields (password, api_key, token, title, description, raw_input, body, content, transcript). Production log level INFO contains no user content.
 

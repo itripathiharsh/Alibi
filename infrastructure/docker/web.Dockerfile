@@ -19,6 +19,7 @@ COPY apps/mobile/package.json ./apps/mobile/package.json
 
 ENV BUILD_STANDALONE=true \
     NEXT_TELEMETRY_DISABLED=1 \
+    BACKEND_INTERNAL_URL=http://api:8000 \
     NODE_ENV=production
 
 # Install dependencies strictly from lockfile

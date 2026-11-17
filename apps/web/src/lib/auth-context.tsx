@@ -17,8 +17,8 @@ interface AuthContextType {
   accessToken: string | null;
   isLoading: boolean;
   needsSetup: boolean | null;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, displayName?: string) => Promise<void>;
+  login: (email: string, password: string, redirectTo?: string) => Promise<void>;
+  signup: (email: string, password: string, displayName?: string, redirectTo?: string) => Promise<void>;
   setupOwner: (email: string, password: string, displayName?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, redirectTo?: string) => {
     const { data, error } = await api.POST("/api/v1/auth/login", {
       body: {
         email,
@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (data.user) {
       setUser(data.user as UserProfile);
     }
-    router.push("/dashboard");
+    router.push(redirectTo?.startsWith("/") ? redirectTo : "/dashboard");
   };
 
   const setupOwner = async (email: string, password: string, displayName?: string) => {
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await login(email, password);
   };
 
-  const signup = async (email: string, password: string, displayName?: string) => {
+  const signup = async (email: string, password: string, displayName?: string, redirectTo?: string) => {
     const { error } = await api.POST("/api/v1/auth/signup", {
       body: {
         email,
@@ -118,7 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) {
       throw new Error((error as { detail?: string })?.detail || "Could not create your account.");
     }
-    await login(email, password);
+    await login(email, password, redirectTo);
   };
 
   const logout = async () => {

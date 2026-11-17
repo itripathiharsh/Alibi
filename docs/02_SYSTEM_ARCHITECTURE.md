@@ -1,7 +1,7 @@
 # 02 — System Architecture
 
 ## 1. Style
-**Modular monolith.** One FastAPI process (API) + one worker process (same codebase, different entrypoint) + PostgreSQL. Each account owns an isolated data space; account identity is taken from the authenticated token and every owned-data query is scoped by that identity.
+**Modular monolith.** One FastAPI process (API) + one worker process (same codebase, different entrypoint) + PostgreSQL. Each account owns an isolated data space. Organization membership grants a separate, revocable view over consented professional records only; it does not transfer ownership. Organization data is scoped by active membership and role in addition to record owner identity.
 No microservices, no message broker, no Redis. Modules are isolated by package and talk via public service functions.
 
 > **Hosted mode (ADR-018/020):** the primary runtime is `ALIBI_MODE=hosted`. It's **one container** on Render free, where the API process also runs the worker loop + APScheduler, connected to Neon Postgres. The diagram and process table below describe `local` mode (dev/self-host). Hosted differences: no Ollama/faster-whisper in the image, fastembed only if M7 shows it fits, web is an online-only dashboard (no IndexedDB/Dexie, no PWA offline shell), files stored in Postgres, nightly jobs and backups via GitHub Actions.
@@ -15,9 +15,9 @@ No microservices, no message broker, no Redis. Modules are isolated by package a
  │ SQLite local │                     │  learning · scheduling · ai · rag ·        │
  └──────────────┘                     │  knowledge · reports · sharing · sync ·    │
  ┌──────────────┐                     │  notifications                             │
- │ Web app      │◄───────────────────►│                                            │
+ │ Web app      │◄───────────────────►│ organization portal (role + consent scoped) │
  │ Next.js      │                     └───────┬───────────────┬────────────────────┘
- │ IndexedDB    │                             │ SQL           │ jobs table
+ │ online only  │                             │ SQL           │ jobs table
  └──────────────┘                     ┌───────▼───────┐ ┌─────▼──────────────────────┐
  ┌──────────────┐  /s/{token} (RO)   │ PostgreSQL 16 │ │ Worker (same code)         │
  │ Share viewer │◄──────────────────►│ + pgvector    │ │ embeddings · learning ·    │
@@ -143,8 +143,7 @@ renderers (PDF/XLSX/CSV) store files → report `ready`. **Hosted (ADR-020):** o
 - `packages/sync-core` — platform-agnostic sync engine: op queue model, push/pull loop, backoff, conflict surfacing. Storage adapter interface implemented by mobile (SQLite); the web (Dexie) adapter is deferred with FR-SYNC-002 (ADR-020).
 
 ### 8.2 Web (`apps/web`)
-Next.js App Router, client-side data via TanStack Query; auth tokens: access token in memory, refresh token in `HttpOnly; Secure; SameSite=Strict` cookie
-scoped to `/api/v1/auth/refresh` (web only). Hosted on Vercel with a rewrite `/api/*` → backend so cookies stay same-origin. **v1 web is an online-only dashboard (ADR-020):** no service worker/offline shell; scope per doc 05 §1a.
+Next.js App Router, client-side data via TanStack Query; auth tokens: access token in memory, refresh token in `HttpOnly; Secure; SameSite=Strict` cookie scoped to `/api/v1/auth/refresh`. Hosted on Vercel with a rewrite `/api/*` → backend so cookies stay same-origin. The signed-in product is an online-only organization portal. Public marketing routes remain separate. Organization reads require active membership and use backend queries constrained to professional category data; individual task and personal analytics APIs are not exposed in this portal.
 
 ### 8.3 Mobile (`apps/mobile`)
 Expo Router; local DB = expo-sqlite with Drizzle schema mirroring syncable tables; UI reads **from local DB** (single source for UI),

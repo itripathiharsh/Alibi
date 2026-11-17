@@ -380,17 +380,20 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M2b Early hosted deploy �
 
 ---
 
-## M13 — Android app visual refresh
-**Goal:** align the mobile app's navigation and visual presentation with the owner's supplied Home, Tasks, Calendar, Insights, Vault, Profile, capture, and event-sheet references while preserving real API behavior.
-**Read first:** `AGENTS.md`; 00, 05, 10, 14, 16; `IMPLEMENTATION_STATUS.md`; `KNOWN_ISSUES.md`; `DECISIONS.md` ADR-020 and ADR-022; the M13 plan; existing mobile screens and API contracts.
-**Entry criteria:** M12/v1.0 release complete; owner approved six mobile tabs and public individual-account signup (ADR-022/023). No schema, sync, or dependency changes planned; auth API changes are in scope.
+## M13 — Personal Android refresh, public signup, and organization web portal
+**Goal:** deliver the reference-led personal Android app and transition authenticated web into a professional-only organization portal with explicit member consent.
+**Read first:** `AGENTS.md`; 00, 01, 02, 03, 04, 05, 10, 12, 14, 16; `IMPLEMENTATION_STATUS.md`; `KNOWN_ISSUES.md`; `DECISIONS.md` ADR-020, ADR-022, ADR-023, ADR-024; the M13 plan; existing app, API, analytics and sharing code.
+**Entry criteria:** M12/v1.0 release complete; owner approved six mobile tabs, public individual-account signup, and the organization/consent product model (ADR-022/023/024). Schema and API changes are now in scope; no sync protocol or dependency change is planned.
 **Tasks**
 1. Establish shared mobile tokens, branded header/backdrop, typography, and card treatments.
 2. Refresh Home, Tasks, Calendar, Insights, Assistant, and Settings; add API-backed Vault and Profile screens.
 3. Implement six tabs in this order: Home, Tasks, Calendar, Insights, Vault, Profile. Keep Assistant reachable from Vault and settings reachable from Profile.
 4. Preserve existing real API data, capture/event approval flows, empty/error/loading behavior, authentication, and logout.
-5. Add rate-limited `POST /auth/signup`, account provisioning, and signup UI on web and Android; audit cross-user access using authenticated `user_id` scoping. Keep first-run `/auth/setup` compatible.
-6. Update UI guidance, ADR-022/023, status, known issues, and milestone report; do not copy screenshot example data.
+5. Add rate-limited `POST /auth/signup`, account provisioning, and signup UI on Android; retain setup compatibility.
+6. Add organization, membership, invitation, consent, and audit persistence with reversible migrations; add role-protected APIs and professional-only analytics.
+7. Replace authenticated web individual dashboard with a role-aware organization portal (overview, people/invites, insights, settings); keep public landing routes unchanged.
+8. Add public web invite review with explicit member consent and a self-service sharing/leave page; ensure owners and team leads never see non-professional data or unconsented history.
+9. Update generated API client, UI guidance, ADRs, status and known issues; do not copy screenshot example data.
 
 **AC**
 - AC-M13-1 Six requested destinations render in the requested order with clear selected state and accessible labels.
@@ -401,8 +404,13 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M2b Early hosted deploy �
 - AC-M13-6 Android surfaces match supplied visual references, maintain accessible touch targets, and respect reduced motion settings.
 - AC-M13-7 Settings, logout, login, and signup remain navigable and consistent; no schema, sync, provider, or dependency changes.
 - AC-M13-8 Public signup provisions an isolated account on web and Android; duplicate emails and signup rate limits are handled; all protected reads/writes use the authenticated user's ID.
+- AC-M13-9 Owner can create an organization and role-scoped invitations; invitation tokens are hashed, expiring and revocable.
+- AC-M13-10 Member must accept a clear professional-data consent statement before membership activates; consent can be revoked and is audit-logged.
+- AC-M13-11 Organization overview, people and insight pages use real APIs and SQL metrics; all team-lead/owner queries require active membership and filter professional class in SQL.
+- AC-M13-12 No task detail, description, notes, attachments, personal, academic, learning, uncategorized or pre-consent activity is exposed to the organization.
+- AC-M13-13 Public landing pages remain unchanged; signed-in web accounts without organization access are directed to join/create guidance and the Android app.
 
-**QA:** mobile typecheck, Android export/build, and manual review of six screens plus capture/event flows on emulator/device. Mark complete only with evidence recorded in `IMPLEMENTATION_STATUS.md` and an M13 report.
+**QA:** mobile/web/API typechecks, migration upgrade/downgrade, API and two-account consent/IDOR tests, Android build, and manual review of mobile consent plus web role routes. Mark complete only with evidence recorded in `IMPLEMENTATION_STATUS.md` and an M13 report.
 
 ---
 

@@ -26,6 +26,8 @@ Trigger `trg_sync_bump` sets `version`, `server_seq = nextval('sync_seq')`, `upd
 ## 2. Entity-relationship overview
 ```
 users ─┬─ devices ── refresh_tokens
+       ├─ organizations ── organization_memberships ── organization_invites
+       │                                    └─ professional activity (read through consent scope)
        ├─ workspaces ─┬─ categories ── projects
        │              └─ tags
        ├─ tasks ─┬─ subtasks / task_tags / task_dependencies / time_entries / evidence
@@ -50,6 +52,12 @@ max_daily_focus_min=480, reminder_lead_min, quiet_hours, auto_classify_threshold
 **devices**: `id`, `user_id`, `name`, `platform CHECK in ('android','web')`, `app_version`, `last_seen_at`, `last_pull_seq bigint DEFAULT 0`, `revoked_at`, `created_at`.
 
 **refresh_tokens**: `id`, `user_id`, `device_id`, `family_id uuid`, `token_hash bytea UNIQUE` (SHA-256), `expires_at`, `used_at`, `revoked_at`, `created_at`. Index `(family_id)`.
+
+**organizations**: `id uuid`, `name`, `slug`, `owner_user_id`, `created_at`, `updated_at`, `status CHECK in ('active','suspended','deleted')`. Owner is an ALIBI account; organization membership does not change ownership of personal records.
+
+**organization_memberships**: `id uuid`, `organization_id`, `user_id`, `role CHECK in ('owner','team_lead','member')`, `status CHECK in ('active','left','revoked')`, `professional_sharing_consent bool`, `consent_version text NULL`, `consented_at timestamptz NULL`, `revoked_at timestamptz NULL`, `created_at`. Unique `(organization_id,user_id)`; active member access requires consent=true and non-null `consented_at`. Owner/lead access is role-based and never grants data-owner rights.
+
+**organization_invites**: `id uuid`, `organization_id`, `created_by_user_id`, `role CHECK in ('team_lead','member')`, `token_hash bytea UNIQUE` (raw token shown once), `expires_at`, `accepted_by_user_id NULL`, `accepted_at NULL`, `revoked_at NULL`, `created_at`. Index `(organization_id, created_at)`. Invitation links are revocable, expire, and contain no member data.
 
 ### 3.2 Organization
 **workspaces** ⟳: `id`, `user_id`, `name`, `is_default bool`. Each new account receives one default workspace; account data remains isolated by `user_id`.

@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { User, Settings, Moon, Sun, Database, Shield, X } from "lucide-react";
+import Link from "next/link";
+import { User, Settings, Moon, Sun, X } from "lucide-react";
 import { useTheme } from "./theme-provider";
 import { useAuth } from "@/lib/auth-context";
 
-export function AvatarMenu({ serverStatus }: { serverStatus?: string }) {
+export function AvatarMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
@@ -42,40 +43,15 @@ export function AvatarMenu({ serverStatus }: { serverStatus?: string }) {
               <div>
                 <h3 className="font-semibold text-lg text-text">{accountName}</h3>
                 <p className="text-xs text-text-muted">{user?.email}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="w-2 h-2 rounded-full bg-success inline-block"></span>
-                  <span className="text-xs text-text-muted">
-                    Backend: {serverStatus || "Connected"}
-                  </span>
-                </div>
+                <p className="mt-1 text-xs text-text-muted">Organization workspace</p>
               </div>
             </div>
 
             <div className="space-y-2 border-t border-border pt-4">
-              <h4 className="text-xs font-semibold uppercase text-text-muted mb-2 tracking-wider">
-                Settings & Preferences
-              </h4>
-
-              <div className="flex items-center justify-between p-2.5 rounded-control hover:bg-surface2 cursor-pointer transition">
-                <div className="flex items-center gap-3">
-                  <Settings className="w-4 h-4 text-text-muted" />
-                  <span className="text-sm text-text">Categories & Working Hours</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-2.5 rounded-control hover:bg-surface2 cursor-pointer transition">
-                <div className="flex items-center gap-3">
-                  <Shield className="w-4 h-4 text-text-muted" />
-                  <span className="text-sm text-text">AI Providers & Privacy</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-2.5 rounded-control hover:bg-surface2 cursor-pointer transition">
-                <div className="flex items-center gap-3">
-                  <Database className="w-4 h-4 text-text-muted" />
-                  <span className="text-sm text-text">Backup & Offline Export</span>
-                </div>
-              </div>
+              <Link href="/organization/settings" onClick={() => setIsOpen(false)} className="flex items-center gap-3 p-2.5 rounded-control hover:bg-surface2 transition">
+                <Settings className="w-4 h-4 text-text-muted" />
+                <span className="text-sm text-text">Organization & sharing</span>
+              </Link>
 
               <div
                 onClick={toggleTheme}

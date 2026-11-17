@@ -1,9 +1,9 @@
 # Implementation Status
 
-_Last updated: 2026-11-17 by agent (M13 mobile visual refresh and multi-account signup in progress; v1.0.0 remains released)_
+_Last updated: 2026-11-17 by agent (M13 scope expanded by owner to include organization web portal; v1.0.0 remains released)_
 
 ## Current milestone
-**M13 — Android app visual refresh and account signup** · state: **In progress** · entry criteria: ✅ M12/v1.0 release complete; six-tab navigation and multi-account signup approved by owner (ADR-022/023)
+**M13 — Personal Android refresh, public signup, and organization web portal** · state: **In progress** · entry criteria: ✅ M12/v1.0 release complete; six-tab navigation, public signup, and organization/consent product model approved by owner (ADR-022/023/024)
 
 ## Milestones
 | Milestone | State | Started | Completed | Tag | Report |
@@ -27,7 +27,7 @@ _Last updated: 2026-11-17 by agent (M13 mobile visual refresh and multi-account 
 States: Not started · Planning · In progress · Blocked · In QA · Complete.
 
 ## Requirement progress
-See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: **124 / 125 passing; FR-AUTH-007 is implemented but remains unverified**.
+See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: **124 / 131 previously passing; FR-AUTH-007 remains unverified. FR-ORG-001..006 implementation is in progress and has no test evidence yet.**
 
 ## Latest test evidence
 | Date | Commit | Suite | Result | Link |
@@ -47,12 +47,17 @@ See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: **124 / 125 pass
 - M0–M12 remain complete; v1.0.0 remains the released baseline.
 - M13 is refreshing mobile Home, Tasks, Calendar, Insights, Vault, Profile, capture, and event surfaces.
 - Backend account-owned tables and protected operations use authenticated `user_id`. Public signup provisions a separate default workspace and categories; write paths that accept category, project, workspace, task, or calendar-event IDs now validate ownership before saving. No teams or shared workspace are introduced.
-- M13 account check: mobile typecheck passed; public signup and owner-scoped writes are included in the rebuilt APK. Web typecheck remains red on Lucide JSX component type errors across marketing pages; no auth end-to-end tests have been run and device visual review remains outstanding.
+- M13 account check: mobile typecheck passed; public signup and owner-scoped writes are included in the rebuilt APK. Auth end-to-end tests have not been run and device visual review remains outstanding.
 - Owner selected six mobile tabs. ADR-022 and the mobile navigation guidance record that choice; web remains at four destinations.
-- M13 checks: `pnpm --filter @alibi/mobile typecheck` passed (`tsc --noEmit`); backend Ruff and strict mypy checks passed for changed auth and ownership files; `assembleRelease` succeeded and `apksigner` verified the APK v2 signature. The rebuilt `apk/ALIBI-0.1.0.apk` is 63,430,259 bytes (SHA-256 recorded in `apk/README.md`) and uses the repository debug keystore. Account-isolation tests were not run. No Android device/emulator was attached, so visual launch and interaction review remain outstanding. Do not mark M13 complete.
+- Owner changed the web product direction on 2026-11-17. ADR-024 and M13 now cover a role-aware organization portal; member invitation requires explicit, versioned professional-only consent, and only post-consent professional activity is reportable. The public landing routes remain unchanged. Parent access is future scope only.
+- Organization migration/models, role-protected APIs, professional-only SQL analytics, web invite/consent/revoke/leave flows, and signed-in organization portal pages are implemented in M13. Migration `0012` has been applied to the local Docker database. No organization tests have been run; two-account isolation checks remain outstanding. Do not claim this feature complete.
+- M13 checks: organization backend Ruff, strict mypy and compileall passed; migration `0012` upgrade ran in the local Docker database and downgrade SQL generated offline; OpenAPI was regenerated and `@alibi/api-client` codegen/typecheck passed; `pnpm --filter @alibi/web typecheck`, the local Docker production image build, and the Next.js production build all passed with type validation enabled after fixing React 18/19 type resolution (KI-007). The organization route returns 401 without authentication as expected. No tests were run. Prior mobile typecheck and signed APK evidence remain as above. No Android device/emulator was attached. Do not mark M13 complete.
+- 2026-11-17 web UX follow-up: replaced the blue login/signup cards with ALIBI-branded auth layouts and an animated task→plan→reminder illustration; added a pause control and reduced-motion handling. Added a desktop sidebar toggle that releases the sidebar width when collapsed. `pnpm --filter @alibi/web typecheck`, `pnpm --filter @alibi/web build`, and `docker compose up -d --build web` passed; local `/login`, `/signup`, and `/dashboard` returned HTTP 200. This is build/smoke evidence only, not auth or organization behavior test evidence.
+- 2026-11-17 auth motion revision: changed the login/signup visual from subtle decorative motion to an autoplaying three-stage workflow with a progressing step track, shifting task card, changing plan/reminder copy, sliding notification, and ringing bell. Reduced-motion mode slows the movement rather than flattening it; the user can still pause/play it. Web typecheck/build passed; rebuilt Docker web; `/login` returned HTTP 200 and served the workflow markup and animation CSS.
+- 2026-11-17 organization layout follow-up: changed the desktop app shell to offset the header and page column by the open 16rem rail, with consistent 2rem content gutters; the column returns to full width when collapsed. Web typecheck/build passed, the generated CSS contains the calculated sidebar-aware width, Docker web is healthy, and `/dashboard` returns HTTP 200.
 
 ## Open blockers
-- FR-AUTH-007 API/E2E regression tests are outstanding; web typecheck and Android device review are also outstanding.
+- FR-AUTH-007 API/E2E regression tests are outstanding; FR-ORG-001..006 lack test evidence and two-account isolation verification; Android device review remains outstanding.
 
 ## Update rules
 Update this file in the same commit as any feature change. "Complete" requires a linked test run.

@@ -3,27 +3,29 @@
 Principle: **simple on the outside, intelligent underneath.** Information over decoration. Mobile-first.
 
 ## 1. Navigation
-Mobile navigation uses six destinations in the bottom tab bar, matching the owner-approved Android reference. Web remains a four-destination dashboard with a left rail on ≥ 1024 px (ADR-022):
+Mobile navigation uses six destinations in the bottom tab bar, matching the owner-approved Android reference. Signed-in web uses a four-destination organization portal with a left rail on ≥ 1024 px (ADR-024):
 
 | Tab | Contains |
 |-----|----------|
-| **Home** (mobile) / **Dashboard** (web) | Period switcher, score card, metric tiles, charts, today's timeline, pending proposals card |
-| **Tasks** | Today / Upcoming / Backlog / Completed segments, task detail, search |
+| **Home** (mobile) / **Overview** (web) | Personal dashboard on mobile; consented professional team metrics on web |
+| **Tasks** (mobile) / **People** (web) | Personal task management on mobile; team membership, invitations and consent state on web |
 | **Calendar** (mobile) | Day/week views and scheduled items; full calendar capabilities per FR-CAL-001..006 |
-| **Insights** (mobile) / **Reports** (web) | Analytics on mobile; reports, history, shares & access logs on web |
+| **Insights** | Personal analytics on mobile; consented professional analytics on web |
 | **Vault** (mobile) | Knowledge search and saved notes; assistant remains reachable from Vault |
-| **Profile** (mobile) | Account identity and settings entry; sign out |
+| **Profile** (mobile) / **Organization** (web) | Personal account and settings on mobile; organization privacy and workspace settings on web |
 
 On mobile, settings remain under Profile. On web, settings (account, working hours, categories, AI providers, privacy, devices, backup/export) remain under the avatar menu.
 Global **Capture button** (FAB on mobile, `N` shortcut + top bar button on web) on every screen.
 
-### 1a. Web scope in v1 (ADR-020)
-Web uses the **same four tabs** (Dashboard, Tasks, AI Intelligence, Reports) and the avatar-menu Settings, but as a **dashboard**:
-- Dashboard: full. Reports: full (generate, preview, download, shares).
-- Tasks: lists + search + task detail with simple edits (status, reschedule, title, notes). Calendar toggle is **view-only**.
-- AI Intelligence: vault search (read-only), patterns, proposals review, assistant (if AI enabled); AI settings.
-- **Not on web:** capture button/voice, timers, evidence/document upload, calendar editing, offline mode. These are Android-only.
-- The "offline" state in §3 applies to Android only; on web, show an error state with retry instead.
+### 1a. Web scope (ADR-024)
+Public marketing routes (`/`, `/features`, `/how-it-works`, `/why-alibi`, `/docs`) remain the landing site. Signed-in web is an **organization portal** for owners and team leads, not the personal productivity client.
+- Primary pages: Organization overview, People & invitations, Insights, and Organization settings. Navigation and actions are role-aware.
+- Overview: active/consented member count, professional-only focus time/completions, productivity trend, and recent work summary. Every metric has a period selector and meaningful empty/insufficient-data state.
+- People: invite by revocable expiring link; show role and consent status. Member detail lists professional task titles/status and time, without notes/descriptions/attachments.
+- Team-lead and owner reports are computed from professional-category rows only. Personal, academic, learning, uncategorized records and pre-consent history never appear.
+- Invite links show the consent terms before acceptance. Members can review, opt in and revoke sharing; the web portal does not expose member productivity screens. People without an organization can create one or use ALIBI Android for personal features.
+- Individuals use Android for task capture, planning, calendar, timers, vault, assistant and personal analytics. Parent/guardian access is not in v1; future scopes require separate explicit consent.
+- Web is online-only; on API failure show retry state. Charts use Recharts and include accessible data/table alternatives.
 
 ## 2. Critical flow: capture in ≤ 3 interactions
 1. Tap FAB (or long-press for voice) → sheet opens with keyboard focused / recording started.

@@ -86,6 +86,9 @@ Token: 32 random bytes base64url; DB stores SHA-256. URL `https://<host>/s/<toke
 Access logs every hit (hashed IP/UA). Expired/revoked → 410 page without content. Owner sees history + access counts.
 Hosted: the viewer may hit a sleeping server (~1 min cold start). The recipient's link must not fail; document the expected wait in the share message.
 
+## 6.1 Organization portal (FR-ORG-005)
+Organization analytics reuse the existing productivity score formula. Every task aggregate joins its category and filters `sharing_class='professional'`, the active membership's user ID, active consent, and the current consent timestamp. The organization period selector changes the reporting window; task rows created before consent are excluded. Time entries must start on or after consent. Insufficient samples return a null score, never a fabricated zero. Member activity responses include only task title, status, category, deadline/completion timestamps and actual minutes; descriptions, notes, attachments, personal/academic/learning/uncategorized rows are excluded in SQL or omitted from response schemas.
+
 ## 7. Tests
 - Formula unit tests with hand-computed fixtures for every metric (including boundary: midnight-spanning entries, tz edges at 18:30Z = 00:00 IST, DST irrelevant for IST but test with `Europe/London` user too).
 - Property: score ∈ [0,100] or null; invariant to scaling time entries; cancelled tasks don't change score.

@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { AuthPageLayout } from "@/components/auth-page-layout";
 import { useAuth } from "@/lib/auth-context";
 
 export default function LoginPage() {
@@ -11,13 +13,13 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError(null);
     setIsSubmitting(true);
-
     try {
-      await login(email, password);
+      const returnTo = new URLSearchParams(window.location.search).get("returnTo") || undefined;
+      await login(email, password, returnTo);
     } catch (err: unknown) {
       setError((err as Error).message || "Invalid email or password.");
     } finally {
@@ -26,78 +28,24 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-8 shadow-sm">
-        <div className="mb-6 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-blue-600 text-white font-bold text-xl mb-3">
-            A
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Sign in to ALIBI</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Access your tasks, calendar, and analytics.
-          </p>
-        </div>
-
-        {needsSetup && (
-          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-300 text-sm rounded-lg flex items-center justify-between">
-            <span>System requires initial setup.</span>
-            <Link href="/setup" className="font-semibold underline">
-              Set up now
-            </Link>
-          </div>
-        )}
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400 text-sm rounded-lg">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Email Address
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow transition disabled:opacity-50"
-          >
-            {isSubmitting ? "Signing in..." : "Sign In"}
-          </button>
-        </form>
-        <p className="mt-5 text-center text-sm text-gray-600 dark:text-gray-400">
-          New to ALIBI?{" "}
-          <Link href="/signup" className="font-semibold text-orange-600 hover:underline">
-            Create your account
-          </Link>
-        </p>
-      </div>
-    </div>
+    <AuthPageLayout
+      mode="login"
+      eyebrow="Welcome back"
+      title="Good to see you again."
+      description="Sign in to your ALIBI workspace and continue with a clearer plan."
+      notice={needsSetup ? <div className="auth-notice"><span>ALIBI needs its initial setup.</span><Link href="/setup">Set up now</Link></div> : undefined}
+      footer={<>New to ALIBI? <Link href="/signup">Create your account</Link></>}
+    >
+      {error && <div role="alert" className="auth-error">{error}</div>}
+      <form onSubmit={handleSubmit} className="auth-form-fields">
+        <label className="auth-field">Email address
+          <input type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
+        </label>
+        <label className="auth-field">Password
+          <input type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password" />
+        </label>
+        <button type="submit" disabled={isSubmitting} className="auth-submit">{isSubmitting ? "Signing in…" : <>Sign in <ArrowRight size={17} /></>}</button>
+      </form>
+    </AuthPageLayout>
   );
 }
-

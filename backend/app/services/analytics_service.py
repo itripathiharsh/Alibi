@@ -269,6 +269,8 @@ class AnalyticsService:
         from_date: date | None = None,
         to_date: date | None = None,
         tz_str: str = "Asia/Kolkata",
+        sharing_class: str | None = None,
+        created_after: datetime | None = None,
     ) -> ProductivityScoreResponse:
         """Compute the transparent productivity score v1 per doc 10 §3.
 
@@ -289,7 +291,7 @@ class AnalyticsService:
             start_utc, end_utc = resolve_period(period, tz_str, from_date, to_date)
 
         # Fetch candidate tasks for score calculation
-        tasks_query = select(Task).where(
+        tasks_query = select(Task).outerjoin(Category, Category.id == Task.category_id).where(
             and_(
                 Task.user_id == user_id,
                 Task.deleted_at.is_(None),
@@ -300,6 +302,10 @@ class AnalyticsService:
                 ),
             )
         )
+        if sharing_class is not None:
+            tasks_query = tasks_query.where(Category.sharing_class == sharing_class)
+        if created_after is not None:
+            tasks_query = tasks_query.where(Task.created_at >= created_after)
         tasks = list((await self.session.execute(tasks_query)).scalars().all())
 
         priority_weights: dict[Any, float] = {

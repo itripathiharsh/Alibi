@@ -14,6 +14,12 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-AUTH-005 | Password change invalidates all refresh tokens except current | M | M1 | 12, 04§4.2 | backend/tests/integration/auth/ | ☑ |
 | FR-AUTH-006 | Login rate limiting (5 failures / 15 min / IP+email) | M | M1 | 12, 04§4.2 | backend/tests/integration/auth/ | ☑ |
 | FR-AUTH-007 | Rate-limited public signup creates isolated user, workspace and system categories; duplicate email rejected | M | M13 | 12, 04§4.2 | backend/tests/integration/test_auth_api.py; tests/e2e/web + mobile | ☐ |
+| FR-ORG-001 | Create an organization with owner role, separate from personal record ownership | M | M13 | 02§8, 03§3.1, 04§4.18 | backend/tests/integration/organizations/ | ☐ |
+| FR-ORG-002 | Owner creates expiring/revocable member or team-lead invitation links | M | M13 | 03§3.1, 04§4.18, 12§5 | backend/tests/security/organizations/ | ☐ |
+| FR-ORG-003 | Invitation acceptance records versioned professional-only consent; member can revoke | M | M13 | 01§2.1a, 03§3.1, 12§2,5,6 | backend/tests/security/organizations/ + mobile/e2e | ☐ |
+| FR-ORG-004 | Role-protected owner/team-lead access to organization members | M | M13 | 02§8, 04§4.18, 12§5 | backend/tests/security/organizations/ | ☐ |
+| FR-ORG-005 | SQL-derived organization metrics and activity expose only consented professional records after consent | M | M13 | 10, 12§5,6 | backend/tests/integration/organizations/ + web/e2e | ☐ |
+| FR-ORG-006 | Leave/revoke immediately ends organization access and writes an audit event | M | M13 | 03§3.1, 04§4.18, 12§7 | backend/tests/security/organizations/ | ☐ |
 | FR-TASK-001 | Create task from free text; task is persisted **immediately** with raw input even befor… | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-002 | Create task from voice: audio → transcript → same pipeline as text; audio retained only… | M | M4 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-003 | Extraction returns: title, category, project, deadline, priority, estimate, subtasks — … | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
@@ -133,7 +139,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | NFR-MAINT-001 | Backend test coverage | M | all | 14§3 | CI coverage | ☑ |
 | NFR-I18N-001 | Date parsing supports Indian conventions (DD/MM), "kal/parso" optional | M | M2 | 06§7 | backend/tests/ai_eval/extraction_golden | ☑ |
 
-Total requirements: 125.
+Total requirements: 131.
 
 ## Spec acceptance table → requirement mapping
 | Spec acceptance area | Requirement IDs | Gate milestone |

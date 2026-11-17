@@ -5,9 +5,11 @@ import "./features.css";
 import "./how-it-works.css";
 import "./why-alibi.css";
 import "./docs-page.css";
+import "./auth-pages.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth-context";
 import { AppShell } from "@/components/app-shell";
+import { OrganizationProvider } from "@/lib/organization-context";
 
 export const metadata: Metadata = {
   title: "ALIBI — Personal Productivity & Work Intelligence",
@@ -17,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return <html lang="en" className="dark"><body className="antialiased">
-    <ThemeProvider><AuthProvider><AppShell>{children}</AppShell></AuthProvider></ThemeProvider>
+    <ThemeProvider><AuthProvider><OrganizationProvider><AppShell>{children}</AppShell></OrganizationProvider></AuthProvider></ThemeProvider>
   </body></html>;
 }
 

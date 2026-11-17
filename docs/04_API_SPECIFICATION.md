@@ -176,6 +176,27 @@ Hosted mode (ADR-020): these endpoints return 503 `ai_unavailable` unless extern
 | POST | /data/delete | `{scope: category|all, category_id?, confirm_phrase}` |
 | GET | /backups · POST /backups (manual) | list / trigger |
 
+### 4.18 Organizations (FR-ORG)
+All routes require authentication except the safe invite preview. IDs are authorized on the server; clients cannot supply a member's user ID to broaden access.
+| Method | Path | Notes |
+|---|---|---|
+| POST | /organizations | Create organization; caller becomes owner |
+| GET | /organizations/mine | Current account's memberships and consent state |
+| GET | /organizations/{org_id} | Organization details for active members |
+| GET | /organizations/{org_id}/members | Owner/team-lead list; only active members are included |
+| POST | /organizations/{org_id}/invites | Owner creates a team-lead or member invite; token is returned once |
+| GET | /organizations/{org_id}/invites | Owner/team-lead list of pending invite metadata only; raw tokens are never recoverable |
+| GET | /organization-invites/{token} | Safe invite preview: organization name, role, expiry; no member information |
+| POST | /organization-invites/{token}/accept | Authenticated user explicitly accepts professional-only sharing (`professional_sharing_consent=true`); consent version and timestamp recorded |
+| POST | /organizations/{org_id}/consent | Member explicitly opts in; starts a new consent window |
+| POST | /organizations/{org_id}/consent/revoke | Revoke consent immediately; existing org queries stop returning the member |
+| POST | /organizations/{org_id}/leave | Member leaves; owner must transfer ownership first |
+| POST | /organizations/{org_id}/invites/{invite_id}/revoke | Owner/team lead revokes an unused invite |
+| GET | /organizations/{org_id}/overview | SQL aggregates filtered to active, consented professional data |
+| GET | /organizations/{org_id}/members/{membership_id}/activity | Professional task titles/status/times only; no descriptions, notes, evidence, or other sharing classes |
+
+Professional score uses the existing documented score formula applied only to `sharing_class='professional'` rows. Insufficient samples return null with an explanatory state.
+
 ## 5. API acceptance criteria
 - AC-API-1 Every endpoint has request/response Pydantic models, appears in OpenAPI with examples and error responses.
 - AC-API-2 Schemathesis property-based run against OpenAPI: 0 server errors (5xx) and 0 schema violations.
