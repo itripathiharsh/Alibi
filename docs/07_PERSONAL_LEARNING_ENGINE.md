@@ -81,6 +81,9 @@ Target: `log(actual_min)` (durations are right-skewed). Only tasks with ≥ 1 ti
 4. Confidence = Wilson lower bound (95%) of adherence = periods with occurrence / periods elapsed since first, × recency decay `exp(-days_since_last/(3×period))`.
 5. Status: `candidate` (conf 0.4–0.7) → `active` (≥ 0.7) → user may `confirm` (and convert to recurrence rule) or `dismiss` (never re-suggested unless 2× more evidence). Unseen for 3 periods → `stale`.
 
+### Mobile capture suggestions
+Home and Tasks capture may show up to three active routines only when confidence is at least 0.7 and the engine reports at least four observations. The suggestion label and sample count come from `/learning/profile`; no canned examples or generated task history are allowed. Tapping a suggestion fills the capture text field for the user to review and save through the normal capture flow. If no routine meets the threshold or the profile is unavailable, the suggestion section stays hidden.
+
 ## 7. Preference learner (FR-LEARN-005)
 - **Work periods:** for each category, histogram of minutes worked by hour-of-day × weekday from `time_session`; Dirichlet smoothing α=1 per bin; preferred windows = contiguous bins with posterior mass ≥ 1.5× uniform. Sample count = sessions.
 - **Session length:** median & IQR of session minutes per category → scheduler `preferred_block_min`.

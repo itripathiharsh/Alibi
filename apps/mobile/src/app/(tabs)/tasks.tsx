@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "expo-router";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ScrollView,
   StyleSheet,
@@ -19,7 +19,6 @@ import {
   Calendar,
   Plus,
   Play,
-  Square,
   Sparkles,
   Tag as TagIcon,
   CalendarDays,
@@ -28,7 +27,8 @@ import {
   CheckCircle2,
   Circle,
   Mic,
-  MicOff,
+  History,
+  Pause,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, SunriseArt } from "../../components/brand-ui";
@@ -36,6 +36,7 @@ import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder, scheduleTaskTimerReminder, syncTaskTimerReminders } from "../../lib/timer-reminders";
+import { loadLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
 
 const VIEWS = ["today", "upcoming", "backlog", "completed"] as const;
 
@@ -56,6 +57,16 @@ interface RunningTimer {
   id: string;
   task_id: string;
   started_at: string;
+}
+
+/** FR-TASK-016: session-level time facts shown in the task's diary/work log. */
+interface TaskTimeEntry {
+  id: string;
+  task_id: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_min: number | null;
+  source: string;
 }
 
 function computeDeadlineIso(
@@ -138,11 +149,17 @@ function formatDeadlinePreview(
 
 export default function TasksScreen() {
   const router = useRouter();
+  const { taskId } = useLocalSearchParams<{ taskId?: string }>();
+  const openedTaskId = useRef<string | null>(null);
   const [activeView, setActiveView] = useState<(typeof VIEWS)[number]>("today");
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [runningTimers, setRunningTimers] = useState<RunningTimer[]>([]);
   const [clockNow, setClockNow] = useState(Date.now());
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
+  const [taskTimeEntries, setTaskTimeEntries] = useState<TaskTimeEntry[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
 
   // Capture modal
   const [captureVisible, setCaptureVisible] = useState(false);
@@ -154,6 +171,8 @@ export default function TasksScreen() {
   const [customDateStr, setCustomDateStr] = useState("");
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [customTimeStr, setCustomTimeStr] = useState("");
+  const [learnedRoutines, setLearnedRoutines] = useState<LearnedTaskRoutine[]>([]);
+  const [isLoadingRoutines, setIsLoadingRoutines] = useState(false);
 
   const resetModal = () => {
     setCaptureText("");
@@ -217,6 +236,7 @@ export default function TasksScreen() {
       if (res.ok) {
         const data = await res.json();
         setTasks(data);
+        setSelectedTask((current) => current ? data.find((item: TaskItem) => item.id === current.id) ?? current : current);
       }
 
       if (token) {
@@ -447,6 +467,60 @@ export default function TasksScreen() {
     }
   };
 
+  const loadTaskHistory = useCallback(async (task: TaskItem) => {
+    setSelectedTask(task);
+    setTaskTimeEntries([]);
+    setHistoryError(false);
+    setIsLoadingHistory(true);
+    try {
+      let token = await ensureAuthenticated();
+      if (!token) return;
+      const baseUrl = getServerUrl();
+      let response = await fetch(`${baseUrl}/api/v1/time-entries?task_id=${encodeURIComponent(task.id)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.status === 401) {
+        token = await ensureAuthenticated(true);
+        if (token) {
+          response = await fetch(`${baseUrl}/api/v1/time-entries?task_id=${encodeURIComponent(task.id)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        }
+      }
+      if (response.ok) setTaskTimeEntries(await response.json());
+      else setHistoryError(true);
+    } catch {
+      setHistoryError(true);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!taskId || isLoading || openedTaskId.current === taskId) return;
+    const task = tasks.find((item) => item.id === taskId);
+    if (task) {
+      openedTaskId.current = taskId;
+      void loadTaskHistory(task);
+    }
+  }, [taskId, isLoading, tasks, loadTaskHistory]);
+
+  const openCapture = () => {
+    setCaptureVisible(true);
+    setIsLoadingRoutines(true);
+    void (async () => {
+      const token = (await getAccessToken()) || (await ensureAuthenticated());
+      const routines = token ? await loadLearnedTaskRoutines(getServerUrl(), token) : [];
+      setLearnedRoutines(routines);
+      setIsLoadingRoutines(false);
+    })();
+  };
+
+  const focusSessionFromTask = async (task: TaskItem) => {
+    await handleTimerAction(task);
+    await loadTaskHistory(task);
+  };
+
   return (
     <View style={styles.container}>
       <SunriseArt height={176} />
@@ -512,7 +586,12 @@ export default function TasksScreen() {
                     )}
                   </Pressable>
 
-                  <View style={styles.taskTitleCol}>
+                  <Pressable
+                    style={styles.taskTitleCol}
+                    onPress={() => void loadTaskHistory(task)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open work log for ${task.title}`}
+                  >
                     <Text
                       style={[
                         styles.taskTitle,
@@ -522,7 +601,8 @@ export default function TasksScreen() {
                     >
                       {task.title}
                     </Text>
-                  </View>
+                    <Text style={styles.openLogHint}>View work log  ›</Text>
+                  </Pressable>
 
                   {/* Timer Button */}
                   {!isDone && (
@@ -533,14 +613,14 @@ export default function TasksScreen() {
                         pressed && { transform: [{ scale: 0.92 }] },
                       ]}
                       onPress={() => handleTimerAction(task)}
-                      accessibilityLabel={isTimerRunning ? `Stop timer for ${task.title}` : `Start focus on ${task.title}`}
+                      accessibilityLabel={isTimerRunning ? `Pause timer for ${task.title}` : `Start focus on ${task.title}`}
                     >
                       {isTimerRunning ? (
-                        <Square size={16} color="#FFFFFF" />
+                        <Pause size={16} color="#FFFFFF" />
                       ) : (
                         <Play size={16} color={theme.colors.accent.amber} />
                       )}
-                      <Text style={[styles.timerBtnLabel, isTimerRunning && { color: "#FFFFFF" }]}>{isTimerRunning ? "Stop" : "Start"}</Text>
+                      <Text style={[styles.timerBtnLabel, isTimerRunning && { color: "#FFFFFF" }]}>{isTimerRunning ? "Pause" : "Start"}</Text>
                     </Pressable>
                   )}
                 </View>
@@ -583,7 +663,7 @@ export default function TasksScreen() {
       <Pressable
         style={styles.fab}
         accessibilityLabel="Quick capture task"
-        onPress={() => setCaptureVisible(true)}
+        onPress={openCapture}
       >
         <Plus size={24} color="#090D16" />
       </Pressable>
@@ -814,26 +894,25 @@ export default function TasksScreen() {
                 </View>
               )}
 
-              {/* Quick Suggestions */}
-              <View style={styles.suggestionSection}>
-                <Text style={styles.suggestionHeader}>Quick Templates (Tap to fill):</Text>
-                <View style={styles.chipsRow}>
-                  {[
-                    "Finish client report by tomorrow 5pm #work",
-                    "Call doctor at 2pm #urgent",
-                    "Review code changes tonight #dev",
-                    "Buy groceries today at 6pm #personal",
-                  ].map((preset) => (
-                    <Pressable
-                      key={preset}
-                      style={styles.chip}
-                      onPress={() => setCaptureText(preset)}
-                    >
-                      <Text style={styles.chipText}>{preset}</Text>
-                    </Pressable>
-                  ))}
+              {learnedRoutines.length > 0 && (
+                <View style={styles.suggestionSection}>
+                  <Text style={styles.suggestionHeader}>From your learned routines</Text>
+                  <Text style={styles.routineHint}>Based on recurring tasks in your own history</Text>
+                  <View style={styles.chipsRow}>
+                    {learnedRoutines.map((routine) => (
+                      <Pressable
+                        key={routine.label}
+                        style={styles.chip}
+                        onPress={() => setCaptureText(routine.label)}
+                      >
+                        <Text style={styles.chipText}>{routine.label}</Text>
+                        <Text style={styles.routineSamples}>{routine.sample_count} recorded occurrences</Text>
+                      </Pressable>
+                    ))}
+                  </View>
                 </View>
-              </View>
+              )}
+              {isLoadingRoutines && <Text style={styles.routineLoading}>Checking your learned routines…</Text>}
             </ScrollView>
 
             <View style={styles.modalActions}>
@@ -853,6 +932,65 @@ export default function TasksScreen() {
                 </Text>
               </Pressable>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={Boolean(selectedTask)} transparent animationType="slide" onRequestClose={() => setSelectedTask(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.detailContent}>
+            <View style={styles.modalHeader}>
+              <View style={styles.detailHeading}>
+                <History size={18} color={theme.colors.accent.amber} />
+                <Text style={styles.modalTitle}>Task work log</Text>
+              </View>
+              <Pressable onPress={() => setSelectedTask(null)} accessibilityLabel="Close task work log">
+                <X size={21} color={theme.colors.text.secondary} />
+              </Pressable>
+            </View>
+      {selectedTask && <>
+              <Text style={styles.detailTaskTitle}>{selectedTask.title}</Text>
+              <View style={styles.detailSummaryRow}>
+                <View style={styles.detailSummaryCard}>
+                  <Text style={styles.detailMetric}>{selectedTask.actual_min}m</Text>
+                  <Text style={styles.detailMetricLabel}>Recorded time</Text>
+                </View>
+                <View style={styles.detailSummaryCard}>
+                  <Text style={styles.detailMetric}>{selectedTask.estimate_user_min ? `${selectedTask.estimate_user_min}m` : "—"}</Text>
+                  <Text style={styles.detailMetricLabel}>Your estimate</Text>
+                </View>
+                <Pressable style={styles.detailAction} onPress={() => void focusSessionFromTask(selectedTask)}>
+                  {runningTimers.some((timer) => timer.task_id === selectedTask.id)
+                    ? <><Pause size={15} color="#FFFFFF" /><Text style={styles.detailActionText}>Pause</Text></>
+                    : <><Play size={15} color="#FFFFFF" /><Text style={styles.detailActionText}>Start focus</Text></>}
+                </Pressable>
+              </View>
+              <Text style={styles.historyTitle}>Sessions</Text>
+              {isLoadingHistory ? <ActivityIndicator size="small" color={theme.colors.accent.amber} /> : historyError ? (
+                <View style={styles.historyEmpty}>
+                  <Text style={styles.historyErrorText}>Could not load recorded sessions.</Text>
+                  <Pressable onPress={() => void loadTaskHistory(selectedTask)}><Text style={styles.historyRetry}>Try again</Text></Pressable>
+                </View>
+              ) : taskTimeEntries.length === 0 ? (
+                <Text style={styles.historyEmpty}>Start working on this task, then pause or finish a session. Your real work history will show here.</Text>
+              ) : <ScrollView style={styles.historyList} contentContainerStyle={{ gap: 10 }}>
+                {taskTimeEntries.map((entry) => {
+                  const active = entry.ended_at == null;
+                  const minutes = entry.duration_min ?? (active ? Math.max(0, Math.floor((clockNow - Date.parse(entry.started_at)) / 60000)) : 0);
+                  const maxMinutes = Math.max(1, ...taskTimeEntries.map((item) => item.duration_min ?? 0));
+                  const start = new Date(entry.started_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+                  const end = entry.ended_at ? new Date(entry.ended_at).toLocaleString([], { hour: "numeric", minute: "2-digit" }) : "In progress · live";
+                  return <View key={entry.id} style={styles.sessionCard}>
+                    <View style={styles.sessionHeader}>
+                      <View><Text style={styles.sessionDate}>Started {start}</Text><Text style={styles.sessionRange}>Ended {end}</Text></View>
+                      <Text style={[styles.sessionDuration, active && { color: theme.colors.accent.amber }]}>{minutes}m{active ? " · live" : ""}</Text>
+                    </View>
+                    <View style={styles.barTrack}><View style={[styles.sessionBar, { width: `${Math.max(3, Math.min(100, (minutes / maxMinutes) * 100))}%` }, active && styles.sessionBarLive]} /></View>
+                  </View>;
+                })}
+              </ScrollView>}
+              <Text style={styles.historyFootnote}>Each bar reflects time recorded by ALIBI. Running sessions update live.</Text>
+            </>}
           </View>
         </View>
       </Modal>
@@ -924,6 +1062,7 @@ const styles = StyleSheet.create({
   taskTitleCol: {
     flex: 1,
   },
+  openLogHint: { color: theme.colors.text.secondary, fontSize: 11, marginTop: 4 },
   taskTitle: {
     fontSize: 15,
     fontWeight: "600",
@@ -1040,6 +1179,29 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: theme.colors.text.primary,
   },
+  detailContent: { backgroundColor: theme.colors.surface.card, borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 20, paddingBottom: 32, borderWidth: 1, borderColor: theme.colors.border.subtle, gap: 14, maxHeight: "86%" },
+  detailHeading: { flexDirection: "row", alignItems: "center", gap: 8 },
+  detailTaskTitle: { fontSize: 20, lineHeight: 27, color: theme.colors.text.primary, fontWeight: "700" },
+  detailSummaryRow: { flexDirection: "row", alignItems: "stretch", gap: 8 },
+  detailSummaryCard: { flex: 1, padding: 11, borderRadius: 12, backgroundColor: theme.colors.background.base, borderWidth: 1, borderColor: theme.colors.border.subtle, justifyContent: "center" },
+  detailMetric: { fontSize: 18, fontWeight: "800", color: theme.colors.text.primary },
+  detailMetricLabel: { marginTop: 2, fontSize: 10, color: theme.colors.text.secondary },
+  detailAction: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, backgroundColor: theme.colors.accent.amber, borderRadius: 12, paddingHorizontal: 12 },
+  detailActionText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
+  historyTitle: { fontSize: 15, fontWeight: "700", color: theme.colors.text.primary, marginTop: 2 },
+  historyList: { maxHeight: 300 },
+  historyEmpty: { padding: 16, borderRadius: 12, backgroundColor: theme.colors.background.base, color: theme.colors.text.secondary, lineHeight: 20, fontSize: 13 },
+  historyErrorText: { color: theme.colors.text.secondary, fontSize: 13 },
+  historyRetry: { color: theme.colors.accent.amber, fontWeight: "700", marginTop: 8 },
+  sessionCard: { padding: 12, backgroundColor: theme.colors.background.base, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border.subtle, gap: 10 },
+  sessionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
+  sessionDate: { color: theme.colors.text.primary, fontWeight: "600", fontSize: 12 },
+  sessionRange: { color: theme.colors.text.secondary, fontSize: 11, marginTop: 3 },
+  sessionDuration: { color: theme.colors.text.primary, fontWeight: "800", fontSize: 14 },
+  barTrack: { height: 7, borderRadius: 5, backgroundColor: theme.colors.border.subtle, overflow: "hidden" },
+  sessionBar: { height: "100%", borderRadius: 5, backgroundColor: theme.colors.accent.emerald },
+  sessionBarLive: { backgroundColor: theme.colors.accent.amber },
+  historyFootnote: { color: theme.colors.text.secondary, fontSize: 10, lineHeight: 14 },
   listeningHintRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1110,6 +1272,9 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
     fontSize: 12,
   },
+  routineHint: { color: theme.colors.text.secondary, fontSize: 11 },
+  routineSamples: { color: theme.colors.text.secondary, fontSize: 10, marginTop: 3 },
+  routineLoading: { color: theme.colors.text.secondary, fontSize: 11 },
   modalActions: {
     flexDirection: "row",
     justifyContent: "flex-end",

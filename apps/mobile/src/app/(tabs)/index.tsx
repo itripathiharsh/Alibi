@@ -41,6 +41,7 @@ import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder } from "../../lib/timer-reminders";
+import { filterLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
 
 interface TaskItem {
   id: string;
@@ -112,6 +113,7 @@ export default function DashboardScreen() {
   const [customDateStr, setCustomDateStr] = useState("");
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [customTimeStr, setCustomTimeStr] = useState("");
+  const [learnedRoutines, setLearnedRoutines] = useState<LearnedTaskRoutine[]>([]);
 
   // Dynamic greeting based on current local time
   const greeting = useMemo(() => {
@@ -123,6 +125,10 @@ export default function DashboardScreen() {
 
   const displayName = user?.display_name || "there";
   const userInitial = (displayName[0] || "H").toUpperCase();
+
+  const openCapture = () => {
+    setCaptureVisible(true);
+  };
 
   // Calculate today's tasks stats
   const { totalEstimatedMinutes, completedCount, totalCount, completionPercentage } = useMemo(() => {
@@ -194,6 +200,7 @@ export default function DashboardScreen() {
       }
       if (learnRes && learnRes.ok) {
         const profile = await learnRes.json();
+        setLearnedRoutines(filterLearnedTaskRoutines(profile?.routines));
         if (profile?.peak_window) {
           setLearningTip(`You tend to be most productive between ${profile.peak_window}.`);
         }
@@ -477,7 +484,7 @@ export default function DashboardScreen() {
         {/* Elevated Quick Capture Pill */}
         <Pressable
           style={styles.quickCapturePill}
-          onPress={() => setCaptureVisible(true)}
+          onPress={openCapture}
           accessibilityLabel="Open quick capture"
         >
           <PlusCircle size={20} color={theme.colors.text.secondary} />
@@ -487,7 +494,7 @@ export default function DashboardScreen() {
           <Pressable
             style={styles.pillMicBtn}
             onPress={() => {
-              setCaptureVisible(true);
+              openCapture();
               handleMicPress();
             }}
           >
@@ -499,7 +506,7 @@ export default function DashboardScreen() {
         <View style={styles.actionGrid}>
           <Pressable
             style={styles.actionTile}
-            onPress={() => setCaptureVisible(true)}
+            onPress={openCapture}
           >
             <View style={[styles.actionIconBox, { backgroundColor: "#FFF7ED" }]}>
               <CheckSquare size={20} color="#F97316" />
@@ -581,6 +588,7 @@ export default function DashboardScreen() {
                       </Pressable>
 
                       <View style={styles.taskItemContent}>
+                        <Pressable onPress={() => router.push({ pathname: "/(tabs)/tasks", params: { taskId: task.id } })} accessibilityRole="button" accessibilityLabel={`Open work log for ${task.title}`}>
                         <Text
                           style={[
                             styles.taskItemTitle,
@@ -590,6 +598,7 @@ export default function DashboardScreen() {
                         >
                           {task.title}
                         </Text>
+                        </Pressable>
                         <View style={styles.taskItemMeta}>
                           <View style={[styles.catBadge, { backgroundColor: cat.bg }]}>
                             <Text style={[styles.catBadgeText, { color: cat.color }]}>
@@ -1059,26 +1068,20 @@ export default function DashboardScreen() {
                 </View>
               )}
 
-              {/* Quick Suggestions */}
-              <View style={styles.suggestionSection}>
-                <Text style={styles.suggestionHeader}>Quick Templates (Tap to fill):</Text>
-                <View style={styles.chipsRow}>
-                  {[
-                    "Finish product homepage by 6pm #work",
-                    "EMP - quiz preparation tonight #academic",
-                    "Gym workout session #personal",
-                    "Marketing review at 5:30pm #work",
-                  ].map((preset) => (
-                    <Pressable
-                      key={preset}
-                      style={styles.chip}
-                      onPress={() => setCaptureText(preset)}
-                    >
-                      <Text style={styles.chipText}>{preset}</Text>
-                    </Pressable>
-                  ))}
+              {learnedRoutines.length > 0 && (
+                <View style={styles.suggestionSection}>
+                  <Text style={styles.suggestionHeader}>From your learned routines</Text>
+                  <Text style={styles.routineHint}>Based on recurring tasks in your own history</Text>
+                  <View style={styles.chipsRow}>
+                    {learnedRoutines.map((routine) => (
+                      <Pressable key={routine.label} style={styles.chip} onPress={() => setCaptureText(routine.label)}>
+                        <Text style={styles.chipText}>{routine.label}</Text>
+                        <Text style={styles.routineSamples}>{routine.sample_count} recorded occurrences</Text>
+                      </Pressable>
+                    ))}
+                  </View>
                 </View>
-              </View>
+              )}
             </ScrollView>
 
             <View style={styles.modalActions}>
@@ -1908,6 +1911,9 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     fontSize: 11.5,
   },
+  routineHint: { color: "#64748B", fontSize: 11 },
+  routineSamples: { color: "#64748B", fontSize: 10, marginTop: 3 },
+  routineLoading: { color: "#64748B", fontSize: 11 },
   modalActions: {
     flexDirection: "row",
     justifyContent: "flex-end",

@@ -36,6 +36,7 @@ Public marketing routes (`/`, `/features`, `/how-it-works`, `/why-alibi`, `/docs
 
 Rules: evidence text for every AI field (the quoted phrase or "based on N similar tasks"). Low-confidence (< 0.6) fields shown unselected.
 Clarification appears as one question chip, never a blocking dialog. Voice: live waveform, max 120 s, "Cancel" always visible.
+Add Task may show up to three suggestions only when the personal learning engine has learned an active routine from this user's own records (confidence ≥ 0.7 and at least 4 observations). Selecting one fills the capture field; it never creates a task automatically. Hide the section when no routine qualifies. Do not show canned example tasks.
 
 ## 3. Screens & required states
 Every data screen implements: **loading** (skeleton), **empty** (one-line guidance + capture CTA), **error** (message + retry), **offline** (banner + cached data + pending count), **insufficient data** (for analytics/learning).
@@ -43,7 +44,7 @@ Every data screen implements: **loading** (skeleton), **empty** (one-line guidan
 | Screen | Key elements |
 |--------|--------------|
 | Today | Overdue section (red accent), in-progress with running timer, scheduled blocks in time order, unscheduled today tasks, "Plan my day" button |
-| Task detail | Title, status control, chips (category, project, priority, deadline, estimate vs actual), timer, subtasks, notes, evidence, dependencies, history tab, predictions with "why" |
+| Task detail | Diary-like title and completion control; start/pause timer; actual time vs estimate; each recorded session's start/end and duration; per-session bars based only on recorded time; subtasks, notes, evidence, dependencies, history, predictions with "why" |
 | Calendar | Day/week; legend: fixed event (solid, lock icon), work block (tinted, task color), deadline (flag marker), actual time (hatched strip) |
 | Proposal review | Diff list: new blocks (+), displacements (↔, require individual tick), unscheduled tasks with reasons; Accept all / selected / Reject |
 | Dashboard | Score ring with "How is this calculated?" sheet, 6 tiles, charts, every chart has data table toggle (a11y) |

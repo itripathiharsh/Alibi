@@ -56,7 +56,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-DASH-004 | Every metric computed from DB records via documented formulas (doc 10) | M | M3 | 10 | backend/tests/unit/analytics/ + integration/analytics/ | ☑ |
 | FR-DASH-005 | Productivity score transparent: UI shows components and formula; no reward for long hou… | M | M3 | 10 | backend/tests/unit/analytics/ + integration/analytics/ | ☑ |
 | FR-DASH-006 | Metrics with insufficient data show "Not enough data" instead of 0 | M | M3 | 10 | backend/tests/unit/analytics/ + integration/analytics/ | ☑ |
-| FR-DASH-007 | Per-task recorded time and score plus 365-day activity heatmap | M | M13 | 10, 04§4.10 | backend/tests/unit/test_task_score.py; backend/tests/integration/test_analytics_api.py | ◐ |
+| FR-DASH-007 | Per-task recorded time and score plus 365-day activity heatmap | M | M13 | 10, 04§4.10 | backend/tests/unit/test_task_score.py; backend/tests/integration/test_analytics_api.py; mobile Tasks work log (`time-entries?task_id`) | ◐ |
 | FR-LEARN-001 | Behavioural event collector records all learning signals (doc 07 §2) | M | M5 | 07 | backend/tests/unit/learning/ + learning_eval/ | ☑ |
 | FR-LEARN-002 | Routine discovery distinguishes routines from bursts | M | M5 | 07 | backend/tests/unit/learning/ + learning_eval/ | ☑ |
 | FR-LEARN-003 | Task understanding: likely category, project, similar tasks, duration, priority, depend… | M | M5 | 07 | backend/tests/unit/learning/ + learning_eval/ | ☑ |
