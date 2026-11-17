@@ -2,10 +2,16 @@
 Implements AC-M1-2, AC-M1-3, AC-M1-4, AC-M1-9, and AC-SEC-2.
 """
 
+import uuid
+
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.category import Category
+from app.models.task import Task
+from app.models.workspace import Workspace
 
 
 @pytest.mark.asyncio
@@ -167,3 +173,70 @@ async def test_auth_full_lifecycle(client: AsyncClient, db_session: AsyncSession
         },
     )
     assert new_login.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_public_signup_isolates_accounts_and_rejects_duplicate_email(
+    client: AsyncClient,
+    db_session: AsyncSession,
+) -> None:
+    email_a = f"signup_a_{uuid.uuid4().hex[:8]}@example.com"
+    email_b = f"signup_b_{uuid.uuid4().hex[:8]}@example.com"
+    signup_a = await client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": email_a,
+            "password": "UniqueStrongPassword!2026",
+            "display_name": "Account A",
+        },
+    )
+    signup_b = await client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": email_b,
+            "password": "UniqueStrongPassword!2026",
+            "display_name": "Account B",
+        },
+    )
+
+    assert signup_a.status_code == 201
+    assert signup_b.status_code == 201
+    assert signup_a.json()["id"] != signup_b.json()["id"]
+    user_b_id = uuid.UUID(signup_b.json()["id"])
+    workspace_b = await db_session.scalar(
+        select(Workspace).where(Workspace.user_id == user_b_id, Workspace.is_default.is_(True))
+    )
+    professional_b = await db_session.scalar(
+        select(Category).where(Category.user_id == user_b_id, Category.slug == "professional")
+    )
+    assert workspace_b is not None
+    assert professional_b is not None
+    private_task = Task(
+        user_id=user_b_id,
+        workspace_id=workspace_b.id,
+        category_id=professional_b.id,
+        title="Account B private task",
+        raw_input="Account B private task",
+        status="pending",
+    )
+    db_session.add(private_task)
+    await db_session.flush()
+
+    login_a = await client.post(
+        "/api/v1/auth/login",
+        json={"email": email_a, "password": "UniqueStrongPassword!2026"},
+    )
+    assert login_a.status_code == 200
+    access_a = login_a.json()["access_token"]
+    foreign_task = await client.get(
+        f"/api/v1/tasks/{private_task.id}",
+        headers={"Authorization": f"Bearer {access_a}"},
+    )
+    assert foreign_task.status_code == 404
+
+    duplicate = await client.post(
+        "/api/v1/auth/signup",
+        json={"email": email_a.upper(), "password": "UniqueStrongPassword!2026"},
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["code"] == "email_already_registered"

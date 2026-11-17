@@ -5189,6 +5189,64 @@
         }
       }
     },
+    "/api/v1/organizations/{organization_id}/transfer-ownership": {
+      "post": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Transfer Organization Ownership",
+        "operationId": "transfer_organization_ownership_api_v1_organizations__organization_id__transfer_ownership_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Organization Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationTransferRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organizations/{organization_id}/invites/{invite_id}/revoke": {
       "post": {
         "tags": [
@@ -8702,6 +8760,20 @@
           "consented_at"
         ],
         "title": "OrganizationResponse"
+      },
+      "OrganizationTransferRequest": {
+        "properties": {
+          "membership_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Membership Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "membership_id"
+        ],
+        "title": "OrganizationTransferRequest"
       },
       "ProductivityScoreResponse": {
         "properties": {

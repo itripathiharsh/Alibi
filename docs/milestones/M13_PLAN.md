@@ -2,7 +2,7 @@
 
 - Scope: Refresh personal Android and replace authenticated web dashboard with an organization portal for owners/team leads. Public marketing/landing routes remain unchanged.
 - Requirement IDs: FR-AUTH-001..007, FR-ORG-001..006, FR-TASK-001..020, FR-CAL-001..007, FR-DASH-001..006, FR-LEARN-005..009, FR-KNOW-001..004, FR-REP-001..005.
-- Entry: M12/v1.0 release is complete; owner approved six tabs, public self-signup, and organization reporting with professional-only consent (ADR-022/023/024). Schema changes are in scope; no sync-protocol or dependency changes are planned.
+- Entry: M12/v1.0 release is complete; owner approved six tabs, public self-signup, and organization reporting with professional-only consent (ADR-022/023/024). Schema changes are in scope. No new dependency or sync-envelope/conflict-rule change is planned; the owner's audit-fix instruction authorized connecting the already-approved Android SQLite/Drizzle/sync-core stack (ADR-026).
 - Read first: docs 01–05, 10, 12, 14, 16; ADR-020/022/023/024; existing mobile and web routes, analytics, reports, auth and API contracts.
 - Tasks: retain mobile visual refresh and isolated signup; add reversible org/membership/invitation/consent schema; add real role-protected APIs and professional-only SQL analytics; redesign authenticated web nav/pages for Overview, People, Insights and Settings; add public web invite acceptance with consent and self-service revoke/leave; retain public landing design; update docs and API client.
 - Acceptance criteria:
@@ -12,7 +12,7 @@
   - AC-M13-4 Profile uses `/api/v1/auth/me`, analytics summary, and learning profile where available; no sample metrics or personal records are hard-coded.
   - AC-M13-5 Capture and event flows retain their existing API contracts and user confirmation behavior.
   - AC-M13-6 Light mobile surfaces, typography, iconography, spacing, and shared card treatment align with the supplied references; controls meet 48 dp targets and reduced motion/contrast guidance.
-  - AC-M13-7 Settings/logout and login remain navigable and visually consistent; no schema, sync, provider, or dependency changes.
+  - AC-M13-7 Settings/logout and login remain navigable and visually consistent; no new dependency, sync-envelope/conflict-rule, or provider changes.
   - AC-M13-8 Any visitor can create an isolated account from web or Android; duplicate email is handled safely; signup creates only that account's default workspace and categories; protected data remains scoped to the authenticated user.
 - AC-M13-9 Owner can create organizations and role-scoped, expiring invitation links.
 - AC-M13-10 Invite acceptance requires explicit, versioned professional-only sharing consent; member can revoke/leave.

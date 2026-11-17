@@ -6,9 +6,11 @@ from datetime import timedelta
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import NotFoundError
+from app.core.errors import ForbiddenError, NotFoundError
+from app.core.security import create_access_token
 from app.core.time import utc_now
 from app.models.category import Category
+from app.models.organization import OrganizationMembership
 from app.models.task import Task
 from app.models.user import User
 from app.models.workspace import Workspace
@@ -131,3 +133,70 @@ async def test_member_activity_counts_all_tasks_and_shares_only_consented_profes
             today,
             today,
         )
+
+
+@pytest.mark.asyncio
+async def test_owner_can_transfer_organization_and_then_leave(
+    auth_client,
+    db_session: AsyncSession,
+) -> None:
+    owner_id = auth_client.user_id
+    service = OrganizationService(db_session)
+    organization = await service.create_organization(owner_id, "Transfer Test Org")
+    member_id = uuid.uuid4()
+    db_session.add(
+        User(
+            id=member_id,
+            email=f"transfer_{uuid.uuid4().hex[:8]}@example.com",
+            password_hash="test-hash",
+            display_name="New Owner",
+        )
+    )
+    await db_session.flush()
+    new_owner_membership = OrganizationMembership(
+        organization_id=organization.id,
+        user_id=member_id,
+        role="member",
+        status="active",
+        professional_sharing_consent=True,
+        consent_version=CONSENT_VERSION,
+        consented_at=utc_now(),
+    )
+    db_session.add(new_owner_membership)
+    await db_session.flush()
+
+    outsider_id = uuid.uuid4()
+    outsider_device_id = uuid.uuid4()
+    db_session.add(
+        User(
+            id=outsider_id,
+            email=f"outsider_{uuid.uuid4().hex[:8]}@example.com",
+            password_hash="test-hash",
+            display_name="Outsider",
+        )
+    )
+    await db_session.flush()
+    outsider_response = await auth_client.get(
+        f"/api/v1/organizations/{organization.id}",
+        headers={
+            "Authorization": f"Bearer {create_access_token(user_id=outsider_id, device_id=outsider_device_id)}"
+        },
+    )
+    assert outsider_response.status_code == 404
+
+    response = await auth_client.post(
+        f"/api/v1/organizations/{organization.id}/transfer-ownership",
+        json={"membership_id": str(new_owner_membership.id)},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["role"] == "team_lead"
+    assert organization.owner_user_id == member_id
+    assert new_owner_membership.role == "owner"
+
+    with pytest.raises(ForbiddenError):
+        await service.transfer_ownership(owner_id, organization.id, new_owner_membership.id)
+
+    await service.leave_organization(owner_id, organization.id)
+    with pytest.raises(NotFoundError):
+        await service.require_membership(owner_id, organization.id)

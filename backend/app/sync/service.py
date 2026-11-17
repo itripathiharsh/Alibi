@@ -157,7 +157,16 @@ class ServerSyncService:
 
             ws_id: uuid.UUID
             if payload.get("workspace_id"):
-                ws_id = uuid.UUID(str(payload["workspace_id"]))
+                requested_ws_id = uuid.UUID(str(payload["workspace_id"]))
+                workspace_exists = await self.session.scalar(
+                    select(Workspace.id).where(
+                        Workspace.id == requested_ws_id,
+                        Workspace.user_id == user_id,
+                    )
+                )
+                if not workspace_exists:
+                    return ("rejected", {"error": "Workspace not found"}, 0)
+                ws_id = requested_ws_id
             else:
                 ws_res = await self.session.execute(
                     select(Workspace.id).where(Workspace.user_id == user_id).limit(1)
@@ -173,7 +182,36 @@ class ServerSyncService:
                     await self.session.flush()
                     ws_id = default_ws.id
 
+            category_id = None
+            if payload.get("category_id"):
+                category_id = uuid.UUID(str(payload["category_id"]))
+                category_exists = await self.session.scalar(
+                    select(Category.id).where(
+                        Category.id == category_id,
+                        Category.user_id == user_id,
+                    )
+                )
+                if not category_exists:
+                    return ("rejected", {"error": "Category not found"}, 0)
+
+            project_id = None
+            if payload.get("project_id"):
+                project_id = uuid.UUID(str(payload["project_id"]))
+                project_exists = await self.session.scalar(
+                    select(Project.id).where(
+                        Project.id == project_id,
+                        Project.user_id == user_id,
+                    )
+                )
+                if not project_exists:
+                    return ("rejected", {"error": "Project not found"}, 0)
+
             est_min = payload.get("estimate_min")
+            created_at = self._parse_datetime(payload.get("created_at")) or utc_now()
+            deadline_at = self._parse_datetime(payload.get("deadline_at"))
+            completed_at = self._parse_datetime(payload.get("completed_at"))
+            if status_val == "completed" and completed_at is None:
+                completed_at = created_at
 
             new_task = Task(
                 id=entity_id,
@@ -182,14 +220,25 @@ class ServerSyncService:
                 title=payload.get("title", "Untitled Task"),
                 status=status_val,
                 priority=priority_val,
+                category_id=category_id,
+                project_id=project_id,
+                deadline_at=deadline_at,
                 estimate_user_min=est_min,
                 estimate_final_min=est_min,
-                category_id=uuid.UUID(str(payload["category_id"]))
-                if payload.get("category_id")
-                else None,
-                project_id=uuid.UUID(str(payload["project_id"]))
-                if payload.get("project_id")
-                else None,
+                actual_min=int(payload.get("actual_min") or 0),
+                created_at=created_at,
+                completed_at=completed_at,
+                origin=payload.get("origin")
+                if payload.get("origin")
+                in (
+                    "manual",
+                    "voice",
+                    "ai_recommendation",
+                    "meeting",
+                    "external_assignment",
+                    "recurring",
+                )
+                else "manual",
             )
             self.session.add(new_task)
             await self.session.flush()
@@ -245,6 +294,36 @@ class ServerSyncService:
             if "estimate_min" in payload:
                 task.estimate_user_min = payload["estimate_min"]
                 task.estimate_final_min = payload["estimate_min"]
+            if "deadline_at" in payload:
+                task.deadline_at = self._parse_datetime(payload.get("deadline_at"))
+            if "category_id" in payload:
+                category_id = (
+                    uuid.UUID(str(payload["category_id"])) if payload["category_id"] else None
+                )
+                if category_id and not await self.session.scalar(
+                    select(Category.id).where(
+                        Category.id == category_id,
+                        Category.user_id == user_id,
+                    )
+                ):
+                    return ("rejected", {"error": "Category not found"}, task.version)
+                task.category_id = category_id
+            if "project_id" in payload:
+                project_id = (
+                    uuid.UUID(str(payload["project_id"])) if payload["project_id"] else None
+                )
+                if project_id and not await self.session.scalar(
+                    select(Project.id).where(
+                        Project.id == project_id,
+                        Project.user_id == user_id,
+                    )
+                ):
+                    return ("rejected", {"error": "Project not found"}, task.version)
+                task.project_id = project_id
+            if task.status == "completed" and task.completed_at is None:
+                task.completed_at = self._parse_datetime(payload.get("completed_at")) or utc_now()
+            elif task.status != "completed":
+                task.completed_at = None
 
             task.version += 1
             await self.session.flush()
@@ -271,7 +350,33 @@ class ServerSyncService:
         if op_type == "create":
             stmt = select(TimeEntry).where(TimeEntry.id == entity_id, TimeEntry.user_id == user_id)
             res = await self.session.execute(stmt)
-            if res.scalar_one_or_none():
+            existing_entry = res.scalar_one_or_none()
+            if existing_entry:
+                # An offline stop of a timer started online replays the same timer
+                # id as a create op. Finalize that still-open record exactly once.
+                ended_at = self._parse_datetime(payload.get("ended_at"))
+                duration_min = payload.get("duration_min")
+                if (
+                    existing_entry.ended_at is None
+                    and ended_at is not None
+                    and isinstance(duration_min, int)
+                    and 1 <= duration_min <= 1440
+                ):
+                    if ended_at < existing_entry.started_at:
+                        return ("rejected", {"error": "End time precedes start time"}, 1)
+                    existing_entry.ended_at = ended_at
+                    existing_entry.duration_min = duration_min
+                    task = await self.session.scalar(
+                        select(Task).where(
+                            Task.id == existing_entry.task_id,
+                            Task.user_id == user_id,
+                        )
+                    )
+                    if task is None:
+                        return ("rejected", {"error": "Task not found"}, 1)
+                    task.actual_min += duration_min
+                    await self.session.flush()
+                    return ("applied", {"stopped": True}, 1)
                 return ("merged", {"note": "Time entry already exists"}, 1)
 
             started_at = (
@@ -279,14 +384,32 @@ class ServerSyncService:
                 if isinstance(payload.get("started_at"), str)
                 else datetime.now(UTC)
             )
+            task = (
+                await self.session.scalar(
+                    select(Task).where(
+                        Task.id == uuid.UUID(str(payload["task_id"])), Task.user_id == user_id
+                    )
+                )
+                if payload.get("task_id")
+                else None
+            )
+            if task is None:
+                return ("rejected", {"error": "Task not found"}, 0)
+            duration_min = payload.get("duration_min")
+            if not isinstance(duration_min, int) or not 1 <= duration_min <= 1440:
+                return ("rejected", {"error": "Duration must be between 1 and 1440 minutes"}, 0)
+            ended_at = self._parse_datetime(payload.get("ended_at"))
             te = TimeEntry(
                 id=entity_id,
                 user_id=user_id,
-                task_id=uuid.UUID(str(payload["task_id"])) if payload.get("task_id") else None,
+                task_id=task.id,
                 started_at=started_at,
-                duration_min=payload.get("duration_min", 0),
+                ended_at=ended_at or started_at,
+                duration_min=duration_min,
+                source="timer" if payload.get("source") == "timer" else "manual",
             )
             self.session.add(te)
+            task.actual_min += duration_min
             await self.session.flush()
             return ("applied", {"created": True}, 1)
         return ("applied", {}, 1)
@@ -312,17 +435,7 @@ class ServerSyncService:
         for t in tasks:
             if t.server_seq > max_seq:
                 max_seq = t.server_seq
-            task_items.append(
-                {
-                    "entity_type": "task",
-                    "id": str(t.id),
-                    "title": t.title,
-                    "status": t.status,
-                    "version": t.version,
-                    "server_seq": t.server_seq,
-                    "deleted": t.deleted_at is not None,
-                }
-            )
+            task_items.append(self._serialize_task(t))
 
         return {
             "server_epoch": str(SERVER_EPOCH),
@@ -335,10 +448,7 @@ class ServerSyncService:
         """Full initial sync snapshot for new or re-bootstrapping client (doc 11 §4.5)."""
         t_stmt = select(Task).where(Task.user_id == user_id, Task.deleted_at.is_(None))
         t_res = await self.session.execute(t_stmt)
-        tasks = [
-            {"id": str(t.id), "title": t.title, "status": t.status, "version": t.version}
-            for t in t_res.scalars().all()
-        ]
+        tasks = [self._serialize_task(t) for t in t_res.scalars().all()]
 
         c_stmt = select(Category).where(Category.user_id == user_id)
         c_res = await self.session.execute(c_stmt)
@@ -358,6 +468,44 @@ class ServerSyncService:
             "categories": categories,
             "projects": projects,
             "tags": tags,
+        }
+
+    @staticmethod
+    def _parse_datetime(value: Any) -> datetime | None:
+        if isinstance(value, datetime):
+            return value
+        if not isinstance(value, str) or not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=UTC)
+        return parsed
+
+    @staticmethod
+    def _serialize_task(task: Task) -> dict[str, Any]:
+        return {
+            "entity_type": "task",
+            "id": str(task.id),
+            "user_id": str(task.user_id),
+            "workspace_id": str(task.workspace_id),
+            "category_id": str(task.category_id) if task.category_id else None,
+            "project_id": str(task.project_id) if task.project_id else None,
+            "title": task.title,
+            "status": task.status,
+            "priority": task.priority,
+            "deadline_at": task.deadline_at.isoformat() if task.deadline_at else None,
+            "estimate_user_min": task.estimate_user_min,
+            "estimate_final_min": task.estimate_final_min,
+            "actual_min": task.actual_min,
+            "started_at": task.started_at.isoformat() if task.started_at else None,
+            "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+            "created_at": task.created_at.isoformat(),
+            "version": task.version,
+            "server_seq": task.server_seq,
+            "deleted": task.deleted_at is not None,
         }
 
     async def list_conflicts(self, user_id: uuid.UUID) -> list[SyncConflict]:

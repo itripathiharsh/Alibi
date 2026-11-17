@@ -158,3 +158,55 @@ async def test_sync_pull_and_bootstrap_endpoints(
     assert "next_seq" in pull_data
     assert "changes" in pull_data
     assert pull_data["server_epoch"] == boot_data["server_epoch"]
+
+
+@pytest.mark.asyncio
+async def test_sync_finalizes_online_timer_stopped_while_offline(
+    auth_client: httpx.AsyncClient,
+) -> None:
+    """FR-SYNC-001: an offline stop closes an existing server timer without losing minutes."""
+    task_response = await auth_client.post(
+        "/api/v1/tasks",
+        json={"title": "Offline stop test", "status": "pending"},
+    )
+    assert task_response.status_code == 201
+    task_id = task_response.json()["id"]
+
+    timer_response = await auth_client.post(
+        "/api/v1/time-entries/start",
+        json={"task_id": task_id},
+    )
+    assert timer_response.status_code == 201
+    timer = timer_response.json()
+    ended_at = datetime.now(UTC).isoformat()
+
+    sync_response = await auth_client.post(
+        "/api/v1/sync/push",
+        json={
+            "operations": [
+                {
+                    "op_id": str(uuid.uuid4()),
+                    "entity_type": "time_entry",
+                    "entity_id": timer["id"],
+                    "op_type": "create",
+                    "payload": {
+                        "task_id": task_id,
+                        "started_at": timer["started_at"],
+                        "ended_at": ended_at,
+                        "duration_min": 7,
+                        "source": "timer",
+                    },
+                    "client_ts": ended_at,
+                }
+            ]
+        },
+    )
+    assert sync_response.status_code == 200
+    assert sync_response.json()["results"][0]["result"] == "applied"
+
+    running_response = await auth_client.get("/api/v1/time-entries/running/all")
+    assert running_response.status_code == 200
+    assert all(row["id"] != timer["id"] for row in running_response.json())
+    updated_task = await auth_client.get(f"/api/v1/tasks/{task_id}")
+    assert updated_task.status_code == 200
+    assert updated_task.json()["actual_min"] == 7

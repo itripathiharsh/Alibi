@@ -41,6 +41,7 @@ export interface SyncStorageAdapter {
   markOpsComplete(opIds: string[]): Promise<void>;
   markOpConflict(opId: string, detail: Record<string, unknown>): Promise<void>;
   markOpFailed(opId: string, error: string): Promise<void>;
+  markOpsRetryable(opIds: string[], error: string): Promise<void>;
   getSyncState(): Promise<SyncState>;
   saveSyncState(state: Partial<SyncState>): Promise<void>;
   applyRemoteChanges(changes: unknown[]): Promise<void>;

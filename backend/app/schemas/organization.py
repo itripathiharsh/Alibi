@@ -11,6 +11,10 @@ class OrganizationCreateRequest(BaseModel):
     name: str = Field(min_length=2, max_length=120)
 
 
+class OrganizationTransferRequest(BaseModel):
+    membership_id: uuid.UUID
+
+
 class OrganizationResponse(BaseModel):
     id: uuid.UUID
     name: str

@@ -37,11 +37,12 @@ import {
   Tag as TagIcon,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
-import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
+import { getAccessToken, ensureAuthenticated, getUserProfile } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder } from "../../lib/timer-reminders";
 import { filterLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
+import { cacheRunningTimers, cacheTaskView, createTaskOffline, getCachedTaskView, getLocalTimers, makeOfflineId, removeLocalTimer, stopTaskTimerOffline, syncMobileAccount, updateTaskOffline } from "../../lib/offline-sync";
 
 interface TaskItem {
   id: string;
@@ -82,6 +83,7 @@ interface RunningTimer {
   id: string;
   task_id: string;
   started_at: string;
+  source?: string;
 }
 
 export default function DashboardScreen() {
@@ -167,6 +169,20 @@ export default function DashboardScreen() {
 
   // Fetch all live dashboard data
   const fetchDashboardData = useCallback(async () => {
+    const profile = await getUserProfile();
+    if (profile) {
+      try {
+        const [cachedTasks, cachedTimers] = await Promise.all([
+          getCachedTaskView(profile.id, "today"),
+          getLocalTimers(profile.id),
+        ]);
+        if (cachedTasks) setTodayTasks(cachedTasks as TaskItem[]);
+        setRunningTimers(cachedTimers);
+        if (cachedTasks) setIsLoading(false);
+      } catch {
+        // Render the remote result if the local cache cannot be read.
+      }
+    }
     try {
       const token = (await getAccessToken()) || (await ensureAuthenticated());
       const baseUrl = getServerUrl();
@@ -186,7 +202,9 @@ export default function DashboardScreen() {
         setUser(await userRes.json());
       }
       if (tasksRes && tasksRes.ok) {
-        setTodayTasks(await tasksRes.json());
+        const taskData = await tasksRes.json() as TaskItem[];
+        setTodayTasks(taskData);
+        if (profile) await cacheTaskView(profile.id, "today", taskData);
       }
       if (sumRes && sumRes.ok) {
         setSummary(await sumRes.json());
@@ -196,7 +214,8 @@ export default function DashboardScreen() {
       }
       if (timerRes && timerRes.ok) {
         const timerData = await timerRes.json();
-        setRunningTimers(timerData);
+        if (profile) setRunningTimers(await cacheRunningTimers(profile.id, timerData));
+        else setRunningTimers(timerData);
       }
       if (learnRes && learnRes.ok) {
         const profile = await learnRes.json();
@@ -205,8 +224,13 @@ export default function DashboardScreen() {
           setLearningTip(`You tend to be most productive between ${profile.peak_window}.`);
         }
       }
+      if (profile && token) void syncMobileAccount(profile.id, token, baseUrl).catch(() => undefined);
     } catch {
-      // Graceful fallback
+      if (profile) {
+        const cachedTasks = await getCachedTaskView(profile.id, "today");
+        if (cachedTasks) setTodayTasks(cachedTasks as TaskItem[]);
+        setRunningTimers(await getLocalTimers(profile.id));
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -243,6 +267,8 @@ export default function DashboardScreen() {
   // Toggle task status
   const handleToggleTask = async (taskId: string, currentStatus: string) => {
     const newStatus = currentStatus === "completed" ? "pending" : "completed";
+    const profile = await getUserProfile();
+    const activeTimer = runningTimers.find((item) => item.task_id === taskId);
     setTodayTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
     );
@@ -250,6 +276,18 @@ export default function DashboardScreen() {
     try {
       const baseUrl = getServerUrl();
       const token = await ensureAuthenticated();
+      if (!token || activeTimer?.source === "local") {
+        if (profile) {
+          await updateTaskOffline(profile.id, taskId, { status: newStatus as TaskItem["status"] });
+          if (newStatus === "completed" && activeTimer) {
+            await stopTaskTimerOffline(profile.id, activeTimer.id);
+            await removeLocalTimer(profile.id, activeTimer.id);
+            setRunningTimers((current) => current.filter((item) => item.id !== activeTimer.id));
+            await cancelTaskTimerReminder(activeTimer.id);
+          }
+        }
+        return;
+      }
       const res = await fetch(`${baseUrl}/api/v1/tasks/${taskId}/status`, {
         method: "POST",
         headers: {
@@ -260,19 +298,30 @@ export default function DashboardScreen() {
       });
       if (!res.ok) throw new Error("Task status could not be updated.");
       if (newStatus === "completed") {
-        const timer = runningTimers.find((item) => item.task_id === taskId);
-        if (timer) {
-          await fetch(`${baseUrl}/api/v1/time-entries/${timer.id}/stop`, {
+        if (activeTimer) {
+          const stopResponse = await fetch(`${baseUrl}/api/v1/time-entries/${activeTimer.id}/stop`, {
             method: "POST",
             headers: { Authorization: `Bearer ${token}` },
           });
-          await cancelTaskTimerReminder(timer.id);
-          setRunningTimers((current) => current.filter((item) => item.id !== timer.id));
+          if (!stopResponse.ok) throw new Error("Timer could not be stopped.");
+          await cancelTaskTimerReminder(activeTimer.id);
+          if (profile) await removeLocalTimer(profile.id, activeTimer.id);
+          setRunningTimers((current) => current.filter((item) => item.id !== activeTimer.id));
         }
       }
       fetchDashboardData();
     } catch {
-      setTodayTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: currentStatus as TaskItem["status"] } : t)));
+      if (profile) {
+        await updateTaskOffline(profile.id, taskId, { status: newStatus as TaskItem["status"] });
+        if (newStatus === "completed" && activeTimer) {
+          await stopTaskTimerOffline(profile.id, activeTimer.id);
+          await removeLocalTimer(profile.id, activeTimer.id);
+          setRunningTimers((current) => current.filter((item) => item.id !== activeTimer.id));
+          await cancelTaskTimerReminder(activeTimer.id);
+        }
+      } else {
+        setTodayTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: currentStatus as TaskItem["status"] } : t)));
+      }
     }
   };
 
@@ -324,16 +373,12 @@ export default function DashboardScreen() {
   const handleCaptureSubmit = async () => {
     if (!captureText.trim() || isCapturing) return;
     setIsCapturing(true);
+    const profile = await getUserProfile();
+    const taskId = makeOfflineId();
+    let deadlineIso: string | null = null;
     try {
       const baseUrl = getServerUrl();
-      const token = await ensureAuthenticated();
-      if (!token) {
-        setIsCapturing(false);
-        return;
-      }
-
       // Compute ISO deadline
-      let deadlineIso: string | null = null;
       if (selectedDate) {
         const target = new Date();
         if (selectedDate === "tomorrow") target.setDate(target.getDate() + 1);
@@ -361,7 +406,23 @@ export default function DashboardScreen() {
         deadlineIso = target.toISOString();
       }
 
+      const token = await ensureAuthenticated();
+      if (!token) {
+        if (!profile) return;
+        const task = await createTaskOffline(profile.id, {
+          id: taskId,
+          title: captureText.trim(),
+          deadline_at: deadlineIso,
+          origin: isListening ? "voice" : "manual",
+        });
+        setTodayTasks((previous) => [task as TaskItem, ...previous]);
+        resetModal();
+        setCaptureVisible(false);
+        return;
+      }
+
       const payload: Record<string, any> = {
+        id: taskId,
         raw_input: captureText.trim(),
         origin: isListening ? "voice" : "manual",
         status: taskStatus,
@@ -386,7 +447,19 @@ export default function DashboardScreen() {
         Alert.alert("Capture Error", errJson.detail || "Failed to parse task.");
       }
     } catch (err: any) {
-      Alert.alert("Network Error", err?.message || "Failed to capture task.");
+      if (profile) {
+        const task = await createTaskOffline(profile.id, {
+          id: taskId,
+          title: captureText.trim(),
+          deadline_at: deadlineIso,
+          origin: "manual",
+        });
+        setTodayTasks((previous) => [task as TaskItem, ...previous]);
+        resetModal();
+        setCaptureVisible(false);
+      } else {
+        Alert.alert("Network Error", err?.message || "Failed to capture task.");
+      }
     } finally {
       setIsCapturing(false);
     }

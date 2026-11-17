@@ -135,6 +135,7 @@ test('SyncEngine: push and pull cycle', async () => {
     },
     async markOpConflict() {},
     async markOpFailed() {},
+    async markOpsRetryable() {},
     async getSyncState() {
       return { server_epoch: 'epoch-1', last_seq: 10, last_synced_at: null, in_progress: false };
     },
@@ -174,5 +175,63 @@ test('SyncEngine: push and pull cycle', async () => {
   assert.equal(pulled, 1);
   assert.deepEqual(completedOps, ['op-test-1']);
   assert.equal(appliedChanges.length, 1);
+});
+
+test('SyncEngine: failed push returns in-flight operations to retryable state', async () => {
+  const retryable = [];
+  const operation = {
+    op_id: 'op-retry', entity_type: 'task', entity_id: 'task-retry', op_type: 'create',
+    base_version: null, payload: { title: 'Offline task' },
+    client_ts: '2026-11-16T00:00:00Z', attempts: 0, state: 'pending',
+  };
+  const adapter = {
+    async getPendingOps() { return [operation]; },
+    async markOpsInflight() {},
+    async markOpsComplete() {},
+    async markOpConflict() {},
+    async markOpFailed() {},
+    async markOpsRetryable(ids, error) { retryable.push({ ids, error }); },
+    async getSyncState() { return { server_epoch: 'epoch-1', last_seq: 0, last_synced_at: null, in_progress: false }; },
+    async saveSyncState() {},
+    async applyRemoteChanges() {},
+  };
+  const api = {
+    async push() { throw new Error('network unavailable'); },
+    async pull() { throw new Error('must not pull after failed push'); },
+    async bootstrap() { throw new Error('must not bootstrap after failed push'); },
+  };
+
+  const engine = new SyncEngine(adapter, api);
+  await assert.rejects(engine.syncCycle(), /network unavailable/);
+  assert.deepEqual(retryable, [{ ids: ['op-retry'], error: 'network unavailable' }]);
+});
+
+test('SyncEngine: first sync bootstraps while preserving outbox data', async () => {
+  const snapshots = [];
+  const savedStates = [];
+  const adapter = {
+    async getPendingOps() { return []; },
+    async markOpsInflight() {},
+    async markOpsComplete() {},
+    async markOpConflict() {},
+    async markOpFailed() {},
+    async markOpsRetryable() {},
+    async getSyncState() { return { server_epoch: null, last_seq: 0, last_synced_at: null, in_progress: false }; },
+    async saveSyncState(state) { savedStates.push(state); },
+    async applyRemoteChanges(changes) { snapshots.push(...changes); },
+  };
+  const api = {
+    async push() { return { results: [] }; },
+    async pull() { return { server_epoch: 'epoch-new', since_seq: 0, next_seq: 5, changes: [] }; },
+    async bootstrap() {
+      return { server_epoch: 'epoch-new', tasks: [{ id: 'task-1' }], categories: [], projects: [], tags: [] };
+    },
+  };
+
+  const engine = new SyncEngine(adapter, api);
+  const result = await engine.syncCycle();
+  assert.equal(result.pulled, 0);
+  assert.deepEqual(snapshots, [{ id: 'task-1', entity_type: 'task' }]);
+  assert.ok(savedStates.some((state) => state.server_epoch === 'epoch-new' && state.last_seq === 0));
 });
 

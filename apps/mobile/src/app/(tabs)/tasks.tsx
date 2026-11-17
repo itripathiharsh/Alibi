@@ -32,11 +32,25 @@ import {
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, SunriseArt } from "../../components/brand-ui";
-import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
+import { getAccessToken, ensureAuthenticated, getUserProfile } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder, scheduleTaskTimerReminder, syncTaskTimerReminders } from "../../lib/timer-reminders";
 import { loadLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
+import {
+  cacheRunningTimers,
+  cacheTaskView,
+  cacheTaskTimeEntries,
+  createTaskOffline,
+  getCachedTaskView,
+  getLocalTimers,
+  getLocalTaskTimeEntries,
+  removeLocalTimer,
+  startTaskTimerOffline,
+  stopTaskTimerOffline,
+  syncMobileAccount,
+  updateTaskOffline,
+} from "../../lib/offline-sync";
 
 const VIEWS = ["today", "upcoming", "backlog", "completed"] as const;
 
@@ -57,6 +71,7 @@ interface RunningTimer {
   id: string;
   task_id: string;
   started_at: string;
+  source?: string;
 }
 
 /** FR-TASK-016: session-level time facts shown in the task's diary/work log. */
@@ -217,6 +232,20 @@ export default function TasksScreen() {
   };
 
   const fetchTasks = useCallback(async () => {
+    const profile = await getUserProfile();
+    if (profile) {
+      try {
+        const cached = await getCachedTaskView(profile.id, activeView);
+        if (cached) {
+          setTasks(cached as TaskItem[]);
+          setSelectedTask((current) => current ? (cached.find((item) => item.id === current.id) as TaskItem | undefined) ?? current : current);
+          setIsLoading(false);
+        }
+        setRunningTimers(await getLocalTimers(profile.id));
+      } catch {
+        // Continue with the online request if the local database is unavailable.
+      }
+    }
     try {
       let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
@@ -234,9 +263,11 @@ export default function TasksScreen() {
         }
       }
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as TaskItem[];
+        if (profile) await cacheTaskView(profile.id, activeView, data);
         setTasks(data);
         setSelectedTask((current) => current ? data.find((item: TaskItem) => item.id === current.id) ?? current : current);
+        if (profile && token) void syncMobileAccount(profile.id, token, baseUrl).catch(() => undefined);
       }
 
       if (token) {
@@ -245,12 +276,17 @@ export default function TasksScreen() {
         });
         if (timerRes.ok) {
           const timerData = await timerRes.json();
-          setRunningTimers(timerData);
+          if (profile) setRunningTimers(await cacheRunningTimers(profile.id, timerData));
+          else setRunningTimers(timerData);
           void syncTaskTimerReminders(timerData);
         }
       }
     } catch {
-      // Degrade gracefully
+      if (profile) {
+        const cached = await getCachedTaskView(profile.id, activeView);
+        if (cached) setTasks(cached as TaskItem[]);
+        setRunningTimers(await getLocalTimers(profile.id));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -268,16 +304,30 @@ export default function TasksScreen() {
   const handleCapture = async () => {
     if (!captureText.trim() || isCapturing) return;
     setIsCapturing(true);
+    let queuedOffline = false;
+    let offlineProfileId: string | null = null;
+    const deadlineIso = computeDeadlineIso(selectedDate, customDateStr, selectedTime, customTimeStr);
     try {
+      const profile = await getUserProfile();
+      offlineProfileId = profile?.id ?? null;
       let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
       if (!token) {
-        Alert.alert("Authentication", "Connecting to your ALIBI account...");
-        setIsCapturing(false);
+        if (!profile) throw new Error("Sign in once while online before capturing work offline.");
+        const task = await createTaskOffline(profile.id, {
+          title: captureText.trim(),
+          status: taskStatus,
+          deadline_at: deadlineIso,
+          origin: isListening ? "voice" : "manual",
+        });
+        setTasks((previous) => [task as TaskItem, ...previous.filter((item) => item.id !== task.id)]);
+        if (!deadlineIso && taskStatus === "pending") setActiveView("backlog");
+        queuedOffline = true;
+        resetModal();
+        setCaptureVisible(false);
         return;
       }
 
-      const deadlineIso = computeDeadlineIso(selectedDate, customDateStr, selectedTime, customTimeStr);
       const payload: Record<string, any> = {
         raw_input: captureText.trim(),
         origin: isListening ? "voice" : "manual",
@@ -330,6 +380,9 @@ export default function TasksScreen() {
             },
             ...prev,
           ]);
+          if (offlineProfileId) {
+            void cacheTaskView(offlineProfileId, activeView, [capturedTask, ...tasks.filter((item) => item.id !== capturedTask.id)] as TaskItem[]);
+          }
         }
         resetModal();
         setCaptureVisible(false);
@@ -339,7 +392,21 @@ export default function TasksScreen() {
         Alert.alert("Capture Error", errJson.detail || "Failed to parse and capture task.");
       }
     } catch (err: unknown) {
-      Alert.alert("Network Error", err instanceof Error ? err.message : "Failed to capture task. Check server connectivity.");
+      const profile = offlineProfileId ? { id: offlineProfileId } : await getUserProfile();
+      if (profile && !queuedOffline) {
+        const task = await createTaskOffline(profile.id, {
+          title: captureText.trim(),
+          status: taskStatus,
+          deadline_at: deadlineIso,
+          origin: isListening ? "voice" : "manual",
+        });
+        setTasks((previous) => [task as TaskItem, ...previous.filter((item) => item.id !== task.id)]);
+        if (!deadlineIso && taskStatus === "pending") setActiveView("backlog");
+        resetModal();
+        setCaptureVisible(false);
+      } else {
+        Alert.alert("Network Error", err instanceof Error ? err.message : "Failed to capture task. Check server connectivity.");
+      }
     } finally {
       setIsCapturing(false);
     }
@@ -347,10 +414,25 @@ export default function TasksScreen() {
 
   const handleStatusToggle = async (task: TaskItem) => {
     const nextStatus = task.status === "completed" ? "pending" : "completed";
+    const profile = await getUserProfile();
+    const activeTimer = runningTimers.find((item) => item.task_id === task.id);
     try {
       let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
-      if (!token) return;
+      if (!token || activeTimer?.source === "local") {
+        if (!profile) return;
+        const updated = await updateTaskOffline(profile.id, task.id, { status: nextStatus });
+        if (updated) setTasks((previous) => previous.map((item) => item.id === task.id ? updated as TaskItem : item));
+        if (nextStatus === "completed") {
+          const timer = runningTimers.find((item) => item.task_id === task.id);
+          if (timer) {
+            await stopTaskTimerOffline(profile.id, timer.id);
+            setRunningTimers((previous) => previous.filter((item) => item.id !== timer.id));
+            await cancelTaskTimerReminder(timer.id);
+          }
+        }
+        return;
+      }
 
       let res = await fetch(`${baseUrl}/api/v1/tasks/${task.id}/status`, {
         method: "POST",
@@ -385,22 +467,44 @@ export default function TasksScreen() {
               body: JSON.stringify({}),
             });
             await cancelTaskTimerReminder(timer.id);
+            if (profile) await removeLocalTimer(profile.id, timer.id);
           }
         }
         fetchTasks();
       }
     } catch {
-      // Degrade
+      if (profile) {
+        const updated = await updateTaskOffline(profile.id, task.id, { status: nextStatus });
+        if (updated) setTasks((previous) => previous.map((item) => item.id === task.id ? updated as TaskItem : item));
+      }
     }
   };
 
   const handleTimerAction = async (task: TaskItem) => {
+    const profile = await getUserProfile();
+    const activeTimer = runningTimers.find((timer) => timer.task_id === task.id);
+    const useOfflineTimer = async () => {
+      if (!profile) return false;
+      if (activeTimer) {
+        await stopTaskTimerOffline(profile.id, activeTimer.id);
+        setRunningTimers((previous) => previous.filter((timer) => timer.id !== activeTimer.id));
+        await cancelTaskTimerReminder(activeTimer.id);
+      } else {
+        const timer = await startTaskTimerOffline(profile.id, task.id);
+        setRunningTimers((previous) => [...previous.filter((item) => item.task_id !== task.id), timer]);
+        void scheduleTaskTimerReminder({ timerId: timer.id, taskId: timer.task_id, startedAt: timer.started_at });
+      }
+      void fetchTasks();
+      return true;
+    };
     try {
       let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
-      if (!token) return;
+      if (!token || activeTimer?.source === "local") {
+        await useOfflineTimer();
+        return;
+      }
 
-      const activeTimer = runningTimers.find((timer) => timer.task_id === task.id);
       if (activeTimer) {
         // Stop timer
         let res = await fetch(`${baseUrl}/api/v1/time-entries/${activeTimer.id}/stop`, {
@@ -427,6 +531,7 @@ export default function TasksScreen() {
         if (res.ok) {
           setRunningTimers((previous) => previous.filter((timer) => timer.id !== activeTimer.id));
           await cancelTaskTimerReminder(activeTimer.id);
+          if (profile) await removeLocalTimer(profile.id, activeTimer.id);
           fetchTasks();
         }
       } else {
@@ -455,6 +560,7 @@ export default function TasksScreen() {
         if (res.ok) {
           const entry = await res.json();
           setRunningTimers((previous) => [...previous.filter((timer) => timer.task_id !== task.id), entry]);
+          if (profile) await cacheRunningTimers(profile.id, [...runningTimers.filter((timer) => timer.task_id !== task.id), entry]);
           void scheduleTaskTimerReminder({ timerId: entry.id, taskId: entry.task_id, startedAt: entry.started_at });
           fetchTasks();
         } else {
@@ -463,7 +569,13 @@ export default function TasksScreen() {
         }
       }
     } catch (err: unknown) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Timer action failed.");
+      try {
+        if (!(await useOfflineTimer())) {
+          Alert.alert("Error", err instanceof Error ? err.message : "Timer action failed.");
+        }
+      } catch (offlineError) {
+        Alert.alert("Error", offlineError instanceof Error ? offlineError.message : "Timer action failed.");
+      }
     }
   };
 
@@ -472,9 +584,13 @@ export default function TasksScreen() {
     setTaskTimeEntries([]);
     setHistoryError(false);
     setIsLoadingHistory(true);
+    const profile = await getUserProfile();
     try {
       let token = await ensureAuthenticated();
-      if (!token) return;
+      if (!token) {
+        if (profile) setTaskTimeEntries(await getLocalTaskTimeEntries(profile.id, task.id));
+        return;
+      }
       const baseUrl = getServerUrl();
       let response = await fetch(`${baseUrl}/api/v1/time-entries?task_id=${encodeURIComponent(task.id)}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -487,10 +603,15 @@ export default function TasksScreen() {
           });
         }
       }
-      if (response.ok) setTaskTimeEntries(await response.json());
+      if (response.ok) {
+        const entries = await response.json() as TaskTimeEntry[];
+        setTaskTimeEntries(entries);
+        if (profile) await cacheTaskTimeEntries(profile.id, task.id, entries);
+      }
       else setHistoryError(true);
     } catch {
-      setHistoryError(true);
+      if (profile) setTaskTimeEntries(await getLocalTaskTimeEntries(profile.id, task.id));
+      else setHistoryError(true);
     } finally {
       setIsLoadingHistory(false);
     }

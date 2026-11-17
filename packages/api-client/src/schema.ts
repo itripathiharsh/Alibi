@@ -1686,6 +1686,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{organization_id}/transfer-ownership": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transfer Organization Ownership */
+        post: operations["transfer_organization_ownership_api_v1_organizations__organization_id__transfer_ownership_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{organization_id}/invites/{invite_id}/revoke": {
         parameters: {
             query?: never;
@@ -3115,6 +3132,14 @@ export interface components {
             professional_sharing_consent: boolean;
             /** Consented At */
             consented_at: string | null;
+        };
+        /** OrganizationTransferRequest */
+        OrganizationTransferRequest: {
+            /**
+             * Membership Id
+             * Format: uuid
+             */
+            membership_id: string;
         };
         /** ProductivityScoreResponse */
         ProductivityScoreResponse: {
@@ -7303,6 +7328,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transfer_organization_ownership_api_v1_organizations__organization_id__transfer_ownership_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrganizationTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

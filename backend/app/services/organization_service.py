@@ -266,6 +266,47 @@ class OrganizationService:
         )
         await self.session.flush()
 
+    async def transfer_ownership(
+        self,
+        user_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        new_owner_membership_id: uuid.UUID,
+    ) -> tuple[Organization, OrganizationMembership]:
+        """Transfer ownership to an active member and keep the former owner as team lead."""
+        organization, current_membership = await self.require_membership(user_id, organization_id)
+        if current_membership.role != "owner" or organization.owner_user_id != user_id:
+            raise ForbiddenError(
+                detail="Only the current organization owner can transfer ownership."
+            )
+
+        new_owner = await self.session.scalar(
+            select(OrganizationMembership).where(
+                OrganizationMembership.id == new_owner_membership_id,
+                OrganizationMembership.organization_id == organization_id,
+                OrganizationMembership.status == "active",
+                OrganizationMembership.user_id != user_id,
+            )
+        )
+        if not new_owner:
+            raise NotFoundError("Active organization member not found.")
+
+        previous_owner_id = user_id
+        organization.owner_user_id = new_owner.user_id
+        current_membership.role = "team_lead"
+        new_owner.role = "owner"
+        await self.audit_repo.record(
+            action="org_ownership_transferred",
+            user_id=user_id,
+            detail={
+                "organization_id": str(organization_id),
+                "previous_owner_user_id": str(previous_owner_id),
+                "new_owner_user_id": str(new_owner.user_id),
+                "new_owner_membership_id": str(new_owner.id),
+            },
+        )
+        await self.session.flush()
+        return organization, current_membership
+
     async def revoke_invite(
         self,
         user_id: uuid.UUID,

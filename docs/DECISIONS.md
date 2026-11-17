@@ -234,3 +234,23 @@ Migration 0013 replaces the partial unique index and has a guarded downgrade. Th
 
 ### Owner approval
 Owner requested concurrent independent timers, two-hour notifications and per-task scoring on 2026-11-18, and selected a separate task score.
+
+## ADR-026 — Android local task cache and outbox recovery
+- Status: Accepted as an implementation detail of the owner's 2026-11-18 instruction to fix the audited offline gaps
+- Date: 2026-11-18
+- Requirement IDs affected: FR-SYNC-001, FR-SYNC-003, FR-SYNC-004, FR-TASK-001, FR-TASK-003, FR-CAL-009
+
+### Context
+The whole-app audit found that Android had server sync endpoints and the shared sync engine, but its task screens still relied on direct API requests. Task capture, status changes, cached task views, active local timers and stopped timer sessions therefore did not reliably survive a network outage.
+
+### Decision
+1. Use the already-approved `expo-sqlite`, Drizzle, and `@alibi/sync-core` stack to persist account-scoped task views, a task outbox, sync cursor, local timer sessions, and recorded timer history.
+2. Keep the existing `/api/v1/sync` operation envelope and conflict rules. Extend current task serialization/validation so task details needed by Android survive a round trip; when an offline stop reuses an online timer ID, finalize the existing open entry exactly once.
+3. Cache local and server timers separately so a server refresh cannot discard an in-progress offline timer. Pending local data wins over pulled server data until its operation is resolved.
+4. This is a partial Android offline slice: task capture/read/status and task timer history only. Calendar, Vault, voice upload, file uploads, other syncable entities, conflict UI, and full M10 scenarios remain incomplete. Do not mark M10 complete until its own exit gate passes.
+
+### Consequences
+No new third-party package or database migration is introduced; these dependencies were already in the approved stack. SQLite tables are created/upgraded locally. Android behavior still requires an emulator/device airplane-mode run before the offline requirement can be marked done.
+
+### Owner authorization
+The owner explicitly instructed the agent to finish the outstanding whole-app audit fixes on 2026-11-18. No sync envelope or conflict-rule change is part of this implementation.

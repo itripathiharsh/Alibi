@@ -1,37 +1,37 @@
-# M10 Report — Android Offline Support & Sync
+# M10 Report — Android Offline Support & Sync (re-audit correction)
 
 - Dates: 2026-11-16 → 2026-11-16
-- Commit / tag: `HEAD` / `m10-complete`
+- Original tag: `m10-complete` (historical; retained)
+- Current milestone state: **Reopened / In progress** after the 2026-11-18 whole-app audit found the Android UI was not connected to local storage or sync.
 
 ## 1. Completed features
 | Req ID | Summary | Evidence (test names / run link) |
 |---|---|---|
-| FR-SYNC-001 | Server sync engine (`sync_operations`, `sync_conflicts`, server epoch) | Migration `0011_sync_and_offline.py`, `test_sync_push_idempotency_and_duplicate_handling` |
+| FR-SYNC-001 | Server sync endpoints and a partial Android task/timer offline path | Sync API tests plus new local SQLite/outbox integration; full offline entity scope remains incomplete |
 | FR-SYNC-003 | Savepoint-isolated push processing with duplicate idempotency | `test_sync_push_idempotency_and_duplicate_handling` |
-| FR-SYNC-004 | Incremental pull by sequence cursor and full snapshot bootstrap with epoch verification | `test_sync_pull_and_bootstrap_endpoints` |
-| FR-SYNC-005 | Explicit, non-destructive field-level conflict detection and surfacing | `test_sync_conflict_surfacing_and_resolution` |
-| FR-SYNC-006 | Open conflict resolution API (`/api/v1/sync/conflicts/{id}/resolve`) | `test_sync_conflict_surfacing_and_resolution` |
-| FR-SYNC-007 | Cross-platform `@alibi/sync-core` with outbox coalescing, backoff, and engine cycle | `packages/sync-core/tests/sync-core.test.mjs` (5 tests passed) |
+| FR-SYNC-004 | Incremental pull and bootstrap endpoints | `test_sync_pull_and_bootstrap_endpoints`; first-bootstrap engine regression added |
+| FR-SYNC-005 | Server title-conflict detection and surfacing API | `test_sync_conflict_surfacing_and_resolution`; Android conflict resolution UI is not implemented |
+| FR-SYNC-006 | Open conflict resolution API | Server API exists; Android conflict UI remains open |
+| FR-SYNC-007 | Shared sync core with outbox coalescing, retry restoration, bootstrap, and engine cycle | `packages/sync-core/tests/sync-core.test.mjs` (7 tests after re-audit) |
 
 ## 2. Acceptance criteria
 | AC ID | Result (pass/fail) | Evidence |
 |---|---|---|
-| AC-M10-1 | Pass | Push idempotency (S1 & S2), field-level merge (S3), title conflict surfacing (S4), conflict resolution, and sequence pull verified (`test_sync_engine_api.py`). |
-| AC-M10-2 | Pass | Outbox coalescing drops ephemeral create+delete and coalesces consecutive updates preserving base_version (`packages/sync-core/tests/sync-core.test.mjs`). |
-| AC-M10-3 | Pass | Backoff algorithm tested with exponential progression and jitter bounds. |
-| AC-M10-4 | Pass | Server epoch detection triggers re-bootstrap while strictly preserving local pending outbox operations. |
+| AC-M10-1 | Incomplete | Only selected server and sync-core cases run; the required S1–S15 matrix, fuzz tests, and device cases have not passed. |
+| AC-M10-2 | Partial | Coalescing, network retry restoration, and initial bootstrap have unit coverage; complete migration/outbox preservation is not yet tested on Android. |
+| AC-M10-3 | Partial | Backoff function is unit-tested; server cold-start retry and offline cold-start performance are not measured on device. |
+| AC-M10-4 | Incomplete | First bootstrap path is covered; backup epoch reset with real pending SQLite operations has not been verified end-to-end. |
 
 ## 3. Test results
 | Suite | Command | Passed | Failed | Skipped | Coverage |
 |---|---|---|---|---|---|
-| Full CI | `pwsh -File .\make.ps1 ci` | 89 | 0 | 0 | 100% gate pass |
-| Sync Engine API | `pytest backend/tests/integration/test_sync_engine_api.py` | 3 | 0 | 0 | 100% pass |
-| sync-core Unit | `node --test packages/sync-core/tests/sync-core.test.mjs` | 5 | 0 | 0 | 100% pass |
-| TypeScript check | `pnpm -r run typecheck` | 6 projects | 0 | 0 | 100% pass |
+| Original 2026-11-16 CI record | `pwsh -File .\make.ps1 ci` | Historical | — | — | It did not validate Android local persistence; it is not evidence that M10's offline exit gate passed. |
+| Re-audit sync-core | `pnpm --filter @alibi/sync-core test` | 7 | 0 | 0 | Coalescing, backoff, retry restoration, bootstrap, engine cycle |
+| Re-audit backend | `uv run python -m pytest -q -rA` | 102 | 0 | 0 | Full backend suite passes, including offline timer finalization regression |
+| Device QA | Airplane-mode, relaunch, outbox recovery, conflicts | Not run | — | — | No Android device/emulator is currently attached |
 
 ## 4. Manual QA charters
-- Verified idempotent push handling: duplicate batches safely return status `duplicate` without duplicate rows or errors.
-- Verified concurrent edits on different fields cleanly merge; concurrent edits on title record an explicit open conflict for user resolution.
+- Previous manual checks covered server idempotency and title conflict APIs only. They did not exercise Android task storage in airplane mode.
 
 ## 5. Performance & benchmarks
 - Batch push latency (20 operations): **14.2 ms**
@@ -39,12 +39,15 @@
 - Incremental pull query latency: **2.3 ms**
 
 ## 6. Known limitations / new KIs
-- Web offline is deferred to post-v1 per ADR-020 (web operates online-only against backend API).
+- Android task capture/read/status and task timers now have a partial SQLite/outbox path (ADR-026). This work has not been device-tested.
+- Calendar, Vault, voice/file uploads, other syncable entities, Android conflict UI, complete M10 scenarios/fuzz, and cold-start performance remain outstanding (KI-016).
+- Web offline remains deferred to post-v1 per ADR-020.
 
 ## 7. Decisions made (ADR links)
 - [ADR-020: Hosted-mode adaptations and web offline deferral](file:///D:/alibi/docs/DECISIONS.md#adr-020--hosted-mode-adaptations)
 
 ## 8. Documentation updated
-- `docs/IMPLEMENTATION_STATUS.md` updated to reflect M10 Complete.
-- `openapi.json` and `@alibi/api-client` regenerated with Sync endpoints.
+- `docs/IMPLEMENTATION_STATUS.md` now records M10 as reopened and in progress; `m10-complete` is historical only.
+- `openapi.json` and `@alibi/api-client` were regenerated after the organization ownership-transfer endpoint.
+- Re-audit correction recorded 2026-11-18. Do not mark M10 complete until every exit-gate item is verified.
 

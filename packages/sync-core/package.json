@@ -10,7 +10,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc",
-    "test": "node --test tests/sync-core.test.mjs"
+    "test": "pnpm run build && node --test tests/sync-core.test.mjs"
   },
   "dependencies": {
     "@alibi/domain-types": "workspace:*"

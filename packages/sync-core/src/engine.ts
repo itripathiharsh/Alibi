@@ -72,12 +72,10 @@ export class SyncEngine {
       return response.results.length;
     } catch (err) {
       // Revert inflight status or let backoff handle retry
-      for (const op of coalescedOps) {
-        await this.adapter.markOpFailed(
-          op.op_id,
-          err instanceof Error ? err.message : String(err)
-        );
-      }
+      await this.adapter.markOpsRetryable(
+        opIds,
+        err instanceof Error ? err.message : String(err),
+      );
       throw err;
     }
   }
@@ -90,14 +88,14 @@ export class SyncEngine {
     const pullResult = await this.api.pull(state.last_seq);
 
     // Server epoch check (doc 11 §4.3 step 51):
-    if (state.server_epoch && state.server_epoch !== pullResult.server_epoch) {
+    if (!state.server_epoch || state.server_epoch !== pullResult.server_epoch) {
       // Server was restored from backup! Trigger bootstrap re-sync while preserving local outbox
       const bootstrapData = await this.api.bootstrap();
       await this.adapter.applyRemoteChanges([
-        ...(bootstrapData.tasks as unknown[]),
-        ...(bootstrapData.categories as unknown[]),
-        ...(bootstrapData.projects as unknown[]),
-        ...(bootstrapData.tags as unknown[]),
+        ...(bootstrapData.tasks as Record<string, unknown>[]).map((item) => ({ ...item, entity_type: 'task' })),
+        ...(bootstrapData.categories as Record<string, unknown>[]).map((item) => ({ ...item, entity_type: 'category' })),
+        ...(bootstrapData.projects as Record<string, unknown>[]).map((item) => ({ ...item, entity_type: 'project' })),
+        ...(bootstrapData.tags as Record<string, unknown>[]).map((item) => ({ ...item, entity_type: 'tag' })),
       ]);
       await this.adapter.saveSyncState({
         server_epoch: pullResult.server_epoch,

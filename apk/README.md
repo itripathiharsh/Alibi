@@ -10,8 +10,8 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **Build Date**: November 18, 2026
 - **Variant**: Android release APK, Hermes
 - **Signing**: Signed with the repository's current Android debug keystore. This is installable for direct distribution/testing, but it is not a Play Store production signature.
-- **SHA-256**: `1EE0D4A0BBF932FA586B66137FEC9E73DCE6ED54C58246C0A601C3618716830C`
-- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified with `apksigner`; Expo Notifications and Android notification permissions are present. Device delivery has not yet been verified.
+- **SHA-256**: `5507261881EC7669C89A015D178BB3D4389371FC838518F1785DB2504E2B7B88`
+- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified with `apksigner`; Expo SQLite and Expo Notifications are included. No Android device was attached for offline or notification behavior verification.
 
 ---
 
@@ -50,6 +50,9 @@ This directory hosts the official compiled Android application package (`.apk`) 
    - Insights adds per-task recorded minutes, evidence-based task scores, and a 365-day activity heatmap.
 7. **Faster entry to the app**:
    - Signup form and authenticated app shell render without host discovery or setup-status waits. The first server operation can still wait for a sleeping free-tier host to wake.
+8. **Partial offline task support**:
+   - Task views, task capture, status changes, and task timer sessions use an account-scoped local SQLite cache and sync outbox.
+   - Calendar, Vault, voice/file uploads, and other app surfaces are not yet available offline; see `docs/KNOWN_ISSUES.md` (KI-016).
 
 ---
 

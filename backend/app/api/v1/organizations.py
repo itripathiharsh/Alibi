@@ -21,6 +21,7 @@ from app.schemas.organization import (
     OrganizationMemberResponse,
     OrganizationOverviewResponse,
     OrganizationResponse,
+    OrganizationTransferRequest,
 )
 from app.services.organization_service import OrganizationService
 
@@ -175,6 +176,29 @@ async def leave_organization(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
     await OrganizationService(db).leave_organization(auth.user.id, organization_id)
+
+
+@router.post(
+    "/organizations/{organization_id}/transfer-ownership",
+    response_model=OrganizationResponse,
+)
+async def transfer_organization_ownership(
+    organization_id: uuid.UUID,
+    body: OrganizationTransferRequest,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> OrganizationResponse:
+    organization, actor_membership = await OrganizationService(db).transfer_ownership(
+        auth.user.id,
+        organization_id,
+        body.membership_id,
+    )
+    return _organization_response(
+        organization.id,
+        organization.name,
+        organization.slug,
+        actor_membership,
+    )
 
 
 @router.post(
