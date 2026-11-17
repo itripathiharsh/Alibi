@@ -23,6 +23,7 @@ import {
   Share2,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
+import { BrandHeader, SunriseArt } from "../../components/brand-ui";
 import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
 import { getServerUrl, autoDetectServer } from "../../lib/config";
 
@@ -35,6 +36,11 @@ interface SummaryData {
   on_time_rate: number | null;
   efficiency: number | null;
 }
+interface ScoreData { score: number | null; insufficient_data: boolean }
+interface TimeDistribution { category_name: string; category_color: string; total_min: number; percentage: number }
+interface TrendPoint { date: string; completed_count: number }
+interface HeatmapDay { date: string; completed_count: number; minutes_logged: number }
+interface LearningData { peak_window?: string | null }
 
 interface ReportItem {
   id: string;
@@ -49,10 +55,15 @@ interface ReportItem {
 
 export default function ReportsScreen() {
   const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [score, setScore] = useState<ScoreData | null>(null);
+  const [distribution, setDistribution] = useState<TimeDistribution[]>([]);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
+  const [heatmap, setHeatmap] = useState<HeatmapDay[]>([]);
+  const [learning, setLearning] = useState<LearningData | null>(null);
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<"weekly" | "monthly">("weekly");
+  const [selectedPeriod, setSelectedPeriod] = useState<"daily" | "weekly" | "monthly">("daily");
   const [includePersonal, setIncludePersonal] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -63,23 +74,24 @@ export default function ReportsScreen() {
       const baseUrl = getServerUrl();
       if (!token) return;
 
-      // 1. Fetch live SQL analytics summary
-      const sumRes = await fetch(`${baseUrl}/api/v1/analytics/summary?period=${selectedPeriod}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (sumRes.ok) {
-        const data = await sumRes.json();
-        setSummary(data);
-      }
-
-      // 2. Fetch existing generated reports list
-      const repRes = await fetch(`${baseUrl}/api/v1/reports`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (repRes.ok) {
-        const repData = await repRes.json();
-        setReports(repData);
-      }
+      const headers = { Authorization: `Bearer ${token}` };
+      const endpoints = [
+        `${baseUrl}/api/v1/analytics/summary?period=${selectedPeriod}`,
+        `${baseUrl}/api/v1/reports`,
+        `${baseUrl}/api/v1/analytics/productivity-score?period=${selectedPeriod}`,
+        `${baseUrl}/api/v1/analytics/charts/time-distribution?period=${selectedPeriod}`,
+        `${baseUrl}/api/v1/analytics/charts/completion-trend?period=${selectedPeriod}`,
+        `${baseUrl}/api/v1/analytics/charts/consistency-heatmap?days=35`,
+        `${baseUrl}/api/v1/learning/profile`,
+      ];
+      const responses = await Promise.all(endpoints.map((url) => fetch(url, { headers }).catch(() => null)));
+      if (responses[0]?.ok) setSummary(await responses[0].json());
+      if (responses[1]?.ok) setReports(await responses[1].json());
+      if (responses[2]?.ok) setScore(await responses[2].json());
+      if (responses[3]?.ok) setDistribution(await responses[3].json());
+      if (responses[4]?.ok) setTrend(await responses[4].json());
+      if (responses[5]?.ok) setHeatmap(await responses[5].json());
+      if (responses[6]?.ok) setLearning(await responses[6].json());
     } catch {
       // Degrade gracefully
     } finally {
@@ -106,7 +118,7 @@ export default function ReportsScreen() {
 
       const today = new Date();
       const startDate = new Date();
-      startDate.setDate(today.getDate() - (selectedPeriod === "weekly" ? 7 : 30));
+      startDate.setDate(today.getDate() - (selectedPeriod === "daily" ? 0 : selectedPeriod === "weekly" ? 7 : 30));
 
       const payload = {
         report_type: selectedPeriod,
@@ -176,25 +188,26 @@ export default function ReportsScreen() {
   };
 
   const hasData = summary && (summary.tasks_completed > 0 || summary.total_time_min > 0);
+  const trendMaximum = Math.max(1, ...trend.map((point) => point.completed_count));
+  const heatmapDays = heatmap.slice(-28);
+  const periodLabel = selectedPeriod === "daily" ? "today" : selectedPeriod === "weekly" ? "this week" : "this month";
 
   return (
+    <View style={styles.screen}>
+    <SunriseArt height={190} />
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <BrandHeader />
+      <View style={styles.screenHeading}><Text style={styles.screenTitle}>Insights</Text><Text style={styles.screenSubtitle}>Understand your productivity, time and working patterns.</Text></View>
       {/* Period Selector Tabs */}
       <View style={styles.periodTabs}>
-        <Pressable
-          style={[styles.periodTab, selectedPeriod === "weekly" && styles.periodTabActive]}
-          onPress={() => setSelectedPeriod("weekly")}
-        >
-          <Text style={[styles.periodTabText, selectedPeriod === "weekly" && styles.periodTabTextActive]}>
-            Weekly View
-          </Text>
-        </Pressable>
+        <Pressable style={[styles.periodTab, selectedPeriod === "daily" && styles.periodTabActive]} onPress={() => setSelectedPeriod("daily")}><Text style={[styles.periodTabText, selectedPeriod === "daily" && styles.periodTabTextActive]}>Today</Text></Pressable>
+        <Pressable style={[styles.periodTab, selectedPeriod === "weekly" && styles.periodTabActive]} onPress={() => setSelectedPeriod("weekly")}><Text style={[styles.periodTabText, selectedPeriod === "weekly" && styles.periodTabTextActive]}>This Week</Text></Pressable>
         <Pressable
           style={[styles.periodTab, selectedPeriod === "monthly" && styles.periodTabActive]}
           onPress={() => setSelectedPeriod("monthly")}
         >
           <Text style={[styles.periodTabText, selectedPeriod === "monthly" && styles.periodTabTextActive]}>
-            Monthly View
+            This Month
           </Text>
         </Pressable>
       </View>
@@ -225,26 +238,43 @@ export default function ReportsScreen() {
             </View>
             <View style={styles.metricItem}>
               <Text style={styles.metricValue}>
-                {summary.completion_rate != null ? `${Math.round(summary.completion_rate * 100)}%` : "—"}
+                {summary.efficiency != null ? `${Math.round(summary.efficiency * 100)}%` : "—"}
               </Text>
-              <Text style={styles.metricLabel}>Completion</Text>
+              <Text style={styles.metricLabel}>Efficiency</Text>
             </View>
             <View style={styles.metricItem}>
               <Text style={styles.metricValue}>
-                {summary.on_time_rate != null ? `${Math.round(summary.on_time_rate * 100)}%` : "—"}
+                {score?.score != null ? `${score.score}%` : "—"}
               </Text>
-              <Text style={styles.metricLabel}>On-Time</Text>
+              <Text style={styles.metricLabel}>Productivity score</Text>
             </View>
           </View>
         ) : (
           <View style={styles.awaitingBox}>
             <Text style={styles.awaitingTitle}>Awaiting Task Activity</Text>
             <Text style={styles.awaitingSubtitle}>
-              No tasks completed in this {selectedPeriod} period. Complete tasks and log time to see verified SQL metrics without fabrication.
+              No recorded activity for {periodLabel}. Complete tasks and log time to see your verified metrics.
             </Text>
           </View>
         )}
       </View>
+
+      <View style={styles.chartCard}>
+        <View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Time Distribution</Text><Text style={styles.chartSubtitle}>Logged time by category · {periodLabel}</Text></View><Clock size={19} color="#F47B25" /></View>
+        {isLoading ? <ActivityIndicator color={theme.colors.accent.amber} /> : distribution.length === 0 ? <Text style={styles.chartEmpty}>Log time to see your category breakdown.</Text> : <View style={styles.distributionList}>{distribution.slice(0, 5).map((item) => <View key={item.category_name} style={styles.distributionRow}><View style={styles.distributionMeta}><View style={[styles.legendDot, { backgroundColor: item.category_color }]} /><Text style={styles.distributionName} numberOfLines={1}>{item.category_name}</Text><Text style={styles.distributionValue}>{Math.round(item.percentage)}%</Text></View><View style={styles.track}><View style={[styles.fill, { width: `${Math.max(0, Math.min(100, item.percentage))}%`, backgroundColor: item.category_color }]} /></View></View>)}</View>}
+      </View>
+
+      <View style={styles.chartCard}>
+        <View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Task Progress</Text><Text style={styles.chartSubtitle}>Completed tasks · {periodLabel}</Text></View><BarChart3 size={19} color="#F47B25" /></View>
+        {isLoading ? <ActivityIndicator color={theme.colors.accent.amber} /> : trend.length === 0 || trend.every((point) => point.completed_count === 0) ? <Text style={styles.chartEmpty}>Completed task history will appear here.</Text> : <View style={styles.trendChart}>{trend.slice(-10).map((point) => <View key={point.date} style={styles.trendColumn}><Text style={styles.trendCount}>{point.completed_count || ""}</Text><View style={[styles.trendBar, { height: Math.max(6, (point.completed_count / trendMaximum) * 94), backgroundColor: point.completed_count ? "#F47B25" : "#FCE2D1" }]} /><Text style={styles.trendDay}>{new Date(point.date).toLocaleDateString(undefined, { weekday: "short" })}</Text></View>)}</View>}
+      </View>
+
+      <View style={styles.chartCard}>
+        <View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Focus Pattern</Text><Text style={styles.chartSubtitle}>Days with recorded activity</Text></View><Calendar size={19} color="#F47B25" /></View>
+        {isLoading ? <ActivityIndicator color={theme.colors.accent.amber} /> : heatmapDays.length === 0 || heatmapDays.every((day) => day.minutes_logged === 0 && day.completed_count === 0) ? <Text style={styles.chartEmpty}>Your activity pattern appears as you record work.</Text> : <View style={styles.heatmap}>{heatmapDays.map((day) => <View key={day.date} accessibilityLabel={`${day.date}: ${day.completed_count} completed, ${day.minutes_logged} minutes`} style={[styles.heatCell, { backgroundColor: day.minutes_logged > 0 || day.completed_count > 0 ? "#F47B25" : "#F7E6DB", opacity: day.minutes_logged > 0 || day.completed_count > 0 ? .42 + Math.min(.58, day.minutes_logged / 240) : .55 }]} />)}</View>}
+      </View>
+
+      <View style={[styles.chartCard, styles.learningCard]}><View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Your Learning Engine</Text><Text style={styles.chartSubtitle}>{learning?.peak_window ? `Recorded focus window: ${learning.peak_window}` : "Patterns build from your recorded work."}</Text></View><Sparkles size={20} color="#8B5CF6" /></View></View>
 
       {/* Actionable Report Generator Card */}
       <View style={styles.card}>
@@ -346,18 +376,43 @@ export default function ReportsScreen() {
         ))
       )}
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background.base,
-  },
+  screen: { flex: 1, backgroundColor: theme.colors.background.base },
+  container: { flex: 1, backgroundColor: "transparent" },
   content: {
-    padding: 16,
+    paddingHorizontal: 18,
+    paddingTop: 7,
+    paddingBottom: 26,
     gap: 14,
   },
+  screenHeading: { paddingTop: 6, paddingBottom: 4 },
+  screenTitle: { fontSize: 30, lineHeight: 36, fontWeight: "800", letterSpacing: -0.6, color: theme.colors.text.primary },
+  screenSubtitle: { fontSize: 14, lineHeight: 20, color: theme.colors.text.secondary, marginTop: 1 },
+  chartCard: { padding: 16, borderRadius: 21, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: theme.colors.border.subtle, gap: 16, shadowColor: "#19354A", shadowOpacity: .04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
+  chartHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  chartTitle: { fontSize: 17, fontWeight: "800", color: theme.colors.text.primary },
+  chartSubtitle: { color: theme.colors.text.secondary, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  chartEmpty: { color: theme.colors.text.secondary, fontSize: 13, paddingVertical: 12, lineHeight: 19 },
+  distributionList: { gap: 13 },
+  distributionRow: { gap: 7 },
+  distributionMeta: { flexDirection: "row", alignItems: "center", gap: 8 },
+  legendDot: { width: 10, height: 10, borderRadius: 5 },
+  distributionName: { color: theme.colors.text.primary, flex: 1, fontSize: 13, fontWeight: "600" },
+  distributionValue: { color: theme.colors.text.secondary, fontSize: 12, fontWeight: "700" },
+  track: { height: 8, borderRadius: 8, backgroundColor: "#F0F1F3", overflow: "hidden" },
+  fill: { height: "100%", borderRadius: 8 },
+  trendChart: { height: 145, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-around", paddingTop: 12 },
+  trendColumn: { alignItems: "center", justifyContent: "flex-end", gap: 5, flex: 1, height: "100%" },
+  trendCount: { color: theme.colors.text.secondary, fontSize: 9, height: 12 },
+  trendBar: { width: 17, borderRadius: 7, minHeight: 6 },
+  trendDay: { color: theme.colors.text.secondary, fontSize: 9 },
+  heatmap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  heatCell: { width: 18, height: 18, borderRadius: 5 },
+  learningCard: { backgroundColor: "#F7F3FF", borderColor: "#ECE5FF" },
   periodTabs: {
     flexDirection: "row",
     backgroundColor: theme.colors.surface.card,

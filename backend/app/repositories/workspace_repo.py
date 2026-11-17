@@ -24,6 +24,16 @@ class WorkspaceRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_id(self, user_id: uuid.UUID, workspace_id: uuid.UUID) -> Workspace | None:
+        """Fetch an active workspace owned by the user."""
+        stmt = select(Workspace).where(
+            Workspace.id == workspace_id,
+            Workspace.user_id == user_id,
+            Workspace.deleted_at.is_(None),
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def create(self, workspace: Workspace) -> Workspace:
         """Create a new workspace."""
         self.session.add(workspace)

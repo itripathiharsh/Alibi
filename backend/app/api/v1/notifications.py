@@ -4,10 +4,14 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AuthContext, get_auth_context, get_db
+from app.core.errors import NotFoundError
+from app.models.calendar import CalendarEvent
 from app.notifications.service import NotificationService
+from app.repositories.task_repo import TaskRepository
 from app.schemas.notification import (
     NotificationCreateRequest,
     NotificationResponse,
@@ -23,6 +27,17 @@ async def schedule_notification(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> NotificationResponse | None:
     """Schedule a notification with quiet hours suppression (AC-M8-3/5)."""
+    if body.task_id and not await TaskRepository(db, auth.user.id).get_by_id(body.task_id):
+        raise NotFoundError("Task not found.")
+    if body.event_id:
+        event = await db.scalar(
+            select(CalendarEvent).where(
+                CalendarEvent.id == body.event_id,
+                CalendarEvent.user_id == auth.user.id,
+            )
+        )
+        if not event:
+            raise NotFoundError("Calendar event not found.")
     service = NotificationService(db)
     notif = await service.schedule_notification(
         user_id=auth.user.id,

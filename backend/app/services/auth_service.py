@@ -6,10 +6,12 @@ import uuid
 from datetime import timedelta
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.errors import (
+    ConflictError,
     ForbiddenError,
     NotFoundError,
     UnauthorizedError,
@@ -60,25 +62,71 @@ class AuthService:
         display_name: str | None = None,
         ip_hash: str | None = None,
     ) -> User:
-        """First-time system setup creating the sole owner account (AC-M1-2, AC-M1-9)."""
+        """First-time system bootstrap (FR-AUTH-001, AC-M1-2, AC-M1-9)."""
         count = await self.user_repo.count()
         if count > 0:
             raise ForbiddenError(
-                detail="Initial setup has already been completed. Further account creation is forbidden.",
+                detail="Initial setup has already been completed. Use public sign-up to create another account.",
                 code="setup_already_completed",
+            )
+
+        return await self._create_account(
+            email=email,
+            password=password,
+            display_name=display_name,
+            audit_action="user_setup",
+            ip_hash=ip_hash,
+        )
+
+    async def signup(
+        self,
+        email: str,
+        password: str,
+        display_name: str | None = None,
+    ) -> User:
+        """Create one isolated self-service account (FR-AUTH-007)."""
+        return await self._create_account(
+            email=email,
+            password=password,
+            display_name=display_name,
+            audit_action="user_signup",
+            ip_hash=None,
+        )
+
+    async def _create_account(
+        self,
+        email: str,
+        password: str,
+        display_name: str | None,
+        audit_action: str,
+        ip_hash: str | None,
+    ) -> User:
+        normalized_email = email.strip().lower()
+        if await self.user_repo.get_by_email(normalized_email):
+            raise ConflictError(
+                detail="An account with that email already exists. Sign in or use another email.",
+                code="email_already_registered",
             )
 
         validate_password_strength(password)
         pw_hash = hash_password(password)
 
         user = User(
-            email=email.strip().lower(),
+            email=normalized_email,
             password_hash=pw_hash,
             display_name=display_name.strip() if display_name else None,
             timezone=settings.alibi_timezone,
             settings={},
         )
-        await self.user_repo.create(user)
+        try:
+            async with self.session.begin_nested():
+                await self.user_repo.create(user)
+        except IntegrityError as err:
+            # The unique CITEXT email constraint also protects concurrent sign-ups.
+            raise ConflictError(
+                detail="An account with that email already exists. Sign in or use another email.",
+                code="email_already_registered",
+            ) from err
 
         # 1. Create default workspace
         workspace = Workspace(
@@ -141,7 +189,7 @@ class AuthService:
 
         # 3. Log audit event
         await self.audit_repo.record(
-            action="user_setup",
+            action=audit_action,
             user_id=user.id,
             ip_hash=ip_hash,
             detail={"email": user.email},

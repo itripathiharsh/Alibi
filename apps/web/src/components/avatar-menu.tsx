@@ -3,10 +3,14 @@
 import React, { useState } from "react";
 import { User, Settings, Moon, Sun, Database, Shield, X } from "lucide-react";
 import { useTheme } from "./theme-provider";
+import { useAuth } from "@/lib/auth-context";
 
 export function AvatarMenu({ serverStatus }: { serverStatus?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
+  const accountName = user?.display_name || user?.email || "Your ALIBI account";
+  const accountInitial = accountName.charAt(0).toUpperCase();
 
   return (
     <>
@@ -16,7 +20,7 @@ export function AvatarMenu({ serverStatus }: { serverStatus?: string }) {
         aria-label="User settings and account menu"
       >
         <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-medium text-sm">
-          A
+          {accountInitial}
         </div>
       </button>
 
@@ -33,11 +37,11 @@ export function AvatarMenu({ serverStatus }: { serverStatus?: string }) {
 
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-bold text-lg">
-                A
+                {accountInitial}
               </div>
               <div>
-                <h3 className="font-semibold text-lg text-text">ALIBI Owner</h3>
-                <p className="text-xs text-text-muted">owner@alibi.local</p>
+                <h3 className="font-semibold text-lg text-text">{accountName}</h3>
+                <p className="text-xs text-text-muted">{user?.email}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="w-2 h-2 rounded-full bg-success inline-block"></span>
                   <span className="text-xs text-text-muted">
@@ -89,6 +93,15 @@ export function AvatarMenu({ serverStatus }: { serverStatus?: string }) {
                   {theme}
                 </span>
               </div>
+
+              <button
+                type="button"
+                onClick={() => { setIsOpen(false); void logout(); }}
+                className="w-full flex items-center gap-3 p-2.5 rounded-control text-sm text-red-700 hover:bg-red-50 transition"
+              >
+                <User className="w-4 h-4" />
+                Sign out of {user?.email || "this account"}
+              </button>
             </div>
           </div>
         </div>

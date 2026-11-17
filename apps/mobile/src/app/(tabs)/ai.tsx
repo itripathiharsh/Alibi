@@ -27,6 +27,7 @@ import {
   Layers,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
+import { BrandHeader, SunriseArt } from "../../components/brand-ui";
 import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
 import { getServerUrl, autoDetectServer } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
@@ -226,6 +227,9 @@ export default function AIScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
+      <SunriseArt height={170} />
+      <BrandHeader />
+      <View style={styles.screenHeading}><Text style={styles.screenTitle}>Ask ALIBI</Text><Text style={styles.screenSubtitle}>Answers grounded in your tasks, notes and learning.</Text></View>
       {/* Top Banner: Grounding Guarantee */}
       <View style={styles.topBanner}>
         <View style={styles.bannerRow}>
@@ -387,6 +391,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background.base,
   },
+  screenHeading: { paddingHorizontal: 20, paddingTop: 5, paddingBottom: 11 },
+  screenTitle: { fontSize: 30, lineHeight: 36, fontWeight: "800", letterSpacing: -0.6, color: theme.colors.text.primary },
+  screenSubtitle: { fontSize: 14, lineHeight: 20, color: theme.colors.text.secondary, marginTop: 2 },
   topBanner: {
     flexDirection: "row",
     alignItems: "center",

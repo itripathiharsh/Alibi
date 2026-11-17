@@ -63,7 +63,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="owner@alibi.local"
+              placeholder="you@example.com"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -90,6 +90,12 @@ export default function LoginPage() {
             {isSubmitting ? "Signing in..." : "Sign In"}
           </button>
         </form>
+        <p className="mt-5 text-center text-sm text-gray-600 dark:text-gray-400">
+          New to ALIBI?{" "}
+          <Link href="/signup" className="font-semibold text-orange-600 hover:underline">
+            Create your account
+          </Link>
+        </p>
       </div>
     </div>
   );

@@ -184,12 +184,17 @@ dependencies {
     }
 }
 
-// Transpile modern JS (optional chaining ?., nullish coalescing ??, etc.) for JavaScriptCore
+// Transpile modern JS for JavaScriptCore; Hermes already accepts the Metro bundle as generated.
+def useHermesEngine = project.providers.gradleProperty("hermesEnabled").map { it.toBoolean() }.getOrElse(false)
 tasks.matching { it.name.startsWith("createBundle") || it.name == "mergeDebugAssets" }.configureEach { t ->
     t.doLast {
-        println "[build.gradle] Transpiling index.android.bundle with Babel for JavaScriptCore compatibility..."
-        exec {
-            commandLine "node", file("${projectDir}/../../transpile_bundle_gradle.js").absolutePath
+        if (!useHermesEngine) {
+            println "[build.gradle] Transpiling index.android.bundle with Babel for JavaScriptCore compatibility..."
+            exec {
+                commandLine "node", file("${projectDir}/../../transpile_bundle_gradle.js").absolutePath
+            }
+        } else {
+            println "[build.gradle] Skipping JavaScriptCore transpilation for Hermes bundle."
         }
     }
 }

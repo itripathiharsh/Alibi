@@ -8,6 +8,12 @@ IDs: `KI-###` for defects/limitations, `RISK-###` for planning risks. Every S1/S
 | KI-001 | S3 (Minor) | Tooling (Windows) | Windows Application Control (os error 4551) blocks unsigned `.venv/Scripts/*.exe` wrappers | M0 | Invoke tools via `python -m <module>` (handled automatically in `make.ps1`) | Agent | Mitigated |
 | KI-002 | S3 (Minor) | Build (Web) | Next.js standalone build attempts NTFS symlinks requiring elevated developer mode on Windows | M0 | Guarded with `BUILD_STANDALONE=true` so Windows local dev exports cleanly while Docker builds standalone | Agent | Mitigated |
 | KI-003 | S2 (Major) | Assistant (RAG) | Chatbot returned 'no records' fallback due to task status mismatch ('draft'/'active') and missing conversational / priority intent patterns | Post-M12 | Fixed in `intent.py`, `tools.py`, `validator.py`, and `service.py` to route greetings, help, priorities, and tasks with live SQL counts | Agent | Resolved |
+| KI-004 | S3 (Minor) | Mobile UI | Reference-led six-tab visual refresh is in progress; emulator/device visual review and accessibility pass remain outstanding | M13 | Use existing routes and API-backed data; complete visual QA before marking M13 complete | Agent | In progress |
+| KI-005 | S3 (Minor) | Android packaging | The JavaScriptCore Babel post-step tried to parse Hermes output and failed | M13 | Guarded the Babel step to run only for JavaScriptCore; debug and release APK builds now pass | Agent | Resolved |
+| KI-006 | S2 (Major) | Mobile authentication | Fresh installs silently attempted a hard-coded owner login, which could expose the server owner's data | M13 review | Removed default-credential login and added public signup, explicit login, and a legacy-session guard; mobile typecheck passed | Agent | Resolved |
+| KI-007 | S2 (Major) | Web typecheck | `pnpm --filter @alibi/web typecheck` fails because `lucide-react` icon component types are rejected as JSX components across marketing pages | M13 auth check | Auth-related files report no matching errors; full web typecheck/build remains blocked pending React/Lucide type compatibility fix | Agent | Open |
+| KI-008 | S2 (Major) | Account sign-up | Public account registration and multi-account data isolation lack new automated regression coverage | M13 ADR-023 | Signup and foreign-record ownership checks are implemented; add the required API and two-account isolation tests before marking FR-AUTH-007 done | Agent | Open |
+| KI-009 | S2 (Major) | Public registration | Signup has no email verification and uses a process-local per-IP attempt limiter | M13 ADR-023 | TLS is required in hosted mode; monitor registration abuse and add verification only with a separate approved design | Agent | Accepted limitation |
 
 ## Risk register (planning)
 | ID | Risk | Likelihood | Impact | Mitigation | Trigger to re-evaluate |
@@ -30,7 +36,7 @@ IDs: `KI-###` for defects/limitations, `RISK-###` for planning risks. Every S1/S
 | RISK-016 | Losing the `age` private key makes backups unreadable | Low | High | Owner keeps two offline copies (USB + paper/password manager); restore drill each milestone | — |
 
 ## Accepted limitations (v1)
-- Single owner account; no team features.
+- Individual self-service accounts; no team features. Signup has no email verification and rate limiting is per API process (ADR-023).
 - iOS not supported.
 - Google Calendar sync not included (optional one-way import only if time permits).
 - Web offline is read + limited writes (Android is the offline-first client).

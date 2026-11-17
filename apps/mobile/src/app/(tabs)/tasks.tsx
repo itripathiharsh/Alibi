@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "expo-router";
 import {
   ScrollView,
   StyleSheet,
@@ -21,6 +22,8 @@ import {
   Square,
   Sparkles,
   Tag as TagIcon,
+  CalendarDays,
+  UserRound,
   X,
   CheckCircle2,
   Circle,
@@ -28,6 +31,7 @@ import {
   MicOff,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
+import { BrandHeader, SunriseArt } from "../../components/brand-ui";
 import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
 import { getServerUrl, autoDetectServer } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
@@ -132,6 +136,7 @@ function formatDeadlinePreview(
 }
 
 export default function TasksScreen() {
+  const router = useRouter();
   const [activeView, setActiveView] = useState<(typeof VIEWS)[number]>("today");
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [runningTimer, setRunningTimer] = useState<RunningTimer | null>(null);
@@ -425,6 +430,9 @@ export default function TasksScreen() {
 
   return (
     <View style={styles.container}>
+      <SunriseArt height={176} />
+      <BrandHeader right={<><Pressable style={styles.headerAction} onPress={() => router.push("/calendar")} accessibilityLabel="Open calendar"><CalendarDays size={21} color={theme.colors.text.primary} /></Pressable><Pressable style={styles.headerAction} onPress={() => router.push("/(tabs)/profile")} accessibilityLabel="Open profile"><UserRound size={21} color={theme.colors.text.primary} /></Pressable></>} />
+      <View style={styles.screenHeading}><Text style={styles.screenTitle}>Tasks</Text><Text style={styles.screenSubtitle}>Capture, organize and get things done.</Text></View>
       {/* View Selector Tabs */}
       <View style={styles.viewTabs}>
         {VIEWS.map((view) => (
@@ -831,6 +839,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background.base,
   },
+  headerAction: { width: 40, height: 40, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,.84)", borderWidth: 1, borderColor: theme.colors.border.subtle },
+  screenHeading: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 8 },
+  screenTitle: { fontSize: 30, lineHeight: 36, fontWeight: "800", letterSpacing: -0.6, color: theme.colors.text.primary },
+  screenSubtitle: { fontSize: 14, lineHeight: 20, color: theme.colors.text.secondary, marginTop: 1 },
   viewTabs: {
     flexDirection: "row",
     paddingHorizontal: 16,
@@ -864,11 +876,16 @@ const styles = StyleSheet.create({
   },
   taskCard: {
     backgroundColor: theme.colors.surface.card,
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 19,
+    padding: 16,
     borderWidth: 1,
     borderColor: theme.colors.border.subtle,
     gap: 10,
+    shadowColor: "#19354A",
+    shadowOpacity: 0.045,
+    shadowRadius: 11,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
   taskHeader: {
     flexDirection: "row",
@@ -965,14 +982,19 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "center",
-    padding: 20,
+    backgroundColor: "rgba(8,23,35,0.42)",
+    justifyContent: "flex-end",
+    paddingHorizontal: 0,
+    paddingTop: 24,
   },
   modalContent: {
     backgroundColor: theme.colors.surface.card,
-    borderRadius: 16,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     padding: 20,
+    paddingBottom: 30,
     borderWidth: 1,
     borderColor: theme.colors.border.subtle,
     gap: 16,

@@ -52,7 +52,7 @@ max_daily_focus_min=480, reminder_lead_min, quiet_hours, auto_classify_threshold
 **refresh_tokens**: `id`, `user_id`, `device_id`, `family_id uuid`, `token_hash bytea UNIQUE` (SHA-256), `expires_at`, `used_at`, `revoked_at`, `created_at`. Index `(family_id)`.
 
 ### 3.2 Organization
-**workspaces** ⟳: `id`, `user_id`, `name`, `is_default bool`. v1 creates exactly one default workspace; kept for future separation.
+**workspaces** ⟳: `id`, `user_id`, `name`, `is_default bool`. Each new account receives one default workspace; account data remains isolated by `user_id`.
 
 **categories** ⟳: `id`, `user_id`, `workspace_id`, `name`, `slug`, `is_system bool`, `sharing_class CHECK in ('professional','personal','academic','learning')`,
 `external_ai_allowed bool NOT NULL` (default false for personal, true otherwise — still subject to global switch), `color`, `position`.
@@ -203,7 +203,7 @@ Note: scheduling (M6) needs fixed events and work blocks, so `calendar_events` s
 - AC-DB-2 Migration test: each revision upgraded with representative rows present, data preserved.
 - AC-DB-3 Append-only triggers: UPDATE/DELETE on `task_events`, `behavior_observations`, `audit_log` raise.
 - AC-DB-4 `server_seq` strictly increases across concurrent writes (concurrency test, 20 parallel writers).
-- AC-DB-5 Ownership: repository tests prove user A cannot read/write user B rows (even though v1 is single-user — protects sharing and future).
+- AC-DB-5 Ownership: repository tests prove one account cannot read/write another account's rows.
 - AC-DB-6 Running-timer uniqueness and work-block exclusion constraints reject violations.
 - AC-DB-7 `tasks.actual_min` equals SUM(time_entries) for all tasks (nightly verifier job + test).
 - AC-DB-8 `docs/03` updated in the same commit as any migration (CI check: migration file changed ⇒ this doc changed).

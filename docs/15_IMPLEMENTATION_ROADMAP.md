@@ -380,6 +380,32 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M2b Early hosted deploy �
 
 ---
 
+## M13 — Android app visual refresh
+**Goal:** align the mobile app's navigation and visual presentation with the owner's supplied Home, Tasks, Calendar, Insights, Vault, Profile, capture, and event-sheet references while preserving real API behavior.
+**Read first:** `AGENTS.md`; 00, 05, 10, 14, 16; `IMPLEMENTATION_STATUS.md`; `KNOWN_ISSUES.md`; `DECISIONS.md` ADR-020 and ADR-022; the M13 plan; existing mobile screens and API contracts.
+**Entry criteria:** M12/v1.0 release complete; owner approved six mobile tabs and public individual-account signup (ADR-022/023). No schema, sync, or dependency changes planned; auth API changes are in scope.
+**Tasks**
+1. Establish shared mobile tokens, branded header/backdrop, typography, and card treatments.
+2. Refresh Home, Tasks, Calendar, Insights, Assistant, and Settings; add API-backed Vault and Profile screens.
+3. Implement six tabs in this order: Home, Tasks, Calendar, Insights, Vault, Profile. Keep Assistant reachable from Vault and settings reachable from Profile.
+4. Preserve existing real API data, capture/event approval flows, empty/error/loading behavior, authentication, and logout.
+5. Add rate-limited `POST /auth/signup`, account provisioning, and signup UI on web and Android; audit cross-user access using authenticated `user_id` scoping. Keep first-run `/auth/setup` compatible.
+6. Update UI guidance, ADR-022/023, status, known issues, and milestone report; do not copy screenshot example data.
+
+**AC**
+- AC-M13-1 Six requested destinations render in the requested order with clear selected state and accessible labels.
+- AC-M13-2 Existing authenticated Home, task, calendar, and insights actions and data remain intact.
+- AC-M13-3 Vault reads and creates real notes via `/api/v1/vault/*`; loading, empty, and error states are visible; grounded assistant remains reachable.
+- AC-M13-4 Profile uses `/api/v1/auth/me`, analytics summary, and learning profile; no sample metrics or personal records are hard-coded.
+- AC-M13-5 Capture and event flows retain their existing API contracts and user confirmation behavior.
+- AC-M13-6 Android surfaces match supplied visual references, maintain accessible touch targets, and respect reduced motion settings.
+- AC-M13-7 Settings, logout, login, and signup remain navigable and consistent; no schema, sync, provider, or dependency changes.
+- AC-M13-8 Public signup provisions an isolated account on web and Android; duplicate emails and signup rate limits are handled; all protected reads/writes use the authenticated user's ID.
+
+**QA:** mobile typecheck, Android export/build, and manual review of six screens plus capture/event flows on emulator/device. Mark complete only with evidence recorded in `IMPLEMENTATION_STATUS.md` and an M13 report.
+
+---
+
 ## Cross-milestone checklist (every milestone)
 - [ ] `M{N}_PLAN.md` written before coding
 - [ ] Migrations + doc 03 updated

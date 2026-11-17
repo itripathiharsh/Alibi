@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/v1/auth/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an isolated ALIBI account
+         * @description Create an individual account with private default data (FR-AUTH-007).
+         */
+        post: operations["signup_api_v1_auth_signup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/setup-status": {
         parameters: {
             query?: never;
@@ -34,7 +54,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Initialize single owner account
+         * Bootstrap the first ALIBI account
          * @description First-time owner creation with default workspace and system categories.
          *
          *     Fails with 403 Forbidden on subsequent invocations (AC-M1-2).
@@ -2948,6 +2968,21 @@ export interface components {
             /** Needs Setup */
             needs_setup: boolean;
         };
+        /** SignupRequest */
+        SignupRequest: {
+            /**
+             * Email
+             * @description Account email address
+             */
+            email: string;
+            /**
+             * Password
+             * @description Password must be at least 12 characters
+             */
+            password: string;
+            /** Display Name */
+            display_name?: string | null;
+        };
         /** SubtaskCreateRequest */
         SubtaskCreateRequest: {
             /** Title */
@@ -3207,6 +3242,10 @@ export interface components {
             category_hint?: string | null;
             /** Id */
             id?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Deadline At */
+            deadline_at?: string | null;
         };
         /** TaskCaptureResponse */
         TaskCaptureResponse: {
@@ -3685,6 +3724,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    signup_api_v1_auth_signup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     check_setup_status_api_v1_auth_setup_status_get: {
         parameters: {
             query?: never;

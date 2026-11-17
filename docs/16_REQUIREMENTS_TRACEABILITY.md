@@ -13,6 +13,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-AUTH-004 | Device registration (name, platform) on login; owner can list and revoke devices | M | M1 | 12, 04§4.2 | backend/tests/integration/auth/ | ☑ |
 | FR-AUTH-005 | Password change invalidates all refresh tokens except current | M | M1 | 12, 04§4.2 | backend/tests/integration/auth/ | ☑ |
 | FR-AUTH-006 | Login rate limiting (5 failures / 15 min / IP+email) | M | M1 | 12, 04§4.2 | backend/tests/integration/auth/ | ☑ |
+| FR-AUTH-007 | Rate-limited public signup creates isolated user, workspace and system categories; duplicate email rejected | M | M13 | 12, 04§4.2 | backend/tests/integration/test_auth_api.py; tests/e2e/web + mobile | ☐ |
 | FR-TASK-001 | Create task from free text; task is persisted **immediately** with raw input even befor… | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-002 | Create task from voice: audio → transcript → same pipeline as text; audio retained only… | M | M4 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-003 | Extraction returns: title, category, project, deadline, priority, estimate, subtasks — … | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
@@ -132,7 +133,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | NFR-MAINT-001 | Backend test coverage | M | all | 14§3 | CI coverage | ☑ |
 | NFR-I18N-001 | Date parsing supports Indian conventions (DD/MM), "kal/parso" optional | M | M2 | 06§7 | backend/tests/ai_eval/extraction_golden | ☑ |
 
-Total requirements: 124.
+Total requirements: 125.
 
 ## Spec acceptance table → requirement mapping
 | Spec acceptance area | Requirement IDs | Gate milestone |

@@ -141,15 +141,15 @@ class SlidingWindowRateLimiter:
             if not self._history[key]:
                 del self._history[key]
 
-    def check(self, key: str) -> None:
-        """Check if key has exceeded the allowed attempts. Raises RateLimitError if exceeded."""
+    def check(self, key: str, detail: str = "Too many failed login attempts.") -> None:
+        """Check if key has exceeded its window, with an operation-specific safe message."""
         now = datetime.now(UTC)
         self._prune(key, now)
         attempts = self._history.get(key, [])
         if len(attempts) >= self.max_attempts:
             # 6th attempt inside 15 minutes is rejected
             raise RateLimitError(
-                detail=f"Too many failed login attempts. Please try again in {self.window_seconds // 60} minutes.",
+                detail=f"{detail} Please try again in {self.window_seconds // 60} minutes.",
                 retry_after=self.window_seconds,
             )
 
@@ -167,3 +167,4 @@ class SlidingWindowRateLimiter:
 
 
 login_rate_limiter = SlidingWindowRateLimiter(max_attempts=5, window_seconds=900)
+signup_rate_limiter = SlidingWindowRateLimiter(max_attempts=5, window_seconds=900)

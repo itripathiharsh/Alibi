@@ -14,6 +14,7 @@ import {
 import { useRouter } from "expo-router";
 import { getServerUrl, pingServer, setServerUrl } from "../lib/config";
 import { loginMobile } from "../lib/auth";
+import theme from "../lib/theme";
 
 export default function MobileLoginScreen() {
   const router = useRouter();
@@ -69,7 +70,8 @@ export default function MobileLoginScreen() {
             style={styles.logoImage}
             resizeMode="contain"
           />
-          <Text style={styles.subtitle}>Sign in with your server credentials</Text>
+          <Text style={styles.title}>Sign in to ALIBI</Text>
+          <Text style={styles.subtitle}>Your tasks and notes stay with your account.</Text>
         </View>
 
         {errorMessage && (
@@ -116,7 +118,7 @@ export default function MobileLoginScreen() {
             style={styles.input}
             value={email}
             onChangeText={setEmail}
-            placeholder="owner@alibi.local"
+            placeholder="you@example.com"
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -140,6 +142,7 @@ export default function MobileLoginScreen() {
               <Text style={styles.submitText}>Sign In</Text>
             )}
           </TouchableOpacity>
+          <TouchableOpacity onPress={() => { setServerUrl(serverInput); router.push("/signup"); }} style={styles.signupLink} accessibilityRole="button"><Text style={styles.signupText}>Create your ALIBI account</Text></TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -149,7 +152,7 @@ export default function MobileLoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#030712",
+    backgroundColor: theme.colors.background.base,
   },
   scroll: {
     padding: 20,
@@ -166,39 +169,40 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#F9FAFB",
+    fontSize: 25,
+    fontWeight: "800",
+    color: theme.colors.text.primary,
+    marginTop: 12,
   },
   subtitle: {
     fontSize: 14,
-    color: "#9CA3AF",
+    color: theme.colors.text.secondary,
     marginTop: 4,
   },
   errorBanner: {
-    backgroundColor: "rgba(239, 68, 68, 0.15)",
+    backgroundColor: "#FFF1F0",
     borderWidth: 1,
-    borderColor: "#EF4444",
+    borderColor: "#F4B0A9",
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
   },
   errorText: {
-    color: "#FCA5A5",
+    color: "#B42318",
     fontSize: 13,
   },
   card: {
-    backgroundColor: "#111827",
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#1F2937",
-    borderRadius: 12,
+    borderColor: theme.colors.border.subtle,
+    borderRadius: 20,
     padding: 16,
     marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#D1D5DB",
+    color: theme.colors.text.primary,
     marginBottom: 10,
   },
   serverRow: {
@@ -209,14 +213,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pingButton: {
-    backgroundColor: "#374151",
+    backgroundColor: "#102E42",
     paddingHorizontal: 16,
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
   },
   pingText: {
-    color: "#F9FAFB",
+    color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "600",
   },
@@ -225,23 +229,23 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   pingSuccess: {
-    color: "#34D399",
+    color: "#16834B",
   },
   pingFail: {
-    color: "#F87171",
+    color: "#B42318",
   },
   input: {
-    backgroundColor: "#1F2937",
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#374151",
-    borderRadius: 8,
+    borderColor: theme.colors.border.subtle,
+    borderRadius: 13,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: "#F9FAFB",
+    color: theme.colors.text.primary,
     fontSize: 14,
   },
   submitButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#102E42",
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
@@ -255,5 +259,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
   },
+  signupLink: { minHeight: 48, alignItems: "center", justifyContent: "center", marginTop: 6 },
+  signupText: { color: theme.colors.accent.amber, fontSize: 14, fontWeight: "700" },
 });
 

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import AuthContext, get_auth_context, get_auth_service, get_current_user
 from app.core.config import settings
 from app.core.errors import UnauthorizedError
+from app.core.security import signup_rate_limiter
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
@@ -20,6 +21,7 @@ from app.schemas.auth import (
     RefreshRequest,
     SetupRequest,
     SetupStatusResponse,
+    SignupRequest,
     TokenRefreshResponse,
     TokenResponse,
     UpdateMeRequest,
@@ -28,6 +30,32 @@ from app.schemas.auth import (
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post(
+    "/signup",
+    response_model=UserProfile,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create an isolated ALIBI account",
+)
+async def signup(
+    payload: SignupRequest,
+    request: Request,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> UserProfile:
+    """Create an individual account with private default data (FR-AUTH-007)."""
+    client_ip = request.client.host if request.client else "unknown"
+    signup_rate_limiter.check(
+        client_ip,
+        detail="Too many account creation attempts.",
+    )
+    signup_rate_limiter.record_failure(client_ip)
+    user = await auth_service.signup(
+        email=payload.email,
+        password=payload.password,
+        display_name=payload.display_name,
+    )
+    return UserProfile.model_validate(user)
 
 
 @router.get(
@@ -47,7 +75,7 @@ async def check_setup_status(
     "/setup",
     response_model=UserProfile,
     status_code=status.HTTP_201_CREATED,
-    summary="Initialize single owner account",
+    summary="Bootstrap the first ALIBI account",
 )
 async def initial_setup(
     payload: SetupRequest,

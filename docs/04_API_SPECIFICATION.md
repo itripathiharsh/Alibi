@@ -5,7 +5,7 @@ This document defines conventions and the endpoint catalogue; schemas live in Py
 
 ## 1. Conventions
 - Base path `/api/v1`. JSON UTF-8. snake_case fields. Timestamps ISO-8601 with offset (server returns UTC `Z`). Dates `YYYY-MM-DD` interpreted in user tz.
-- Auth: `Authorization: Bearer <access_token>` (except `/auth/login`, `/auth/refresh`, `/auth/setup`, `/health/*`, `/s/*`).
+- Auth: `Authorization: Bearer <access_token>` (except `/auth/login`, `/auth/refresh`, `/auth/setup`, `/auth/signup`, `/health/*`, `/s/*`).
 - Device: `X-Device-Id: <uuid>` required on authenticated requests from apps (used by sync and audit).
 - Idempotency: all `POST` creating resources accept client-supplied `id` (UUIDv7) **or** `Idempotency-Key` header; repeating returns the original result with `200` instead of `201`.
 - Optimistic concurrency: `PATCH`/`DELETE` on syncable entities accept `If-Match: <version>`; mismatch → `409 version_conflict` with current entity in body.
@@ -53,6 +53,7 @@ This document defines conventions and the endpoint catalogue; schemas live in Py
 |---|---|---|
 | GET | /auth/setup-status | `{needs_setup: bool}` |
 | POST | /auth/setup | `{email, password, display_name}` → 201 user; only when 0 users else 403 |
+| POST | /auth/signup | `{email, password, display_name}` → 201 isolated user account; rate limited; duplicate email → 409 |
 | POST | /auth/login | `{email, password, device:{id,name,platform}}` → `{access_token, refresh_token, expires_in, user}` (web: refresh in cookie) |
 | POST | /auth/refresh | `{refresh_token}` or cookie → new pair (rotation) |
 | POST | /auth/logout | revokes current device family |

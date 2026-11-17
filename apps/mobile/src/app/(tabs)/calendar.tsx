@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "expo-router";
 import {
   ScrollView,
   StyleSheet,
@@ -17,8 +18,10 @@ import {
   Circle,
   Tag as TagIcon,
   Plus,
+  UserRound,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
+import { BrandHeader, SunriseArt } from "../../components/brand-ui";
 import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
 import { getServerUrl, autoDetectServer } from "../../lib/config";
 
@@ -32,6 +35,7 @@ interface ScheduledTask {
 }
 
 export default function CalendarScreen() {
+  const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -97,11 +101,13 @@ export default function CalendarScreen() {
 
   return (
     <View style={styles.container}>
+      <SunriseArt height={180} />
+      <BrandHeader right={<Pressable style={styles.headerAction} onPress={() => router.push("/(tabs)/profile")} accessibilityLabel="Open profile"><UserRound size={21} color={theme.colors.text.primary} /></Pressable>} />
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.titleRow}>
-          <CalendarIcon size={22} color={theme.colors.accent.amber} />
-          <Text style={styles.title}>Schedule</Text>
+        <View style={styles.headingCopy}>
+          <Text style={styles.title}>Calendar</Text>
+          <Text style={styles.subtitle}>Your time, plans and tasks in one place.</Text>
         </View>
         <View style={styles.monthSelector}>
           <Pressable onPress={() => changeWeek(-1)} style={styles.navArrow}>
@@ -251,17 +257,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background.base,
   },
+  headerAction: { width: 40, height: 40, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,.84)", borderWidth: 1, borderColor: theme.colors.border.subtle },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 18,
-    paddingTop: 54,
+    paddingTop: 8,
     paddingBottom: 16,
-    backgroundColor: theme.colors.surface.card,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.subtle,
+    backgroundColor: "transparent",
   },
+  headingCopy: { flex: 1, gap: 2 },
+  subtitle: { color: theme.colors.text.secondary, fontSize: 12 },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",

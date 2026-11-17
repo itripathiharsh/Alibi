@@ -5,13 +5,13 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "alibi",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "icon": "./assets/icon_square_transparent.png",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#090D16"
+      "backgroundColor": "#FBF9F8"
     },
     "ios": {
       "supportsTablet": true,

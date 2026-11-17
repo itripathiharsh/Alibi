@@ -10,6 +10,7 @@ import {
   TextInput,
   Modal,
   Alert,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -90,7 +91,7 @@ export default function DashboardScreen() {
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [score, setScore] = useState<ScoreData | null>(null);
   const [learningTip, setLearningTip] = useState<string>(
-    "You tend to be most productive between 9 AM – 12 PM."
+    "ALIBI will surface a pattern after it has enough recorded work."
   );
   const [runningTimer, setRunningTimer] = useState<RunningTimer | null>(null);
   const [timerSeconds, setTimerSeconds] = useState(25 * 60);
@@ -118,15 +119,12 @@ export default function DashboardScreen() {
     return "Good Evening,";
   }, []);
 
-  const displayName = user?.display_name || "Harsh";
+  const displayName = user?.display_name || "there";
   const userInitial = (displayName[0] || "H").toUpperCase();
 
   // Calculate today's tasks stats
   const { totalEstimatedMinutes, completedCount, totalCount, completionPercentage } = useMemo(() => {
-    const totalEst = todayTasks.reduce(
-      (acc, t) => acc + (t.estimate_user_min || 30),
-      0
-    );
+    const totalEst = todayTasks.reduce((acc, t) => acc + (t.estimate_user_min || 0), 0);
     const completed = todayTasks.filter((t) => t.status === "completed").length;
     const total = todayTasks.length || 1;
     const pct = Math.round((completed / total) * 100);
@@ -440,10 +438,7 @@ export default function DashboardScreen() {
       {/* Top Header Bar */}
       <View style={styles.topBar}>
         <View style={styles.logoRow}>
-          <View style={styles.logoIcon}>
-            <CheckSquare size={18} color="#FFFFFF" strokeWidth={2.5} />
-          </View>
-          <Text style={styles.logoText}>ALIBI</Text>
+          <Image source={require("../../../assets/logo_full_light.png")} style={styles.homeLogo} resizeMode="contain" accessibilityLabel="ALIBI" />
         </View>
 
         <View style={styles.topRightActions}>
@@ -454,8 +449,8 @@ export default function DashboardScreen() {
 
           <Pressable
             style={styles.avatarBtn}
-            onPress={() => router.push("/settings")}
-            accessibilityLabel="User settings"
+            onPress={() => router.push("/(tabs)/profile")}
+            accessibilityLabel="Open profile"
           >
             <Text style={styles.avatarText}>{userInitial}</Text>
           </Pressable>
@@ -533,7 +528,7 @@ export default function DashboardScreen() {
 
           <Pressable
             style={styles.actionTile}
-            onPress={() => router.push("/ai")}
+            onPress={() => router.push("/vault")}
           >
             <View style={[styles.actionIconBox, { backgroundColor: "#FAF5FF" }]}>
               <Layers size={20} color="#8B5CF6" />
@@ -543,7 +538,7 @@ export default function DashboardScreen() {
 
           <Pressable
             style={styles.actionTile}
-            onPress={() => router.push("/ai")}
+            onPress={() => router.push("/vault")}
           >
             <View style={[styles.actionIconBox, { backgroundColor: "#F0FDF4" }]}>
               <BookOpen size={20} color="#16A34A" />
@@ -560,7 +555,7 @@ export default function DashboardScreen() {
               <View>
                 <Text style={styles.todayTitle}>Today</Text>
                 <Text style={styles.todaySubheader}>
-                  {totalCount} tasks • ~ {totalEstHours}h {totalEstMins}m
+                  {totalCount} tasks • {totalEstimatedMinutes > 0 ? `~ ${totalEstHours}h ${totalEstMins}m estimated` : "No estimates yet"}
                 </Text>
               </View>
               <Pressable
@@ -748,7 +743,7 @@ export default function DashboardScreen() {
               <View style={styles.statCol}>
                 <TrendingUp size={13} color="#F97316" />
                 <Text style={styles.statVal}>
-                  {score?.score !== null && score?.score !== undefined ? `${score.score}%` : "87%"}
+                  {score?.score !== null && score?.score !== undefined ? `${score.score}%` : "—"}
                 </Text>
                 <Text style={styles.statLbl}>Efficiency</Text>
               </View>
@@ -1134,6 +1129,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  homeLogo: { width: 136, height: 36 },
   logoIcon: {
     width: 28,
     height: 28,
@@ -1712,14 +1708,19 @@ const styles = StyleSheet.create({
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    padding: 20,
+    backgroundColor: "rgba(8,23,35,0.42)",
+    justifyContent: "flex-end",
+    paddingHorizontal: 0,
+    paddingTop: 22,
   },
   modalContent: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     padding: 20,
+    paddingBottom: 30,
     gap: 14,
     maxHeight: "85%",
   },

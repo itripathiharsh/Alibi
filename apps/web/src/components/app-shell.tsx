@@ -1,11 +1,25 @@
 "use client";
-import { usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { AvatarMenu } from "@/components/avatar-menu";
+import { useAuth } from "@/lib/auth-context";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  if (pathname === "/" || pathname === "/features" || pathname === "/how-it-works" || pathname === "/why-alibi" || pathname === "/docs") return <>{children}</>;
+  const router = useRouter();
+  const { user, isLoading, needsSetup } = useAuth();
+  const publicRoutes = ["/", "/features", "/how-it-works", "/why-alibi", "/docs", "/login", "/signup", "/setup"];
+  const isPublicRoute = publicRoutes.includes(pathname);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isPublicRoute && !user) router.replace(needsSetup ? "/setup" : "/login");
+    else if ((pathname === "/login" || pathname === "/signup" || pathname === "/setup") && user) router.replace("/dashboard");
+  }, [isLoading, isPublicRoute, needsSetup, pathname, router, user]);
+
+  if (isPublicRoute) return <>{children}</>;
+  if (isLoading || !user) return <div className="min-h-screen bg-background" aria-busy="true" />;
   return <div className="min-h-screen flex flex-col">
     <Navigation />
     <header className="lg:pl-64 h-16 border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-20 flex items-center justify-between px-4 lg:px-8">

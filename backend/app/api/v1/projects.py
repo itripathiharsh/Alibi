@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import AuthContext, get_auth_context, get_db
 from app.core.errors import NotFoundError
 from app.models.project import Project
+from app.repositories.category_repo import CategoryRepository
 from app.repositories.project_repo import ProjectRepository
 from app.repositories.workspace_repo import WorkspaceRepository
 from app.schemas.project import ProjectCreateRequest, ProjectResponse, ProjectUpdateRequest
@@ -35,9 +36,15 @@ async def create_project(
 ) -> Project:
     """Create a new project."""
     repo = ProjectRepository(db, auth.user_id)
+    category_repo = CategoryRepository(db)
+    if data.category_id and not await category_repo.get_by_id(auth.user_id, data.category_id):
+        raise NotFoundError("Category not found.")
     ws_id = data.workspace_id
-    if not ws_id:
-        ws_repo = WorkspaceRepository(db)
+    ws_repo = WorkspaceRepository(db)
+    if ws_id:
+        if not await ws_repo.get_by_id(auth.user_id, ws_id):
+            raise NotFoundError("Workspace not found.")
+    else:
         default_ws = await ws_repo.get_default(auth.user_id)
         if not default_ws:
             raise NotFoundError("Default workspace not found.")
@@ -68,6 +75,11 @@ async def update_project(
     project = await repo.get_by_id(project_id)
     if not project:
         raise NotFoundError("Project not found.")
+
+    if data.category_id is not None and not await CategoryRepository(db).get_by_id(
+        auth.user_id, data.category_id
+    ):
+        raise NotFoundError("Category not found.")
 
     if data.name is not None:
         project.name = data.name.strip()

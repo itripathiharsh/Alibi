@@ -1,7 +1,7 @@
 # 02 — System Architecture
 
 ## 1. Style
-**Modular monolith.** One FastAPI process (API) + one worker process (same codebase, different entrypoint) + PostgreSQL.
+**Modular monolith.** One FastAPI process (API) + one worker process (same codebase, different entrypoint) + PostgreSQL. Each account owns an isolated data space; account identity is taken from the authenticated token and every owned-data query is scoped by that identity.
 No microservices, no message broker, no Redis. Modules are isolated by package and talk via public service functions.
 
 > **Hosted mode (ADR-018/020):** the primary runtime is `ALIBI_MODE=hosted`. It's **one container** on Render free, where the API process also runs the worker loop + APScheduler, connected to Neon Postgres. The diagram and process table below describe `local` mode (dev/self-host). Hosted differences: no Ollama/faster-whisper in the image, fastembed only if M7 shows it fits, web is an online-only dashboard (no IndexedDB/Dexie, no PWA offline shell), files stored in Postgres, nightly jobs and backups via GitHub Actions.

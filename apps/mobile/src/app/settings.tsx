@@ -13,6 +13,7 @@ import { AlertCircle, ArrowLeft, Check, LogOut, Server, Wifi } from "lucide-reac
 import theme from "../lib/theme";
 import { getServerUrl, setServerUrl, pingServer, autoDetectServer, type ServerMeta } from "../lib/config";
 import { logoutMobile, getUserProfile, type MobileUserProfile } from "../lib/auth";
+import { BrandHeader, SunriseArt } from "../components/brand-ui";
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -52,11 +53,13 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}><SunriseArt height={170} /><ScrollView contentContainerStyle={styles.content}>
+      <BrandHeader right={<Pressable onPress={() => router.back()} style={styles.backIcon} accessibilityRole="button" accessibilityLabel="Back to profile"><ArrowLeft size={20} color={theme.colors.text.primary} /></Pressable>} />
+      <View style={styles.pageHeading}><Text style={styles.pageTitle}>Settings</Text><Text style={styles.pageSubtitle}>Server connection and account access.</Text></View>
       {/* Header */}
       <View style={styles.sectionHeader}>
         <Server size={18} color={theme.colors.accent.amber} />
-        <Text style={styles.sectionTitle}>Backend Connectivity (AC-M0-2 / AC-UI-6)</Text>
+        <Text style={styles.sectionTitle}>Server Connection</Text>
       </View>
 
       <Text style={styles.instructionText}>
@@ -197,26 +200,26 @@ export default function SettingsScreen() {
           justifyContent: "center",
           gap: 8,
           paddingVertical: 12,
-          backgroundColor: "#1F2937",
-          borderRadius: 8,
+          backgroundColor: "#FFFFFF",
+          borderRadius: 15,
           borderWidth: 1,
-          borderColor: "#374151",
+          borderColor: "#F2A5A5",
         }}
         onPress={async () => {
           await logoutMobile();
           router.replace("/login");
         }}
       >
-        <LogOut size={16} color="#F87171" />
-        <Text style={{ color: "#F87171", fontSize: 13, fontWeight: "600" }}>Sign Out</Text>
+        <LogOut size={18} color="#D92D35" />
+        <Text style={{ color: "#D92D35", fontSize: 14, fontWeight: "700" }}>Sign Out</Text>
       </Pressable>
 
       {/* Back Button */}
       <Pressable style={styles.backBtn} onPress={() => router.back()}>
         <ArrowLeft size={16} color={theme.colors.text.secondary} />
-        <Text style={styles.backBtnText}>Return to Dashboard</Text>
+        <Text style={styles.backBtnText}>Back to Profile</Text>
       </Pressable>
-    </ScrollView>
+    </ScrollView></View>
   );
 }
 
@@ -226,9 +229,14 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.base,
   },
   content: {
-    padding: 16,
+    padding: 18,
+    paddingBottom: 30,
     gap: 16,
   },
+  backIcon: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderRadius: 15, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: "#FFFFFF" },
+  pageHeading: { paddingHorizontal: 2, paddingBottom: 2 },
+  pageTitle: { fontSize: 30, color: theme.colors.text.primary, fontWeight: "800", letterSpacing: -0.6 },
+  pageSubtitle: { color: theme.colors.text.secondary, fontSize: 14, marginTop: 2 },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -254,7 +262,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     backgroundColor: theme.colors.surface.card,
-    borderRadius: 8,
+    borderRadius: 15,
     borderWidth: 1,
     borderColor: theme.colors.border.subtle,
     color: theme.colors.text.primary,
@@ -281,7 +289,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.subtle,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: 12,
   },
   presetBtnText: {
     color: theme.colors.text.secondary,
@@ -298,8 +306,8 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     backgroundColor: theme.colors.accent.amber,
-    borderRadius: 8,
-    paddingVertical: 12,
+    borderRadius: 15,
+    paddingVertical: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -309,14 +317,14 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveBtnText: {
-    color: "#090D16",
+    color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "700",
   },
   autoDetectBtn: {
     backgroundColor: theme.colors.surface.card,
-    borderRadius: 8,
-    paddingVertical: 10,
+    borderRadius: 15,
+    paddingVertical: 13,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -354,7 +362,7 @@ const styles = StyleSheet.create({
     color: theme.colors.accent.emerald,
   },
   resultTextError: {
-    color: "#EF4444",
+    color: "#B42318",
   },
   resultDetails: {
     gap: 2,

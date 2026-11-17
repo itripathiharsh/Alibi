@@ -83,6 +83,8 @@ class TaskService:
         workspace = await self.workspace_repo.get_default(self.user_id)
         if not workspace:
             raise NotFoundError("Default workspace not found.")
+        if category_hint and not await self.category_repo.get_by_id(self.user_id, category_hint):
+            raise NotFoundError("Category not found.")
 
         initial_status = status if status in ("pending", "completed") else "pending"
         initial_completed_at = now if initial_status == "completed" else None
@@ -203,6 +205,7 @@ class TaskService:
         task_id: uuid.UUID | None = None,
     ) -> Task:
         """Create a new task with full fields."""
+        await self._assert_owned_references(category_id, project_id)
         workspace = await self.workspace_repo.get_default(self.user_id)
         if not workspace:
             raise NotFoundError("Default workspace not found.")
@@ -356,6 +359,12 @@ class TaskService:
         if not task:
             raise NotFoundError("Task not found.")
 
+        if "category_id" in updates or "project_id" in updates:
+            await self._assert_owned_references(
+                updates.get("category_id", task.category_id),
+                updates.get("project_id", task.project_id),
+            )
+
         diff: dict[str, Any] = {}
         for key, val in updates.items():
             if hasattr(task, key) and getattr(task, key) != val:
@@ -375,6 +384,17 @@ class TaskService:
             )
             await self.session.flush()
         return task
+
+    async def _assert_owned_references(
+        self,
+        category_id: uuid.UUID | None,
+        project_id: uuid.UUID | None,
+    ) -> None:
+        """Reject foreign category/project IDs before storing user-owned records."""
+        if category_id and not await self.category_repo.get_by_id(self.user_id, category_id):
+            raise NotFoundError("Category not found.")
+        if project_id and not await self.project_repo.get_by_id(project_id):
+            raise NotFoundError("Project not found.")
 
     async def soft_delete_task(self, task_id: uuid.UUID) -> None:
         """Soft delete a task and record audit event."""

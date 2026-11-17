@@ -10,7 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AuthContext, get_auth_context, get_db
 from app.calendar_service.conflicts import CalendarConflictService
+from app.core.errors import NotFoundError
 from app.models.calendar import CalendarEvent, ScheduleRecommendation
+from app.repositories.task_repo import TaskRepository
 from app.scheduling.proposal_service import SchedulingProposalService
 from app.schemas.notification import ConflictDetectRequest, ConflictResponse
 from app.schemas.scheduling import (
@@ -160,6 +162,9 @@ async def create_calendar_event(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="end_at must be >= start_at"
         )
+
+    if body.task_id and not await TaskRepository(db, auth.user.id).get_by_id(body.task_id):
+        raise NotFoundError("Task not found.")
 
     ev = CalendarEvent(
         user_id=auth.user.id,

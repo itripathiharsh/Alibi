@@ -6,7 +6,7 @@ Every requirement ID appears in `16_REQUIREMENTS_TRACEABILITY.md` with its miles
 Priority: **M** = must (release-blocking), **S** = should, **C** = could/later.
 
 ## 1. Product summary
-ALIBI is a single-owner personal productivity system (Android + responsive web) that captures tasks by text/voice,
+ALIBI is a personal productivity system for individual accounts (Android + responsive web) that captures tasks by text/voice,
 classifies and schedules them, tracks real time spent, learns the user's patterns, answers questions over the user's
 own history (RAG), and produces factual reports that can be safely shared.
 
@@ -15,7 +15,8 @@ Core loop: Capture → Organize → Schedule → Execute → Learn → Analyze �
 **Owner amendments 2026-11-13 (ADR-018/020):** runs for ₹0 on free hosted services (no always-on PC). Android is the full client; **web is a dashboard** (analytics, reports/sharing, task lists with simple edits, vault search, settings). AI is opt-in cloud (off by default); Ollama is dev/local only. Requirements changed by this are marked "(ADR-020)".
 
 ### Users
-- **Owner** (exactly one in v1): full access.
+- **Account holder** (self-service sign-up): full access to their own data and devices.
+- **Service operator**: configures and operates the ALIBI server; has no product-level access to account data through the client.
 - **Share recipient** (unauthenticated, link-based): read-only access to one report snapshot, professional scope by default.
 
 ### Out of scope for v1 (explicitly)
@@ -33,6 +34,7 @@ email/Slack integrations; payments; push notifications via a paid service; psych
 | FR-AUTH-004 | Device registration (name, platform) on login; owner can list and revoke devices | M |
 | FR-AUTH-005 | Password change invalidates all refresh tokens except current | M |
 | FR-AUTH-006 | Login rate limiting (5 failures / 15 min / IP+email) | M |
+| FR-AUTH-007 | Public self-sign-up creates an isolated account, default workspace and system categories; duplicate emails are rejected and signup attempts are rate limited | M |
 
 ### 2.2 Task management (TASK)
 | ID | Req | P |

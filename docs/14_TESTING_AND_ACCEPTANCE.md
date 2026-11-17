@@ -66,6 +66,7 @@ Bug template: `docs/templates/BUG_TEMPLATE.md`. Every S1/S2 fix adds a regressio
 | Reports | correct EOD/periodic | AC-REP-1 |
 | PDF | valid downloadable | AC-REP-3 + E2E download |
 | Sharing | backend permissions enforced | AC-SEC-5, AC-REP-2, direct API calls bypassing UI |
+| Account sign-up | public signup provisions isolated account; duplicate email and signup throttling behave safely | `backend/tests/integration/test_auth_api.py` signup cases; Web and Android signup/login journey |
 | Offline | core tasks usable offline | Maestro airplane-mode flow; S1, S7, S13 |
 | Sync | no silent data loss | AC-SYNC-1/2 |
 | AI gateway | provider failure handled | AC-AI-2 |

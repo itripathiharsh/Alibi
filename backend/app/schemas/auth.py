@@ -22,6 +22,12 @@ class SetupRequest(BaseModel):
     display_name: str | None = Field(default=None, max_length=100)
 
 
+class SignupRequest(BaseModel):
+    email: str = Field(..., pattern=EMAIL_REGEX, description="Account email address")
+    password: str = Field(..., min_length=12, description="Password must be at least 12 characters")
+    display_name: str | None = Field(default=None, max_length=100)
+
+
 class DeviceInfo(BaseModel):
     id: uuid.UUID | None = None
     name: str = Field(default="Web Browser", max_length=100)

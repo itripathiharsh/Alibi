@@ -1,26 +1,40 @@
 import "../polyfills";
 import React, { useEffect } from "react";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Pressable, StyleSheet, Text, View, Image } from "react-native";
-import { User, Shield } from "lucide-react-native";
+import { User } from "lucide-react-native";
 import theme from "../lib/theme";
 import { autoDetectServer } from "../lib/config";
-import { ensureAuthenticated } from "../lib/auth";
+import { ensureAuthenticated, getSetupStatus } from "../lib/auth";
 
 export default function RootLayout() {
   const router = useRouter();
+  const segments = useSegments();
+  const firstSegment = segments[0];
 
   useEffect(() => {
-    // Proactively connect to backend and ensure authenticated session
-    autoDetectServer().then(() => {
-      ensureAuthenticated();
-    });
-  }, []);
+    let cancelled = false;
+    const guardRoute = async () => {
+      await autoDetectServer();
+      const token = await ensureAuthenticated();
+      if (cancelled) return;
+      const isAuthRoute = firstSegment === "login" || firstSegment === "signup";
+      if (token) {
+        if (isAuthRoute) router.replace("/(tabs)");
+        return;
+      }
+      if (isAuthRoute) return;
+      const needsSetup = await getSetupStatus();
+      if (!cancelled) router.replace(needsSetup ? "/signup" : "/login");
+    };
+    void guardRoute();
+    return () => { cancelled = true; };
+  }, [firstSegment, router]);
 
   return (
     <>
-      <StatusBar style="light" backgroundColor={theme.colors.background.base} />
+      <StatusBar style="dark" backgroundColor={theme.colors.background.base} />
       <Stack
         screenOptions={{
           headerStyle: {
@@ -40,6 +54,7 @@ export default function RootLayout() {
         <Stack.Screen
           name="(tabs)"
           options={{
+            headerShown: false,
             headerTitle: () => (
               <View style={styles.brandContainer}>
                 <Image
@@ -48,18 +63,15 @@ export default function RootLayout() {
                   resizeMode="contain"
                 />
                 <Text style={styles.brandTitle}>ALIBI</Text>
-                <View style={styles.versionBadge}>
-                  <Text style={styles.versionText}>M0</Text>
-                </View>
               </View>
             ),
             headerRight: () => (
               <Pressable
-                onPress={() => router.push("/settings" as const)}
+                onPress={() => router.push("/(tabs)/profile" as const)}
                 style={({ pressed }) => [styles.avatarButton, pressed && { opacity: 0.7 }]}
                 hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
                 accessibilityRole="button"
-                accessibilityLabel="Open settings and server configuration"
+                accessibilityLabel="Open your ALIBI profile"
               >
                 <User size={20} color={theme.colors.accent.amber} />
               </Pressable>
@@ -70,7 +82,7 @@ export default function RootLayout() {
           name="settings"
           options={{
             presentation: "modal",
-            headerTitle: "Settings & Connectivity",
+            headerShown: false,
           }}
         />
         <Stack.Screen
@@ -79,6 +91,10 @@ export default function RootLayout() {
             presentation: "modal",
             headerTitle: "Sign In",
           }}
+        />
+        <Stack.Screen
+          name="signup"
+          options={{ presentation: "modal", headerTitle: "Create Account" }}
         />
       </Stack>
     </>

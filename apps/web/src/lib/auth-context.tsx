@@ -18,6 +18,7 @@ interface AuthContextType {
   isLoading: boolean;
   needsSetup: boolean | null;
   login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, displayName?: string) => Promise<void>;
   setupOwner: (email: string, password: string, displayName?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -105,6 +106,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await login(email, password);
   };
 
+  const signup = async (email: string, password: string, displayName?: string) => {
+    const { error } = await api.POST("/api/v1/auth/signup", {
+      body: {
+        email,
+        password,
+        display_name: displayName,
+      },
+    });
+
+    if (error) {
+      throw new Error((error as { detail?: string })?.detail || "Could not create your account.");
+    }
+    await login(email, password);
+  };
+
   const logout = async () => {
     try {
       if (accessToken) {
@@ -137,6 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         needsSetup,
         login,
+        signup,
         setupOwner,
         logout,
         refreshProfile,

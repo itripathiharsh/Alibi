@@ -26,13 +26,15 @@ Status: Proposed · Accepted · Superseded · Rejected.
 | 019 | Provider endpoints/models/free-tier limits as of implementation date | **Pending — M4** |
 | 020 | Hosted-mode feature reductions (opt-in cloud AI, on-device STT, keyword-first search, web = dashboard, early deploy after M2) | **Accepted (owner, 2026-11-13)** |
 | 021 | Pin Expo SDK 58 and Approved Dependencies Justifications (R11) | **Accepted (M0, 2026-11-13)** |
+| 022 | Six-destination Android navigation and reference-led visual refresh | Accepted (owner, 2026-11-17) |
+| 023 | Public self-registration and account-level data isolation | Accepted (owner, 2026-11-17) |
 
 ---
 
 ## ADR-001 — Modular monolith, Postgres-only infrastructure
 **Context:** ₹0 budget, single user, local-first, must run on a personal PC.
 **Decision:** One FastAPI codebase with `api` and `worker` entrypoints; background jobs in a Postgres `jobs` table with `SKIP LOCKED`; APScheduler for periodic triggers.
-**Consequences:** Fewer moving parts and services to host for free; throughput limits irrelevant at 1 user. Revisit only if multi-user.
+**Consequences:** Fewer moving parts and services to host for free. Account provisioning is open to individual users under ADR-023; capacity assumptions must be revisited as adoption grows.
 
 ## ADR-002 — Client-generated UUIDv7 + SyncableMixin from M1
 **Context:** Offline creation on Android must not need server round-trips; retrofitting sync columns later is risky.
@@ -94,7 +96,7 @@ Each serves a stated requirement: auth security (devices, refresh_tokens, audit_
 - **Neon**: 0.5 GB storage, 100 CU-h/month, scale-to-zero after 5 min, pgvector 0.7+ confirmed (https://neon.tech/pricing).
 - **Vercel Hobby**: 100 GB bandwidth, unlimited invocations for non-commercial personal projects confirmed (https://vercel.com/pricing).
 - **GitHub Actions**: 2,000 free minutes/month for private repos confirmed (https://github.com/pricing).
-All free tier limits remain valid and adequate for the single-user ₹0 architecture.
+All free tier limits remain valid for the ₹0 hosted architecture; account-level usage may grow as self-registration is enabled (ADR-023).
 
 ## ADR-020 — Hosted-mode feature reductions
 **Date:** 2026-11-13 · **Status:** Accepted (owner) · **Amends:** ADR-006, ADR-007, ADR-017; FR-AI-010, FR-AI-011, FR-KNOW-003, FR-SYNC-002, FR-CAL-004, FR-TASK-013; roadmap M0, M4, M7–M11.
@@ -145,3 +147,44 @@ Each new dependency introduced for M0 and beyond is recorded with license and ra
 - **`python-multipart`** (Apache-2.0): Required by FastAPI / Starlette for parsing RFC 7578 multipart/form-data evidence file uploads per doc 04 §4.6.
 - **`hypothesis`** (MPL-2.0, dev-only): Property-based testing engine required by AC-M2-5 to prove `actual_min == sum(durations)` across arbitrary randomized sequences of timer actions.
 - **`recharts`** (MIT): React SVG charting component library specified in approved stack (AGENTS §3) for analytics dashboard visualizations with accessible data table toggles per doc 05 §3 and doc 10 §4.
+
+## ADR-022 — Six-destination Android navigation and reference-led visual refresh
+- Status: Accepted (owner)
+- Date: 2026-11-17
+- Requirement IDs affected: FR-AUTH-001..005, FR-TASK-001..020, FR-CAL-001..007, FR-DASH-001..006, FR-KNOW-001..004, FR-REP-001..005
+
+### Context
+The owner supplied seven Android app screenshots and requested the app's entire design match them. The references use six bottom destinations: Home, Tasks, Calendar, Insights, Vault, and Profile. Existing `docs/05_UI_UX_GUIDELINES.md` prescribed four primary destinations. The owner was asked to resolve that conflict and explicitly chose the six tabs. Screenshot task names, dates, metrics, and profile values are examples and must not become production records.
+
+### Options considered
+| Option | Pros | Cons | Cost | Licence |
+|--------|------|------|------|---------|
+| Retain four destinations | Keeps prior guideline unchanged | Does not match the owner's explicit reference selection | None | N/A |
+| Use six mobile destinations; retain four web destinations | Matches Android references; web dashboard scope stays intact | More mobile tabs | None | N/A |
+
+### Decision
+Android bottom tabs are Home, Tasks, Calendar, Insights, Vault, Profile, in that order. The grounded assistant remains reachable from Vault. Settings and logout are reachable from Profile. Web retains the four destinations in ADR-020. Use the supplied visual language without copying any sample data. No backend/API/schema, sync, or dependency changes are part of this decision.
+
+### Consequences
+Update mobile navigation and UI guidance; keep assistant as a hidden route, reachable through Vault. Validate all values on refreshed screens against existing authenticated API data. This decision does not declare the visual refresh complete.
+
+### Owner approval
+Required if on the AGENTS.md ask-first list: no — owner explicitly selected six tabs on 2026-11-17.
+
+## ADR-023 — Public self-registration and account-level data isolation
+- Status: Accepted (owner)
+- Date: 2026-11-17
+- Requirement IDs affected: FR-AUTH-001..007, FR-SEC-001..003, FR-DATA-003
+- Supersedes: Single-owner account assumptions in ADR-001, ADR-018 context, docs/01, docs/12, and the prior M13 plan.
+
+### Context
+The owner approved allowing multiple people to create their own ALIBI accounts on one server. The database and repositories already carry `user_id` ownership; the auth service and signup UI were still restricted to one initial account.
+
+### Decision
+Add unauthenticated `POST /api/v1/auth/signup`. It creates a user with a private default workspace and system categories, uses the existing Argon2id password policy, rejects duplicate emails, records an audit event, and applies an in-process per-IP signup rate limit. Keep `/auth/setup` as first-user bootstrap for compatibility. Web and Android expose signup regardless of whether the server already has users. No email verification or team sharing is added. Protected APIs continue deriving ownership only from the authenticated JWT subject.
+
+### Consequences
+No schema migration is needed: users already have unique case-insensitive emails and owned records have `user_id`. Public signup has abuse risk and no email verification; hosted signup requires TLS and the rate limit is per API process. Each account gets independent categories, workspace, tasks, notes, AI settings, reports, and learning data. Share links remain the only cross-account disclosure path and continue to use frozen snapshots and existing share scope rules.
+
+### Owner approval
+Owner explicitly selected “Allow multiple self-signups” on 2026-11-17.

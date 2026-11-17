@@ -86,6 +86,40 @@ export async function loginMobile(
   }
 }
 
+export async function getSetupStatus(): Promise<boolean | null> {
+  const baseUrl = getServerUrl();
+  try {
+    const response = await fetch(`${baseUrl}/api/v1/auth/setup-status`);
+    if (!response.ok) return null;
+    const data = (await response.json()) as { needs_setup?: boolean };
+    return data.needs_setup === true;
+  } catch {
+    return null;
+  }
+}
+
+export async function signupMobile(
+  email: string,
+  password: string,
+  displayName: string
+): Promise<{ success: boolean; error?: string; user?: MobileUserProfile }> {
+  const baseUrl = getServerUrl();
+  try {
+    const response = await fetch(`${baseUrl}/api/v1/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim(), password, display_name: displayName.trim() || null }),
+    });
+    if (!response.ok) {
+      const data = (await response.json()) as { detail?: string };
+      return { success: false, error: data.detail || "Could not create your account." };
+    }
+    return loginMobile(email.trim(), password);
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : "Could not connect to ALIBI." };
+  }
+}
+
 export async function refreshMobileTokens(): Promise<string | null> {
   const refreshToken = await getRefreshToken();
   if (!refreshToken) return null;
@@ -174,28 +208,26 @@ function isJwtExpired(token: string): boolean {
 
 /**
  * Ensures a valid access token is available.
- * If expired or missing, refreshes or auto-sign-ins with the initialized owner account.
+ * If expired or missing, refreshes the device session. Never signs in with default credentials.
  */
 export async function ensureAuthenticated(forceRefresh: boolean = false): Promise<string | null> {
+  const profile = await getUserProfile();
+  if (profile?.email.trim().toLowerCase() === "owner@alibi.local") {
+    // Older app builds could silently create this default session. Remove it on upgrade
+    // so an existing installation cannot keep sharing the server owner's account.
+    await logoutMobile();
+    return null;
+  }
+
   const existingToken = await getAccessToken();
   if (existingToken && !forceRefresh && !isJwtExpired(existingToken)) {
     return existingToken;
   }
 
-  // Try refreshing with existing refresh token first
-  if (existingToken) {
+  // Refresh from the device's session even if its access token was cleared.
+  if (await getRefreshToken()) {
     const refreshed = await refreshMobileTokens();
     if (refreshed) return refreshed;
-  }
-
-  // Otherwise, auto sign-in with owner account
-  try {
-    const res = await loginMobile("owner@alibi.local", "AlibiOwner2026!", "Android Phone");
-    if (res.success) {
-      return await getAccessToken();
-    }
-  } catch {
-    // Best-effort auto sign-in
   }
   return null;
 }

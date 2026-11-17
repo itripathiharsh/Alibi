@@ -21,7 +21,8 @@ Threats (STRIDE-lite):
 - Access JWT (HS256 with `ALIBI_SECRET_KEY`, 15 min, claims: sub, device_id, jti, iat, exp). Refresh tokens: opaque 256-bit, SHA-256 stored, rotation on each use, family revocation on reuse (FR-AUTH-003).
 - Web: refresh token in `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` cookie; CSRF: SameSite + `Origin` check on cookie-auth endpoints.
 - Mobile: tokens in expo-secure-store (Android Keystore-backed).
-- Single owner; `/auth/setup` disabled after first user.
+- Multiple individual accounts may self-register through `/auth/signup`; `/auth/setup` remains limited to an empty database. Both flows create a private workspace and default categories for that account.
+- Signup is rate limited by client IP using the existing in-process sliding-window limiter. Email verification is not implemented; protect the public endpoint with TLS in hosted mode and monitor abuse.
 
 ## 3. Transport
 - Local mode on LAN: recommended **Tailscale** (free personal plan, WireGuard-encrypted) instead of exposing ports; or Caddy with local CA. Plain HTTP allowed only for `localhost`.
@@ -36,7 +37,7 @@ Threats (STRIDE-lite):
 - **Hosted mode (ADR-018/020):** files go through the storage interface into Postgres (Render's disk is ephemeral), with the same authenticated download rules. Backups run in GitHub Actions and are **always** `age`-encrypted (public key as a repo secret, private key offline with the owner). The `pg_dump` covers files too, because they're in the DB.
 
 ## 5. Authorization
-- Every repository query includes `user_id = :current_user` (base class enforces; raw SQL helpers require it).
+- Every repository query includes `user_id = :current_user` (base class enforces; raw SQL helpers require it). Tokens carry exactly one user subject; clients never select or supply the owner ID for protected operations.
 - Share viewer endpoints use only `report_shares.shared_facts` — never query live tables.
 - Generated IDOR test: for each route, a second user's resource ID returns 404.
 

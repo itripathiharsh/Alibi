@@ -14,7 +14,7 @@ from app.db.base import Base
 
 
 class User(Base):
-    """User account entity. Single-user owner for v1."""
+    """One individual account with isolated user-owned data."""
 
     __tablename__ = "users"
 

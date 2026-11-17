@@ -6,25 +6,25 @@ export const theme = {
   colors: {
     ...light,
     background: {
-      base: "#F8FAFC",
+      base: "#FBF9F8",
     },
     surface: {
       card: "#FFFFFF",
-      surface2: "#F1F5F9",
+      surface2: "#F4F5F7",
       elevated: "#FFFFFF",
     },
     text: {
-      primary: "#0F172A",
-      secondary: "#64748B",
-      muted: "#94A3B8",
+      primary: "#0B2030",
+      secondary: "#53657A",
+      muted: "#8A96A4",
     },
     border: {
-      subtle: "#E2E8F0",
+      subtle: "#E7EAF0",
     },
     accent: {
-      amber: "#F97316",
+      amber: "#FF741F",
       emerald: "#10B981",
-      primary: "#F97316",
+      primary: "#FF741F",
       blue: "#0EA5E9",
       purple: "#8B5CF6",
     },

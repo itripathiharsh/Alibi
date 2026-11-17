@@ -92,6 +92,7 @@ class RecurrenceService:
 
             # Check if an instance already exists for this (rule_id, occ_date)
             stmt = select(Task).where(
+                Task.user_id == self.user_id,
                 Task.recurrence_rule_id == rule.id,
                 Task.recurrence_instance_date == occ_date,
                 Task.deleted_at.is_(None),

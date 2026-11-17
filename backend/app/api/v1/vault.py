@@ -7,7 +7,10 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AuthContext, get_auth_context, get_db
+from app.core.errors import NotFoundError
 from app.models.vault import Note
+from app.repositories.category_repo import CategoryRepository
+from app.repositories.project_repo import ProjectRepository
 from app.schemas.vault import (
     NoteCreateRequest,
     NoteResponse,
@@ -27,6 +30,14 @@ async def create_note(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> NoteResponse:
     """Manually create and chunk a note in the personal knowledge vault."""
+    if body.category_id and not await CategoryRepository(db).get_by_id(
+        auth.user.id, body.category_id
+    ):
+        raise NotFoundError("Category not found.")
+    if body.project_id and not await ProjectRepository(db, auth.user.id).get_by_id(
+        body.project_id
+    ):
+        raise NotFoundError("Project not found.")
     service = VaultIngestionService(db)
     note = await service.ingest_note(
         user_id=auth.user.id,

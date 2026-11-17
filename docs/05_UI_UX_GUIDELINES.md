@@ -3,16 +3,18 @@
 Principle: **simple on the outside, intelligent underneath.** Information over decoration. Mobile-first.
 
 ## 1. Navigation
-Four primary destinations only — bottom tab bar on mobile, left rail on web ≥ 1024 px:
+Mobile navigation uses six destinations in the bottom tab bar, matching the owner-approved Android reference. Web remains a four-destination dashboard with a left rail on ≥ 1024 px (ADR-022):
 
 | Tab | Contains |
 |-----|----------|
-| **Dashboard** | Period switcher, score card, metric tiles, charts, today's timeline, pending proposals card |
-| **Tasks** | Today / Upcoming / Backlog / Completed segments, **Calendar** toggle (day/week), task detail, search |
-| **AI Intelligence** | Assistant chat, **Knowledge Vault** search, Learned patterns & maturity, Schedule proposals, AI settings link |
-| **Reports** | Generate, history, shares & access logs |
+| **Home** (mobile) / **Dashboard** (web) | Period switcher, score card, metric tiles, charts, today's timeline, pending proposals card |
+| **Tasks** | Today / Upcoming / Backlog / Completed segments, task detail, search |
+| **Calendar** (mobile) | Day/week views and scheduled items; full calendar capabilities per FR-CAL-001..006 |
+| **Insights** (mobile) / **Reports** (web) | Analytics on mobile; reports, history, shares & access logs on web |
+| **Vault** (mobile) | Knowledge search and saved notes; assistant remains reachable from Vault |
+| **Profile** (mobile) | Account identity and settings entry; sign out |
 
-Settings (account, working hours, categories, AI providers, privacy, devices, backup/export) via avatar menu — not a tab.
+On mobile, settings remain under Profile. On web, settings (account, working hours, categories, AI providers, privacy, devices, backup/export) remain under the avatar menu.
 Global **Capture button** (FAB on mobile, `N` shortcut + top bar button on web) on every screen.
 
 ### 1a. Web scope in v1 (ADR-020)
@@ -79,4 +81,4 @@ voice capture always has a text alternative, dynamic type up to 200% without tru
 - AC-UI-3 axe-core: 0 serious/critical violations on all web routes.
 - AC-UI-4 Dark/light visual snapshots for core screens (Playwright screenshot diff threshold 0.2%).
 - AC-UI-5 Lighthouse mobile: Performance ≥ 85, Accessibility ≥ 95 on Dashboard and Tasks.
-- AC-UI-6 No screen exceeds 4 primary nav items; settings not in tab bar.
+- AC-UI-6 Android navigation has the six owner-approved destinations in ADR-022; web stays at four primary destinations and settings remain outside its nav.
