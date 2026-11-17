@@ -1,8 +1,8 @@
 """Report and Sharing domain models (doc 03 §3.9, doc 10 §5–6)."""
 
+import uuid
 from datetime import date, datetime
 from typing import Any
-import uuid
 
 from sqlalchemy import (
     Boolean,
@@ -87,9 +87,7 @@ class ReportShare(Base):
     """Secure public link share for a report (doc 03 §3.9, doc 10 §6, doc 12)."""
 
     __tablename__ = "report_shares"
-    __table_args__ = (
-        Index("ix_report_shares_user_created", "user_id", "created_at"),
-    )
+    __table_args__ = (Index("ix_report_shares_user_created", "user_id", "created_at"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -121,7 +119,9 @@ class ReportShare(Base):
         default=utc_now,
         nullable=False,
     )
-    last_accessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_accessed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     access_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     report: Mapped["Report"] = relationship("Report", back_populates="shares")
@@ -165,4 +165,3 @@ class ReportShareAccessLog(Base):
     outcome: Mapped[str] = mapped_column(String(16), nullable=False)
 
     share: Mapped["ReportShare"] = relationship("ReportShare", back_populates="access_logs")
-

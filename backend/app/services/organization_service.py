@@ -36,7 +36,9 @@ class OrganizationService:
         cleaned_name = " ".join(name.split())
         if len(cleaned_name) < 2:
             raise ConflictError(detail="Organization name must contain at least two characters.")
-        slug_base = re.sub(r"[^a-z0-9]+", "-", cleaned_name.lower()).strip("-")[:72] or "organization"
+        slug_base = (
+            re.sub(r"[^a-z0-9]+", "-", cleaned_name.lower()).strip("-")[:72] or "organization"
+        )
         organization = Organization(
             name=cleaned_name,
             slug=f"{slug_base}-{uuid.uuid4().hex[:8]}",
@@ -61,7 +63,9 @@ class OrganizationService:
         await self.session.flush()
         return organization
 
-    async def list_my_memberships(self, user_id: uuid.UUID) -> list[tuple[Organization, OrganizationMembership]]:
+    async def list_my_memberships(
+        self, user_id: uuid.UUID
+    ) -> list[tuple[Organization, OrganizationMembership]]:
         result = await self.session.execute(
             select(Organization, OrganizationMembership)
             .join(OrganizationMembership, OrganizationMembership.organization_id == Organization.id)
@@ -207,7 +211,9 @@ class OrganizationService:
         if existing and existing.status == "active":
             raise ConflictError(detail="You already belong to this organization.")
         if consent_version != CONSENT_VERSION:
-            raise ConflictError(detail="The consent text has changed. Review the current invitation again.")
+            raise ConflictError(
+                detail="The consent text has changed. Review the current invitation again."
+            )
 
         now = utc_now()
         if existing:
@@ -336,9 +342,7 @@ class OrganizationService:
         start_date: date,
         end_date: date,
     ) -> dict[str, object]:
-        organization, _ = await self.require_membership(
-            user_id, organization_id, manager_only=True
-        )
+        organization, _ = await self.require_membership(user_id, organization_id, manager_only=True)
         if end_date < start_date or (end_date - start_date).days > 366:
             raise ConflictError(detail="Choose a date range of 1 to 366 days.")
         start_utc = datetime.combine(start_date, datetime.min.time(), tzinfo=UTC)
@@ -372,47 +376,54 @@ class OrganizationService:
                 Task.created_at >= consented_at,
                 Category.sharing_class == "professional",
             )
-            completed_stmt = select(func.count(Task.id)).join(
-                Category, Category.id == Task.category_id
-            ).where(
-                *base_filters,
-                Task.status == "completed",
-                Task.completed_at >= start_utc,
-                Task.completed_at < end_utc,
+            completed_stmt = (
+                select(func.count(Task.id))
+                .join(Category, Category.id == Task.category_id)
+                .where(
+                    *base_filters,
+                    Task.status == "completed",
+                    Task.completed_at >= start_utc,
+                    Task.completed_at < end_utc,
+                )
             )
             completed = int((await self.session.execute(completed_stmt)).scalar_one())
 
-            open_stmt = select(func.count(Task.id)).join(
-                Category, Category.id == Task.category_id
-            ).where(
-                *base_filters,
-                Task.status.in_(["pending", "in_progress"]),
+            open_stmt = (
+                select(func.count(Task.id))
+                .join(Category, Category.id == Task.category_id)
+                .where(
+                    *base_filters,
+                    Task.status.in_(["pending", "in_progress"]),
+                )
             )
             open_count = int((await self.session.execute(open_stmt)).scalar_one())
 
-            time_stmt = select(
-                func.coalesce(
-                    func.sum(
-                        func.extract(
-                            "epoch",
-                            func.least(func.coalesce(TimeEntry.ended_at, utc_now()), end_utc)
-                            - func.greatest(TimeEntry.started_at, start_utc),
-                        )
-                        / 60
-                    ),
-                    0,
+            time_stmt = (
+                select(
+                    func.coalesce(
+                        func.sum(
+                            func.extract(
+                                "epoch",
+                                func.least(func.coalesce(TimeEntry.ended_at, utc_now()), end_utc)
+                                - func.greatest(TimeEntry.started_at, start_utc),
+                            )
+                            / 60
+                        ),
+                        0,
+                    )
                 )
-            ).join(Task, Task.id == TimeEntry.task_id).join(
-                Category, Category.id == Task.category_id
-            ).where(
-                TimeEntry.user_id == membership.user_id,
-                TimeEntry.deleted_at.is_(None),
-                TimeEntry.started_at >= max(start_utc, consented_at),
-                TimeEntry.started_at < end_utc,
-                func.coalesce(TimeEntry.ended_at, utc_now()) > start_utc,
-                Task.created_at >= consented_at,
-                Task.deleted_at.is_(None),
-                Category.sharing_class == "professional",
+                .join(Task, Task.id == TimeEntry.task_id)
+                .join(Category, Category.id == Task.category_id)
+                .where(
+                    TimeEntry.user_id == membership.user_id,
+                    TimeEntry.deleted_at.is_(None),
+                    TimeEntry.started_at >= max(start_utc, consented_at),
+                    TimeEntry.started_at < end_utc,
+                    func.coalesce(TimeEntry.ended_at, utc_now()) > start_utc,
+                    Task.created_at >= consented_at,
+                    Task.deleted_at.is_(None),
+                    Category.sharing_class == "professional",
+                )
             )
             member_minutes = int((await self.session.execute(time_stmt)).scalar_one())
 
@@ -445,77 +456,94 @@ class OrganizationService:
             total_open += open_count
             total_minutes += member_minutes
 
-            category_stmt = select(
-                Category.name,
-                func.coalesce(
-                    func.sum(
-                        func.extract(
-                            "epoch",
-                            func.least(func.coalesce(TimeEntry.ended_at, utc_now()), end_utc)
-                            - func.greatest(TimeEntry.started_at, start_utc),
-                        )
-                        / 60
+            category_stmt = (
+                select(
+                    Category.name,
+                    func.coalesce(
+                        func.sum(
+                            func.extract(
+                                "epoch",
+                                func.least(func.coalesce(TimeEntry.ended_at, utc_now()), end_utc)
+                                - func.greatest(TimeEntry.started_at, start_utc),
+                            )
+                            / 60
+                        ),
+                        0,
                     ),
-                    0,
-                ),
-            ).join(Task, Task.id == TimeEntry.task_id).join(
-                Category, Category.id == Task.category_id
-            ).where(
-                TimeEntry.user_id == membership.user_id,
-                TimeEntry.deleted_at.is_(None),
-                TimeEntry.started_at >= max(start_utc, consented_at),
-                TimeEntry.started_at < end_utc,
-                func.coalesce(TimeEntry.ended_at, utc_now()) > start_utc,
-                Task.created_at >= consented_at,
-                Task.deleted_at.is_(None),
-                Category.sharing_class == "professional",
-            ).group_by(Category.name)
+                )
+                .join(Task, Task.id == TimeEntry.task_id)
+                .join(Category, Category.id == Task.category_id)
+                .where(
+                    TimeEntry.user_id == membership.user_id,
+                    TimeEntry.deleted_at.is_(None),
+                    TimeEntry.started_at >= max(start_utc, consented_at),
+                    TimeEntry.started_at < end_utc,
+                    func.coalesce(TimeEntry.ended_at, utc_now()) > start_utc,
+                    Task.created_at >= consented_at,
+                    Task.deleted_at.is_(None),
+                    Category.sharing_class == "professional",
+                )
+                .group_by(Category.name)
+            )
             for category_name, minutes in (await self.session.execute(category_stmt)).all():
                 category_minutes[category_name] += int(minutes or 0)
 
-            trend_stmt = select(
-                func.date(func.timezone("UTC", Task.completed_at)),
-                func.count(Task.id),
-            ).join(Category, Category.id == Task.category_id).where(
-                *base_filters,
-                Task.status == "completed",
-                Task.completed_at >= start_utc,
-                Task.completed_at < end_utc,
-            ).group_by(func.date(func.timezone("UTC", Task.completed_at)))
+            trend_stmt = (
+                select(
+                    func.date(func.timezone("UTC", Task.completed_at)),
+                    func.count(Task.id),
+                )
+                .join(Category, Category.id == Task.category_id)
+                .where(
+                    *base_filters,
+                    Task.status == "completed",
+                    Task.completed_at >= start_utc,
+                    Task.completed_at < end_utc,
+                )
+                .group_by(func.date(func.timezone("UTC", Task.completed_at)))
+            )
             for point_date, count in (await self.session.execute(trend_stmt)).all():
                 points[point_date]["completed"] += int(count)
 
-            time_trend_stmt = select(
-                func.date(func.timezone("UTC", TimeEntry.started_at)),
-                func.coalesce(
-                    func.sum(
-                        func.extract(
-                            "epoch",
-                            func.least(func.coalesce(TimeEntry.ended_at, utc_now()), end_utc)
-                            - func.greatest(TimeEntry.started_at, start_utc),
-                        )
-                        / 60
+            time_trend_stmt = (
+                select(
+                    func.date(func.timezone("UTC", TimeEntry.started_at)),
+                    func.coalesce(
+                        func.sum(
+                            func.extract(
+                                "epoch",
+                                func.least(func.coalesce(TimeEntry.ended_at, utc_now()), end_utc)
+                                - func.greatest(TimeEntry.started_at, start_utc),
+                            )
+                            / 60
+                        ),
+                        0,
                     ),
-                    0,
-                ),
-            ).join(Task, Task.id == TimeEntry.task_id).join(
-                Category, Category.id == Task.category_id
-            ).where(
-                TimeEntry.user_id == membership.user_id,
-                TimeEntry.deleted_at.is_(None),
-                TimeEntry.started_at >= max(start_utc, consented_at),
-                TimeEntry.started_at < end_utc,
-                func.coalesce(TimeEntry.ended_at, utc_now()) > start_utc,
-                Task.created_at >= consented_at,
-                Task.deleted_at.is_(None),
-                Category.sharing_class == "professional",
-            ).group_by(func.date(func.timezone("UTC", TimeEntry.started_at)))
+                )
+                .join(Task, Task.id == TimeEntry.task_id)
+                .join(Category, Category.id == Task.category_id)
+                .where(
+                    TimeEntry.user_id == membership.user_id,
+                    TimeEntry.deleted_at.is_(None),
+                    TimeEntry.started_at >= max(start_utc, consented_at),
+                    TimeEntry.started_at < end_utc,
+                    func.coalesce(TimeEntry.ended_at, utc_now()) > start_utc,
+                    Task.created_at >= consented_at,
+                    Task.deleted_at.is_(None),
+                    Category.sharing_class == "professional",
+                )
+                .group_by(func.date(func.timezone("UTC", TimeEntry.started_at)))
+            )
             for point_date, minutes in (await self.session.execute(time_trend_stmt)).all():
                 points[point_date]["minutes"] += int(minutes or 0)
 
         # The time series is intentionally omitted when there is no verified data.
         activity = [
-            {"date": day, "completed_tasks": values["completed"], "focus_time_min": values["minutes"]}
+            {
+                "date": day,
+                "completed_tasks": values["completed"],
+                "focus_time_min": values["minutes"],
+            }
             for day, values in sorted(points.items())
         ]
         await self.audit_repo.record(
@@ -536,7 +564,9 @@ class OrganizationService:
             "members": member_rows,
             "time_by_category": [
                 {"category_name": name, "minutes": minutes}
-                for name, minutes in sorted(category_minutes.items(), key=lambda row: row[1], reverse=True)
+                for name, minutes in sorted(
+                    category_minutes.items(), key=lambda row: row[1], reverse=True
+                )
             ],
             "activity": activity,
         }
@@ -565,59 +595,80 @@ class OrganizationService:
             raise ConflictError(detail="Choose a date range of 1 to 366 days.")
         start_utc = datetime.combine(start_date, datetime.min.time(), tzinfo=UTC)
         end_utc = datetime.combine(end_date + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
+        activity_filters = [
+            Task.user_id == membership.user_id,
+            Task.created_at >= membership.consented_at,
+            Task.deleted_at.is_(None),
+            Category.sharing_class == "professional",
+            (
+                (Task.created_at >= start_utc)
+                | (Task.completed_at >= start_utc)
+                | (Task.deadline_at >= start_utc)
+                | Task.status.in_(["pending", "in_progress"])
+            ),
+            (Task.created_at < end_utc)
+            | (Task.completed_at < end_utc)
+            | (Task.deadline_at < end_utc),
+        ]
         rows = await self.session.execute(
             select(Task, Category.name)
             .join(Category, Category.id == Task.category_id)
-            .where(
-                Task.user_id == membership.user_id,
-                Task.created_at >= membership.consented_at,
-                Task.deleted_at.is_(None),
-                Category.sharing_class == "professional",
-                (
-                    (Task.created_at >= start_utc)
-                    | (Task.completed_at >= start_utc)
-                    | (Task.deadline_at >= start_utc)
-                    | Task.status.in_(["pending", "in_progress"])
-                ),
-                (Task.created_at < end_utc) | (Task.completed_at < end_utc) | (Task.deadline_at < end_utc),
-            )
+            .where(*activity_filters)
             .order_by(Task.created_at.desc())
             .limit(200)
         )
         tasks = rows.all()
-        time_query = select(
-            func.coalesce(
-                func.sum(
-                    func.extract(
-                        "epoch",
-                        func.least(func.coalesce(TimeEntry.ended_at, utc_now()), end_utc)
-                        - func.greatest(TimeEntry.started_at, start_utc),
-                    )
-                    / 60
-                ),
-                0,
+        time_query = (
+            select(
+                func.coalesce(
+                    func.sum(
+                        func.extract(
+                            "epoch",
+                            func.least(func.coalesce(TimeEntry.ended_at, utc_now()), end_utc)
+                            - func.greatest(TimeEntry.started_at, start_utc),
+                        )
+                        / 60
+                    ),
+                    0,
+                )
             )
-        ).join(Task, Task.id == TimeEntry.task_id).join(
-            Category, Category.id == Task.category_id
-        ).where(
-            TimeEntry.user_id == membership.user_id,
-            TimeEntry.deleted_at.is_(None),
-            TimeEntry.started_at >= max(start_utc, membership.consented_at),
-            TimeEntry.started_at < end_utc,
-            func.coalesce(TimeEntry.ended_at, utc_now()) > start_utc,
-            Task.created_at >= membership.consented_at,
-            Task.deleted_at.is_(None),
-            Category.sharing_class == "professional",
+            .join(Task, Task.id == TimeEntry.task_id)
+            .join(Category, Category.id == Task.category_id)
+            .where(
+                TimeEntry.user_id == membership.user_id,
+                TimeEntry.deleted_at.is_(None),
+                TimeEntry.started_at >= max(start_utc, membership.consented_at),
+                TimeEntry.started_at < end_utc,
+                func.coalesce(TimeEntry.ended_at, utc_now()) > start_utc,
+                Task.created_at >= membership.consented_at,
+                Task.deleted_at.is_(None),
+                Category.sharing_class == "professional",
+            )
         )
         focus_time_min = int((await self.session.execute(time_query)).scalar_one())
-        completed = sum(
-            1
-            for task, _ in tasks
-            if task.status == "completed"
-            and task.completed_at is not None
-            and start_utc <= task.completed_at < end_utc
+        completed = int(
+            (
+                await self.session.execute(
+                    select(func.count(Task.id))
+                    .join(Category, Category.id == Task.category_id)
+                    .where(
+                        *activity_filters,
+                        Task.status == "completed",
+                        Task.completed_at >= start_utc,
+                        Task.completed_at < end_utc,
+                    )
+                )
+            ).scalar_one()
         )
-        open_count = sum(1 for task, _ in tasks if task.status in ("pending", "in_progress"))
+        open_count = int(
+            (
+                await self.session.execute(
+                    select(func.count(Task.id))
+                    .join(Category, Category.id == Task.category_id)
+                    .where(*activity_filters, Task.status.in_(["pending", "in_progress"]))
+                )
+            ).scalar_one()
+        )
         score_response = await self.analytics.get_productivity_score(
             user_id=membership.user_id,
             period="custom",

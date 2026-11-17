@@ -1,8 +1,8 @@
 """Calendar Events and Scheduling Recommendation models (doc 03 §3.4/§3.7, doc 09)."""
 
-from datetime import datetime
-from typing import Any
 import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     Boolean,
@@ -19,6 +19,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.time import utc_now
 from app.core.uuid import generate_uuid7
 from app.database.base import Base
+
+if TYPE_CHECKING:
+    from app.models.task import Task
 
 
 class CalendarEvent(Base):
@@ -106,7 +109,7 @@ class CalendarEvent(Base):
         nullable=False,
     )
 
-    task: Mapped["Task | None"] = relationship("Task")  # type: ignore[name-defined]
+    task: Mapped["Task | None"] = relationship("Task")
 
 
 class ScheduleRecommendation(Base):
@@ -208,4 +211,3 @@ class ScheduleRecommendation(Base):
         JSONB,
         nullable=True,
     )
-

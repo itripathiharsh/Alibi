@@ -43,7 +43,7 @@ Every data screen implements: **loading** (skeleton), **empty** (one-line guidan
 
 | Screen | Key elements |
 |--------|--------------|
-| Today | Overdue section (red accent), in-progress with running timer, scheduled blocks in time order, unscheduled today tasks, "Plan my day" button |
+| Today | Open tasks due today or overdue, active in-progress tasks, scheduled blocks in time order, "Plan my day" button. Undated pending tasks stay in Backlog until started or scheduled. |
 | Task detail | Diary-like title and completion control; start/pause timer; actual time vs estimate; each recorded session's start/end and duration; per-session bars based only on recorded time; subtasks, notes, evidence, dependencies, history, predictions with "why" |
 | Calendar | Day/week; legend: fixed event (solid, lock icon), work block (tinted, task color), deadline (flag marker), actual time (hatched strip) |
 | Proposal review | Diff list: new blocks (+), displacements (↔, require individual tick), unscheduled tasks with reasons; Accept all / selected / Reject |

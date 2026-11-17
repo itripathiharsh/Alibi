@@ -62,4 +62,3 @@ class Project(Base, SyncableMixin):
         default="#3B82F6",
         nullable=False,
     )
-

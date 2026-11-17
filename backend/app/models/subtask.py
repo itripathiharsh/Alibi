@@ -1,7 +1,7 @@
 """Subtask domain model (doc 03 §3.3)."""
 
-from datetime import datetime
 import uuid
+from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID

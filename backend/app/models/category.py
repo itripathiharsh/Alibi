@@ -1,6 +1,7 @@
 """Category domain model (doc 03 §3.2)."""
 
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import UUID
@@ -8,6 +9,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.uuid import generate_uuid7
 from app.db.base import Base, SyncableMixin
+
+if TYPE_CHECKING:
+    from app.models.workspace import Workspace
 
 
 class Category(Base, SyncableMixin):
@@ -78,4 +82,4 @@ class Category(Base, SyncableMixin):
         nullable=False,
     )
 
-    workspace: Mapped["Workspace"] = relationship("Workspace", back_populates="categories")  # type: ignore[name-defined]
+    workspace: Mapped["Workspace"] = relationship("Workspace", back_populates="categories")

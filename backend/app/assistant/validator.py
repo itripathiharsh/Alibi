@@ -93,6 +93,21 @@ def generate_deterministic_answer(
 ) -> tuple[str, list[dict[str, Any]]]:
     """Generate a strictly factual, grounded response without using an LLM (AC-RAG-7)."""
     q_lower = query.lower().strip()
+    has_period_scope = (
+        any(
+            token in q_lower
+            for token in [
+                "today",
+                "yesterday",
+                "last week",
+                "this week",
+                "this month",
+                "last month",
+                "202",
+            ]
+        )
+        or re.search(r"\b(20\d\d)\b", q_lower) is not None
+    )
     active_intents = list(intents) if intents is not None else []
 
     # If intents not explicitly passed, infer them from query
@@ -104,15 +119,17 @@ def generate_deterministic_answer(
 
     # 1. Handle Greetings
     if "GREETING" in active_intents:
-        pending_tool = next((t for t in tool_results if t.get("tool_name") == "pending_overdue"), None)
+        pending_tool = next(
+            (t for t in tool_results if t.get("tool_name") == "pending_overdue"), None
+        )
         pending_data = pending_tool.get("data", []) if pending_tool else []
         if pending_data:
             return (
                 f"Hello! I am your ALIBI Grounded Assistant. You currently have {len(pending_data)} active task{'s' if len(pending_data) != 1 else ''} on your schedule.\n\n"
                 "How can I help you today? You can ask:\n"
-                "- *\"What are my highest priority tasks today?\"*\n"
-                "- *\"What did I accomplish this week?\"*\n"
-                "- *\"What are my peak focus hours?\"*",
+                '- *"What are my highest priority tasks today?"*\n'
+                '- *"What did I accomplish this week?"*\n'
+                '- *"What are my peak focus hours?"*',
                 [],
             )
         return (
@@ -126,17 +143,19 @@ def generate_deterministic_answer(
         return (
             "I am your ALIBI Grounded Assistant. I operate under a strict zero-hallucination guarantee, providing answers verified directly by your database records.\n\n"
             "Here is what you can ask me:\n"
-            "- **Priorities & Tasks**: *\"What are my highest priority tasks today?\"*, *\"What is pending or overdue?\"*\n"
-            "- **Accomplishments**: *\"What did I accomplish today?\"*, *\"What tasks did I complete this week?\"*\n"
-            "- **Time Tracking**: *\"How much time did I spend this week?\"*, *\"How long did I work today?\"*\n"
-            "- **Habits & Focus**: *\"What are my peak focus hours?\"*, *\"Summarize my routines\"*\n"
+            '- **Priorities & Tasks**: *"What are my highest priority tasks today?"*, *"What is pending or overdue?"*\n'
+            '- **Accomplishments**: *"What did I accomplish today?"*, *"What tasks did I complete this week?"*\n'
+            '- **Time Tracking**: *"How much time did I spend this week?"*, *"How long did I work today?"*\n'
+            '- **Habits & Focus**: *"What are my peak focus hours?"*, *"Summarize my routines"*\n'
             "- **Knowledge Vault**: Search past meeting notes, work logs, and decisions.",
             [],
         )
 
     # 3. Handle Work Breakdown
     if "BREAKDOWN" in active_intents:
-        pending_tool = next((t for t in tool_results if t.get("tool_name") == "pending_overdue"), None)
+        pending_tool = next(
+            (t for t in tool_results if t.get("tool_name") == "pending_overdue"), None
+        )
         pending_data = pending_tool.get("data", []) if pending_tool else []
         if pending_data:
             target_task = pending_data[0].get("title", "Upcoming Task")
@@ -152,7 +171,7 @@ def generate_deterministic_answer(
                 [],
             )
         return (
-            "To break down work into subtasks, capture your task first or mention the task name (e.g. *\"Break down: Launch new campaign\"*).",
+            'To break down work into subtasks, capture your task first or mention the task name (e.g. *"Break down: Launch new campaign"*).',
             [],
         )
 
@@ -173,8 +192,16 @@ def generate_deterministic_answer(
             [],
         )
 
-    completed_tool = next((t for t in tool_results if t.get("tool_name") == "completed_tasks"), None)
-    if "COMPLETED_TASKS" in active_intents and (not completed_tool or not completed_tool.get("data")):
+    completed_tool = next(
+        (t for t in tool_results if t.get("tool_name") == "completed_tasks"), None
+    )
+    if (
+        "COMPLETED_TASKS" in active_intents
+        and (not completed_tool or not completed_tool.get("data"))
+        and not vault_sources
+    ):
+        if has_period_scope:
+            return ("I don't have records about that for the requested period.", [])
         return (
             "You haven't completed any tasks for the requested period. Check your pending tasks to see what's on your agenda!",
             [],
@@ -193,11 +220,7 @@ def generate_deterministic_answer(
 
     if not has_tools and not has_vault:
         # Check for date or historical queries (AC-RAG-2)
-        has_date_spec = any(
-            k in q_lower
-            for k in ["today", "yesterday", "last week", "this week", "this month", "last month", "202"]
-        ) or re.search(r"\b(20\d\d)\b", q_lower) is not None
-        if has_date_spec or "VAULT_SEARCH" in active_intents:
+        if has_period_scope or "VAULT_SEARCH" in active_intents:
             return ("I don't have records about that for the requested period.", [])
         return (
             "I couldn't find any matching records in your tasks or knowledge vault. Try asking about your pending tasks, completed work, time spent, or type 'help' to see what I can do.",

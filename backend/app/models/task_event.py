@@ -2,9 +2,9 @@
 Immutable, append-only audit event log for every task mutation.
 """
 
+import uuid
 from datetime import datetime
 from typing import Any
-import uuid
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -78,4 +78,3 @@ class TaskEvent(Base):
         default=utc_now,
         nullable=False,
     )
-

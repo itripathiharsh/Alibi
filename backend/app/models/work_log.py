@@ -1,7 +1,7 @@
 """WorkLog domain model (doc 03 §3.4)."""
 
-from datetime import date
 import uuid
+from datetime import date
 
 from sqlalchemy import Date, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
@@ -50,4 +50,3 @@ class WorkLog(Base, SyncableMixin):
         ARRAY(UUID(as_uuid=True)),
         nullable=True,
     )
-

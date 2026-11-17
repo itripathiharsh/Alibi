@@ -1,7 +1,7 @@
 """Unit and property-based tests for concurrent task timers and actual_min consistency."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
@@ -44,6 +44,7 @@ async def test_fr_task_021_independent_task_timers_and_same_task_conflict() -> N
 
     service.time_repo.get_running_timer_for_task = AsyncMock(side_effect=mock_get_running_for_task)
     service.time_repo.start_timer = AsyncMock(side_effect=mock_start)
+    service.task_event_repo.record_event = AsyncMock()
 
     async def mock_get_task(task_id: uuid.UUID) -> Task:
         return Task(
@@ -58,11 +59,70 @@ async def test_fr_task_021_independent_task_timers_and_same_task_conflict() -> N
     t2 = await service.start_timer(task_2)
     assert t2.task_id == task_2
     assert set(active_timers) == {task_1, task_2}
+    assert service.task_event_repo.record_event.await_count == 2
+    assert (
+        service.task_event_repo.record_event.await_args_list[0].kwargs["event_type"]
+        == "timer_started"
+    )
+    assert service.task_event_repo.record_event.await_args_list[0].kwargs["changes"]["status"] == [
+        "pending",
+        "in_progress",
+    ]
 
     # Starting a duplicate timer for one task is still rejected.
     with pytest.raises(ConflictError) as exc_info:
         await service.start_timer(task_1)
     assert "already running for this task" in str(exc_info.value.detail)
+
+
+@pytest.mark.asyncio
+async def test_stopping_timer_records_history_and_learning_session() -> None:
+    user_id = uuid.uuid4()
+    task_id = uuid.uuid4()
+    started_at = datetime.now(UTC)
+    ended_at = started_at + timedelta(minutes=24)
+    entry = TimeEntry(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        task_id=task_id,
+        started_at=started_at,
+        ended_at=None,
+        duration_min=None,
+        source="timer",
+    )
+    service = TimeService(AsyncMock(), user_id)
+    service.time_repo.get_by_id = AsyncMock(return_value=entry)
+
+    async def mock_stop_timer(_entry_id: uuid.UUID, ended_at: datetime | None = None) -> TimeEntry:
+        entry.ended_at = ended_at or datetime.now(UTC)
+        entry.duration_min = 24
+        return entry
+
+    service.time_repo.stop_timer = AsyncMock(side_effect=mock_stop_timer)
+    service.time_repo.get_task_actual_min_sum = AsyncMock(return_value=24)
+    service.task_repo.get_by_id = AsyncMock(
+        return_value=Task(
+            id=task_id,
+            user_id=user_id,
+            workspace_id=uuid.uuid4(),
+            title="Focused work",
+            status="in_progress",
+        )
+    )
+    service.task_event_repo.record_event = AsyncMock()
+    service.ple_collector.on_time_session = AsyncMock()
+
+    stopped = await service.stop_timer(entry.id, ended_at=ended_at)
+
+    assert stopped.duration_min == 24
+    service.task_event_repo.record_event.assert_awaited_once()
+    assert service.task_event_repo.record_event.await_args.kwargs["event_type"] == "timer_stopped"
+    service.ple_collector.on_time_session.assert_awaited_once_with(
+        user_id=user_id,
+        task_id=task_id,
+        duration_min=24,
+        category=None,
+    )
 
 
 # Hypothesis property-based state machine test for actual_min = sum(durations)

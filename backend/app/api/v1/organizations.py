@@ -57,7 +57,9 @@ async def create_organization(
     service = OrganizationService(db)
     organization = await service.create_organization(auth.user.id, body.name)
     membership = await service.require_membership(auth.user.id, organization.id)
-    return _organization_response(organization.id, organization.name, organization.slug, membership[1])
+    return _organization_response(
+        organization.id, organization.name, organization.slug, membership[1]
+    )
 
 
 @router.get("/organizations/mine", response_model=list[OrganizationResponse])
@@ -155,7 +157,9 @@ async def grant_professional_consent(
     return _organization_response(organization.id, organization.name, organization.slug, membership)
 
 
-@router.post("/organizations/{organization_id}/consent/revoke", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/organizations/{organization_id}/consent/revoke", status_code=status.HTTP_204_NO_CONTENT
+)
 async def revoke_professional_consent(
     organization_id: uuid.UUID,
     auth: Annotated[AuthContext, Depends(get_auth_context)],

@@ -74,7 +74,9 @@ def route_intent(query: str, ref_date: date | None = None) -> IntentPlan:
     plan.end_date = end_date
 
     # 1. Greetings (conversational intent)
-    if re.search(r"^(hi|hello|hey|howdy|good morning|good afternoon|good evening|yo|sup|greetings)\b", q):
+    if re.search(
+        r"^(hi|hello|hey|howdy|good morning|good afternoon|good evening|yo|sup|greetings)\b", q
+    ):
         plan.intents.append("GREETING")
 
     # 2. Capabilities & Help
@@ -198,7 +200,17 @@ def route_intent(query: str, ref_date: date | None = None) -> IntentPlan:
 
     # 9. Notes / knowledge / default vault search
     if not plan.intents or any(
-        k in q for k in ["note", "notes", "decision", "decisions", "document", "documents", "what was", "tell me about"]
+        k in q
+        for k in [
+            "note",
+            "notes",
+            "decision",
+            "decisions",
+            "document",
+            "documents",
+            "what was",
+            "tell me about",
+        ]
     ):
         plan.intents.append("VAULT_SEARCH")
         plan.needs_semantic = True

@@ -1,7 +1,7 @@
 """Refresh token model with rotation and family reuse detection (doc 03 §3.1, doc 12 §2)."""
 
-from datetime import datetime
 import uuid
+from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, LargeBinary
 from sqlalchemy.dialects.postgresql import UUID
@@ -16,9 +16,7 @@ class RefreshToken(Base):
     """Opaque 256-bit refresh token entity storing SHA-256 hash."""
 
     __tablename__ = "refresh_tokens"
-    __table_args__ = (
-        Index("ix_refresh_tokens_family_id", "family_id"),
-    )
+    __table_args__ = (Index("ix_refresh_tokens_family_id", "family_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -64,4 +62,3 @@ class RefreshToken(Base):
         default=utc_now,
         nullable=False,
     )
-

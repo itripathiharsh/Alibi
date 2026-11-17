@@ -84,4 +84,3 @@ class Job(Base):
         DateTime(timezone=True),
         nullable=True,
     )
-

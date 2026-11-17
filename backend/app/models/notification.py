@@ -1,7 +1,7 @@
 """Notification domain model (doc 03 §3.10, doc 01 §2.12)."""
 
-from datetime import datetime
 import uuid
+from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
@@ -67,4 +67,3 @@ class Notification(Base):
         default=utc_now,
         nullable=False,
     )
-

@@ -1,7 +1,7 @@
 """Task domain model (doc 03 §3.3)."""
 
-from datetime import date, datetime
 import uuid
+from datetime import date, datetime
 
 from sqlalchemy import (
     CheckConstraint,

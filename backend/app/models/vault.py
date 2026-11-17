@@ -1,8 +1,8 @@
 """Knowledge Vault and RAG Chat models (doc 03 §3.5/§3.8, doc 08)."""
 
+import uuid
 from datetime import date, datetime
 from typing import Any
-import uuid
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -106,9 +106,7 @@ class NoteEmbedding(Base):
     """384-dimensional vector embedding for note chunks (doc 03 §3.5)."""
 
     __tablename__ = "embeddings"
-    __table_args__ = (
-        Index("ix_embeddings_user_note", "user_id", "note_id"),
-    )
+    __table_args__ = (Index("ix_embeddings_user_note", "user_id", "note_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -146,9 +144,7 @@ class ChatThread(Base):
     """Conversation thread with the grounded assistant (doc 03 §3.8, doc 08 §4)."""
 
     __tablename__ = "chat_threads"
-    __table_args__ = (
-        Index("ix_chat_threads_user_created", "user_id", "created_at"),
-    )
+    __table_args__ = (Index("ix_chat_threads_user_created", "user_id", "created_at"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -225,4 +221,3 @@ class ChatMessage(Base):
     )
 
     thread: Mapped["ChatThread"] = relationship("ChatThread", back_populates="messages")
-

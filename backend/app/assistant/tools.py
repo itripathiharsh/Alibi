@@ -156,18 +156,19 @@ class AssistantSQLTools:
         numbers: list[int | float] = [len(tasks)]
 
         for t in tasks:
+            estimate_min = t.estimate_final_min or t.estimate_user_min or 0
             item = {
                 "id": str(t.id),
                 "title": t.title,
                 "deadline": t.deadline_at.isoformat() if t.deadline_at else None,
                 "priority": t.priority,
                 "status": t.status,
-                "estimate_min": t.estimate_final_min or t.estimate_user_min or 0,
+                "estimate_min": estimate_min,
             }
             if t.priority is not None:
                 numbers.append(t.priority)
-            if item["estimate_min"]:
-                numbers.append(item["estimate_min"])
+            if estimate_min:
+                numbers.append(estimate_min)
 
             if t.deadline_at and t.deadline_at.date() < ref_date:
                 overdue.append(item)

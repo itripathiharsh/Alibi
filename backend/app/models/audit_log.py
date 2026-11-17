@@ -1,8 +1,8 @@
 """Append-only audit log domain model (doc 03 §3.10, doc 12 §7)."""
 
+import uuid
 from datetime import datetime
 from typing import Any
-import uuid
 
 from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -49,4 +49,3 @@ class AuditLog(Base):
         nullable=False,
         index=True,
     )
-

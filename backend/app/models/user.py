@@ -1,8 +1,8 @@
 """User domain model (doc 03 §3.1)."""
 
-from datetime import datetime
-from typing import Any
 import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import DateTime, String
 from sqlalchemy.dialects.postgresql import CITEXT, JSONB, UUID
@@ -11,6 +11,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.time import utc_now
 from app.core.uuid import generate_uuid7
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.device import Device
+    from app.models.workspace import Workspace
 
 
 class User(Base):
@@ -64,6 +68,9 @@ class User(Base):
     )
 
     # Relationships
-    devices: Mapped[list["Device"]] = relationship("Device", back_populates="user", cascade="all, delete-orphan")  # type: ignore[name-defined]
-    workspaces: Mapped[list["Workspace"]] = relationship("Workspace", back_populates="user", cascade="all, delete-orphan")  # type: ignore[name-defined]
-
+    devices: Mapped[list["Device"]] = relationship(
+        "Device", back_populates="user", cascade="all, delete-orphan"
+    )
+    workspaces: Mapped[list["Workspace"]] = relationship(
+        "Workspace", back_populates="user", cascade="all, delete-orphan"
+    )

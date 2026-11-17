@@ -34,9 +34,7 @@ async def create_note(
         auth.user.id, body.category_id
     ):
         raise NotFoundError("Category not found.")
-    if body.project_id and not await ProjectRepository(db, auth.user.id).get_by_id(
-        body.project_id
-    ):
+    if body.project_id and not await ProjectRepository(db, auth.user.id).get_by_id(body.project_id):
         raise NotFoundError("Project not found.")
     service = VaultIngestionService(db)
     note = await service.ingest_note(

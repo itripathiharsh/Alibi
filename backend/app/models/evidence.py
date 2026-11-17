@@ -75,4 +75,3 @@ class Evidence(Base, SyncableMixin):
         default=False,
         nullable=False,
     )
-

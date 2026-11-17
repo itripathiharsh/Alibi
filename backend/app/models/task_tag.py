@@ -30,4 +30,3 @@ class TaskTag(Base, SyncableMixin):
         nullable=False,
         index=True,
     )
-

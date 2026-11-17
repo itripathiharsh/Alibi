@@ -1,6 +1,7 @@
 """Workspace domain model (doc 03 §3.2)."""
 
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
@@ -8,6 +9,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.uuid import generate_uuid7
 from app.db.base import Base, SyncableMixin
+
+if TYPE_CHECKING:
+    from app.models.category import Category
+    from app.models.user import User
 
 
 class Workspace(Base, SyncableMixin):
@@ -36,6 +41,7 @@ class Workspace(Base, SyncableMixin):
         nullable=False,
     )
 
-    user: Mapped["User"] = relationship("User", back_populates="workspaces")  # type: ignore[name-defined]
-    categories: Mapped[list["Category"]] = relationship("Category", back_populates="workspace", cascade="all, delete-orphan")  # type: ignore[name-defined]
-
+    user: Mapped["User"] = relationship("User", back_populates="workspaces")
+    categories: Mapped[list["Category"]] = relationship(
+        "Category", back_populates="workspace", cascade="all, delete-orphan"
+    )

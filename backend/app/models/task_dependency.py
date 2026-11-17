@@ -36,4 +36,3 @@ class TaskDependency(Base, SyncableMixin):
         nullable=False,
         index=True,
     )
-

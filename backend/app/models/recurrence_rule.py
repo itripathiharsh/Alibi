@@ -1,8 +1,8 @@
 """RecurrenceRule domain model (doc 03 §3.3)."""
 
+import uuid
 from datetime import date, datetime
 from typing import Any
-import uuid
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -59,4 +59,3 @@ class RecurrenceRule(Base, SyncableMixin):
         default="user",
         nullable=False,
     )
-

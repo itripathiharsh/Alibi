@@ -1,9 +1,9 @@
 """Personal Learning Engine domain models (doc 03 §3.6, doc 07)."""
 
+import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
-import uuid
 
 from sqlalchemy import (
     Boolean,
@@ -19,7 +19,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.time import utc_now
 from app.core.uuid import generate_uuid7
@@ -90,7 +90,9 @@ class LearnedPattern(Base):
             "status IN ('candidate','active','confirmed','dismissed','stale')",
             name="chk_learned_pattern_status",
         ),
-        UniqueConstraint("user_id", "pattern_type", "key", name="uq_learned_patterns_user_type_key"),
+        UniqueConstraint(
+            "user_id", "pattern_type", "key", name="uq_learned_patterns_user_type_key"
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -338,4 +340,3 @@ class MLModel(Base):
         default=True,
         nullable=False,
     )
-

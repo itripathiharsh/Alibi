@@ -39,4 +39,3 @@ class Tag(Base, SyncableMixin):
         String(50),
         nullable=False,
     )
-

@@ -49,3 +49,17 @@ def test_deterministic_answer_empty_context_refusal() -> None:
     )
     assert "I don't have records about that for the requested period." in answer
     assert sources == []
+
+
+def test_empty_completed_task_result_does_not_hide_vault_records() -> None:
+    answer, sources = generate_deterministic_answer(
+        tool_results=[
+            {"tool_name": "completed_tasks", "data": [], "summary": "No completed tasks"}
+        ],
+        vault_sources=[{"title": "Project notes", "snippet": "Recorded project decisions."}],
+        query="What did I complete?",
+        intents=["COMPLETED_TASKS", "VAULT_SEARCH"],
+    )
+
+    assert "Project notes" in answer
+    assert any(source["type"] == "vault_note" for source in sources)

@@ -1,8 +1,8 @@
 """Sync Operations and Conflicts domain models (doc 03 §3.10, doc 11)."""
 
+import uuid
 from datetime import datetime
 from typing import Any
-import uuid
 
 from sqlalchemy import (
     CheckConstraint,
@@ -101,4 +101,3 @@ class SyncConflict(Base):
         default=utc_now,
         nullable=False,
     )
-

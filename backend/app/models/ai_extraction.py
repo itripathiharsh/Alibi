@@ -1,8 +1,8 @@
 """AIExtraction domain model (doc 03 §3.3)."""
 
+import uuid
 from datetime import datetime
 from typing import Any
-import uuid
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -91,4 +91,3 @@ class AIExtraction(Base):
         JSONB,
         nullable=True,
     )
-

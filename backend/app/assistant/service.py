@@ -122,7 +122,9 @@ class AssistantService:
         # 2. Intent Routing
         plan = route_intent(clean_msg)
         # Pre-fetch pending tasks for greeting and breakdown intents
-        if ("GREETING" in plan.intents or "BREAKDOWN" in plan.intents) and "PENDING_OVERDUE" not in plan.intents:
+        if (
+            "GREETING" in plan.intents or "BREAKDOWN" in plan.intents
+        ) and "PENDING_OVERDUE" not in plan.intents:
             plan.intents.append("PENDING_OVERDUE")
 
         tools = AssistantSQLTools(self.session, user_id=user_id)
@@ -200,7 +202,9 @@ class AssistantService:
         model_name = "grounded_v1"
 
         # 5. Optional LLM Synthesis with Grounding Validation if provider available (doc 08 §3)
-        if (sources or tool_results_list) and not any(i in plan.intents for i in ["GREETING", "CAPABILITIES"]):
+        if (sources or tool_results_list) and not any(
+            i in plan.intents for i in ["GREETING", "CAPABILITIES"]
+        ):
             try:
                 from app.ai.gateway import AIGateway
                 from app.ai.types import LLMRequest, Message, Operation
@@ -209,7 +213,9 @@ class AssistantService:
                 gateway = AIGateway(self.session)
                 context_lines = []
                 for s in sources:
-                    context_lines.append(f"[{s['alias']}] {s.get('title', '')}: {s.get('snippet', '')}")
+                    context_lines.append(
+                        f"[{s['alias']}] {s.get('title', '')}: {s.get('snippet', '')}"
+                    )
                 context_str = "\n".join(context_lines)
 
                 system_prompt = (

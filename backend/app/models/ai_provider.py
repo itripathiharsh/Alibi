@@ -1,9 +1,9 @@
 """AI Provider Settings and Usage Log models (doc 03 §3.8)."""
 
+import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
-import uuid
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     Boolean,
@@ -22,6 +22,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.time import utc_now
 from app.core.uuid import generate_uuid7
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class AIProviderSetting(Base):
@@ -102,7 +105,7 @@ class AIProviderSetting(Base):
         nullable=False,
     )
 
-    user: Mapped["User"] = relationship("User")  # type: ignore[name-defined]
+    user: Mapped["User"] = relationship("User")
 
 
 class AIUsageLog(Base):
@@ -177,4 +180,3 @@ class AIUsageLog(Base):
         nullable=False,
         index=True,
     )
-
