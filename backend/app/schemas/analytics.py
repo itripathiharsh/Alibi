@@ -74,6 +74,19 @@ class ConsistencyHeatmapItem(BaseModel):
     minutes_logged: int
 
 
+class TaskActivityItem(BaseModel):
+    task_id: uuid.UUID
+    title: str
+    status: str
+    period_actual_min: int
+    actual_min: int
+    estimate_min: int | None
+    deadline_at: datetime | None
+    completed_at: datetime | None
+    task_score: int | None
+    score_basis: list[str]
+
+
 class EstVsActualItem(BaseModel):
     task_id: uuid.UUID
     title: str

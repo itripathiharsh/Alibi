@@ -1,4 +1,4 @@
-"""TimeEntry repository implementing time tracking and single running timer enforcement."""
+"""TimeEntry repository implementing independent task timers and time logging."""
 
 import uuid
 from collections.abc import Sequence
@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import utc_now
+from app.core.uuid import generate_uuid7
 from app.database.repository import BaseRepository
 from app.models.time_entry import TimeEntry
 
@@ -19,9 +20,38 @@ class TimeEntryRepository(BaseRepository[TimeEntry]):
         super().__init__(TimeEntry, session, user_id)
 
     async def get_running_timer(self) -> TimeEntry | None:
-        """Fetch the user's currently active (running) timer if one exists."""
+        """Fetch the most recently started active timer for legacy clients."""
+        stmt = (
+            select(TimeEntry)
+            .where(
+                TimeEntry.user_id == self.user_id,
+                TimeEntry.ended_at.is_(None),
+                TimeEntry.deleted_at.is_(None),
+            )
+            .order_by(TimeEntry.started_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def list_running_timers(self) -> Sequence[TimeEntry]:
+        """Fetch every active timer owned by this user, oldest first."""
+        stmt = (
+            select(TimeEntry)
+            .where(
+                TimeEntry.user_id == self.user_id,
+                TimeEntry.ended_at.is_(None),
+                TimeEntry.deleted_at.is_(None),
+            )
+            .order_by(TimeEntry.started_at.asc())
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_running_timer_for_task(self, task_id: uuid.UUID) -> TimeEntry | None:
+        """Fetch the active timer for one task, if present."""
         stmt = select(TimeEntry).where(
             TimeEntry.user_id == self.user_id,
+            TimeEntry.task_id == task_id,
             TimeEntry.ended_at.is_(None),
             TimeEntry.deleted_at.is_(None),
         )
@@ -37,7 +67,7 @@ class TimeEntryRepository(BaseRepository[TimeEntry]):
         """Start a new running timer for a task."""
         now = started_at or utc_now()
         entry = TimeEntry(
-            id=entry_id or uuid.uuid4(),
+            id=entry_id or generate_uuid7(),
             user_id=self.user_id,
             task_id=task_id,
             started_at=now,
@@ -81,7 +111,7 @@ class TimeEntryRepository(BaseRepository[TimeEntry]):
     ) -> TimeEntry:
         """Create a completed manual time entry."""
         entry = TimeEntry(
-            id=entry_id or uuid.uuid4(),
+            id=entry_id or generate_uuid7(),
             user_id=self.user_id,
             task_id=task_id,
             started_at=started_at,

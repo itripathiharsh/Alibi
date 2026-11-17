@@ -212,3 +212,25 @@ Schema migration and new organization APIs are required. Public organization sig
 
 ### Owner approval
 The owner requested this product model on 2026-11-17, including professional-only reporting for owners/team leads and future parent access only on consent.
+
+## ADR-025 — Independent task timers and task-level execution score
+- Status: Accepted (owner)
+- Date: 2026-11-18
+- Requirement IDs affected: FR-TASK-021, FR-CAL-009, FR-DASH-007
+- Supersedes: the per-user single-running-timer constraint for active task timers; the overall productivity score formula is unchanged.
+
+### Context
+The owner requested concurrent task tracking, independent elapsed time and scores, a two-hour check-in, and a GitHub-style activity graph. The owner explicitly chose a separate per-task score rather than changing the existing productivity score.
+
+### Decision
+1. Permit at most one active timer per `(user_id, task_id)` while allowing different tasks to run simultaneously. Preserve the legacy `/time-entries/running` response and add `/running/all` for updated clients.
+2. Schedule a private Android local notification two hours after each timer starts. Do not include task titles in lock-screen notification text. Stopping a timer cancels only its own reminder. Notification permission is optional and never blocks logging.
+3. A completed task's separate execution score averages its available deadline result (100 if on time, else 0) and estimate accuracy (`max(0, 100 × (1 − relative deviation))`). Missing targets are omitted; no available target or an incomplete task yields null. This score does not change the overall productivity score and grants no bonus for more hours.
+4. Show period and lifetime time per task and a year of SQL-derived daily activity. Concurrent timer minutes are task effort and can exceed elapsed wall-clock time.
+5. Remove repeated server auto-discovery from ordinary mobile startup and page loads; keep explicit discovery in Settings. Signup renders the form without setup-status polling.
+
+### Consequences
+Migration 0013 replaces the partial unique index and has a guarded downgrade. The Expo notifications module is already in the approved stack; its SDK-compatible package is added to mobile. A sleeping free Render instance can still delay the first actual API request; this change removes repeated client probes but does not keep the host warm.
+
+### Owner approval
+Owner requested concurrent independent timers, two-hour notifications and per-task scoring on 2026-11-18, and selected a separate task score.

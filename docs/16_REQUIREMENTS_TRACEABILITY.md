@@ -36,6 +36,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-TASK-014 | Task origin recorded: manual, voice, ai_recommendation, meeting, external_assignment, r… | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-015 | Activity history: every state change is an append-only `task_events` row, viewable per … | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-016 | Time tracking: start/stop timer and manual time entries; actual time = sum of entries | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
+| FR-TASK-021 | Independent per-task timers; different tasks may run concurrently, same-task duplicate timer rejected | M | M13 | 03§3.3, 04§4.5 | backend/tests/unit/test_time_tracking.py; mobile tasks screen | ◐ |
 | FR-TASK-017 | Task dependencies (blocked-by) | S | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-018 | Recurring responsibilities via RRULE; instances generated ahead (14 days) | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-019 | Search and filter tasks by text, category, project, tag, status, date | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
@@ -48,12 +49,14 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-CAL-006 | Availability computation from working hours − fixed events − accepted blocks | M | M6 | 09, 04§4.8 | backend/tests/integration/calendar/ + e2e | ☑ |
 | FR-CAL-007 | Drag/move work blocks manually (owner action, never AI) | S | M8 | 09, 04§4.8 | backend/tests/integration/calendar/ + e2e | ☑ |
 | FR-CAL-008 | One-way import from Google Calendar (ICS URL or OAuth) | C | M8 | 09, 04§4.8 | backend/tests/integration/calendar/ + e2e | ☑ |
+| FR-CAL-009 | Local two-hour check-in reminder per active task timer; cancellation follows that timer | M | M13 | 04§4.5, ADR-025 | apps/mobile/src/lib/timer-reminders.ts | ◐ |
 | FR-DASH-001 | Periods: daily, weekly, monthly, custom range (Asia/Kolkata day boundaries) | M | M3 | 10 | backend/tests/unit/analytics/ + integration/analytics/ | ☑ |
 | FR-DASH-002 | Metrics: productivity score, total time, completed, pending, overdue, completion rate, … | M | M3 | 10 | backend/tests/unit/analytics/ + integration/analytics/ | ☑ |
 | FR-DASH-003 | Charts: completion, productivity trend, time distribution, daily timeline, consistency … | M | M3 | 10 | backend/tests/unit/analytics/ + integration/analytics/ | ☑ |
 | FR-DASH-004 | Every metric computed from DB records via documented formulas (doc 10) | M | M3 | 10 | backend/tests/unit/analytics/ + integration/analytics/ | ☑ |
 | FR-DASH-005 | Productivity score transparent: UI shows components and formula; no reward for long hou… | M | M3 | 10 | backend/tests/unit/analytics/ + integration/analytics/ | ☑ |
 | FR-DASH-006 | Metrics with insufficient data show "Not enough data" instead of 0 | M | M3 | 10 | backend/tests/unit/analytics/ + integration/analytics/ | ☑ |
+| FR-DASH-007 | Per-task recorded time and score plus 365-day activity heatmap | M | M13 | 10, 04§4.10 | backend/tests/unit/test_task_score.py; backend/tests/integration/test_analytics_api.py | ◐ |
 | FR-LEARN-001 | Behavioural event collector records all learning signals (doc 07 §2) | M | M5 | 07 | backend/tests/unit/learning/ + learning_eval/ | ☑ |
 | FR-LEARN-002 | Routine discovery distinguishes routines from bursts | M | M5 | 07 | backend/tests/unit/learning/ + learning_eval/ | ☑ |
 | FR-LEARN-003 | Task understanding: likely category, project, similar tasks, duration, priority, depend… | M | M5 | 07 | backend/tests/unit/learning/ + learning_eval/ | ☑ |

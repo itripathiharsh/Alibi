@@ -23,7 +23,7 @@ import {
 import theme from "../../lib/theme";
 import { BrandHeader, SunriseArt } from "../../components/brand-ui";
 import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
-import { getServerUrl, autoDetectServer } from "../../lib/config";
+import { getServerUrl } from "../../lib/config";
 
 interface ScheduledTask {
   id: string;
@@ -43,7 +43,6 @@ export default function CalendarScreen() {
 
   const fetchCalendarTasks = useCallback(async () => {
     try {
-      await autoDetectServer();
       const token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
       if (!token) return;

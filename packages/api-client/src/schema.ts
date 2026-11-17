@@ -732,6 +732,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/time-entries/running/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Running Timers
+         * @description List all independent active task timers for the current account.
+         */
+        get: operations["list_running_timers_api_v1_time_entries_running_all_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/time-entries/{entry_id}": {
         parameters: {
             query?: never;
@@ -811,6 +831,26 @@ export interface paths {
          * @description Soft delete an evidence attachment.
          */
         delete: operations["delete_evidence_api_v1_evidence__evidence_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/task-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Task Activity
+         * @description Return task-level actual time and transparent score where evidence exists.
+         */
+        get: operations["get_task_activity_api_v1_analytics_task_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3712,6 +3752,32 @@ export interface components {
              */
             created_at: string;
         };
+        /** TaskActivityItem */
+        TaskActivityItem: {
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            /** Period Actual Min */
+            period_actual_min: number;
+            /** Actual Min */
+            actual_min: number;
+            /** Estimate Min */
+            estimate_min: number | null;
+            /** Deadline At */
+            deadline_at: string | null;
+            /** Completed At */
+            completed_at: string | null;
+            /** Task Score */
+            task_score: number | null;
+            /** Score Basis */
+            score_basis: string[];
+        };
         /** TaskCaptureRequest */
         TaskCaptureRequest: {
             /** Raw Input */
@@ -5620,6 +5686,26 @@ export interface operations {
             };
         };
     };
+    list_running_timers_api_v1_time_entries_running_all_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeEntryResponse"][];
+                };
+            };
+        };
+    };
     delete_time_entry_api_v1_time_entries__entry_id__delete: {
         parameters: {
             query?: never;
@@ -5763,6 +5849,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_task_activity_api_v1_analytics_task_activity_get: {
+        parameters: {
+            query?: {
+                /** @description daily, weekly, monthly, or custom */
+                period?: "daily" | "weekly" | "monthly" | "custom";
+                from?: string | null;
+                to?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskActivityItem"][];
+                };
             };
             /** @description Validation Error */
             422: {

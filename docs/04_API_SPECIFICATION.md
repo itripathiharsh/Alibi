@@ -87,12 +87,13 @@ Category body: `{name, sharing_class, external_ai_allowed, color}`.
 | GET/POST | /recurrences · PATCH/DELETE /recurrences/{id} | RRULE validated with `dateutil.rrule` |
 
 ### 4.5 Time tracking
-| POST | /time-entries/start | `{id, task_id, started_at}` → 409 if a timer is running (body has running entry) |
+| POST | /time-entries/start | `{id, task_id, started_at}` → 409 only if this task already has an active timer; other task timers are independent |
 | POST | /time-entries/{id}/stop | `{ended_at}` |
 | POST | /time-entries | manual `{id, task_id, started_at, ended_at|duration_min, note}` |
 | GET | /time-entries | `task_id`, `from`, `to` |
 | PATCH/DELETE | /time-entries/{id} | |
 | GET | /time-entries/running | current timer or null |
+| GET | /time-entries/running/all | every active timer for the authenticated user |
 
 ### 4.6 Evidence & uploads
 `POST /tasks/{id}/evidence` (multipart file or JSON link/text; MIME allow-list: pdf, png, jpg, webp, docx, xlsx, txt, md, csv; ≤ 25 MB in local mode, **≤ 2 MB in hosted mode with a 250 MB total quota → 413 `payload_too_large` / `storage_quota_exceeded`**, ADR-020; limits come from config), `GET /evidence/{id}/download` (auth, `Content-Disposition: attachment`), `DELETE /evidence/{id}`.
@@ -121,6 +122,7 @@ Hosted mode (ADR-020): these endpoints return 503 `ai_unavailable` unless extern
 | GET | /analytics/charts/completion-trend | `period`, `from`, `to` → list of `{date, completed_count}` |
 | GET | /analytics/charts/time-distribution | `period`, `from`, `to` → list of `{category_id, category_name, category_color, total_min, percentage}` |
 | GET | /analytics/charts/consistency-heatmap | `days` (up to 366) → list of `{date, completed_count, minutes_logged}` |
+| GET | /analytics/task-activity | `period`, `from`, `to`, `limit` → per-task actual minutes and task score evidence |
 | GET | /analytics/charts/est-vs-actual | `period`, `from`, `to` → list of `{task_id, title, category_name, estimate_min, actual_min, ratio}` |
 | GET | /analytics/charts/category-workload | `period`, `from`, `to` → list of `{category_id, category_name, category_color, completed_count, open_count, total_min}` |
 

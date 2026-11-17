@@ -107,7 +107,7 @@ time_logged, subtask_changed, evidence_added, prediction_feedback, deleted, rest
 `actor CHECK in ('user','ai','system','sync')`, `device_id`, `occurred_at` (client time), `recorded_at` (server). Index `(task_id, occurred_at)`.
 
 **time_entries** ⟳: `id`, `user_id`, `task_id`, `started_at`, `ended_at NULL` (running timer), `duration_min int NULL` (computed on stop; or manual),
-`source CHECK in ('timer','manual','pomodoro')`, `note`. Constraint: at most one running timer per user (partial unique index on `user_id WHERE ended_at IS NULL AND deleted_at IS NULL`).
+`source CHECK in ('timer','manual','pomodoro')`, `note`. Constraint: at most one running timer per task and user (partial unique index on `(user_id, task_id) WHERE ended_at IS NULL AND deleted_at IS NULL`); different tasks may run concurrently. Each task's actual minutes sum its own entries. When timers overlap, summed task effort can exceed wall-clock time.
 CHECK `ended_at > started_at`, `duration_min BETWEEN 1 AND 1440`.
 
 **evidence** ⟳: `id`, `user_id`, `task_id`, `kind CHECK in ('file','link','text')`, `title`, `url`, `text`, `storage_key`, `mime`, `size_bytes`, `sha256`, `is_deliverable bool`.

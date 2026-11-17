@@ -15,11 +15,32 @@ from app.schemas.analytics import (
     ProductivityScoreResponse,
     ScoreFormulaResponse,
     SummaryMetricsResponse,
+    TaskActivityItem,
     TimeDistributionItem,
 )
 from app.services.analytics_service import AnalyticsService
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
+
+
+@router.get("/task-activity", response_model=list[TaskActivityItem])
+async def get_task_activity(
+    period: PeriodType = Query("weekly", description="daily, weekly, monthly, or custom"),
+    from_date: date | None = Query(None, alias="from"),
+    to_date: date | None = Query(None, alias="to"),
+    limit: int = Query(20, ge=1, le=100),
+    auth: AuthContext = Depends(get_auth_context),
+    session: AsyncSession = Depends(get_db),
+) -> list[TaskActivityItem]:
+    """Return task-level actual time and transparent score where evidence exists."""
+    service = AnalyticsService(session)
+    return await service.get_task_activity(
+        user_id=auth.user_id,
+        period=period,
+        from_date=from_date,
+        to_date=to_date,
+        limit=limit,
+    )
 
 
 @router.get("/summary", response_model=SummaryMetricsResponse)

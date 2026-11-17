@@ -5,8 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { Pressable, StyleSheet, Text, View, Image } from "react-native";
 import { User } from "lucide-react-native";
 import theme from "../lib/theme";
-import { autoDetectServer } from "../lib/config";
-import { ensureAuthenticated, getSetupStatus } from "../lib/auth";
+import { getAccessToken, getRefreshToken } from "../lib/auth";
 
 export default function RootLayout() {
   const router = useRouter();
@@ -16,17 +15,17 @@ export default function RootLayout() {
   useEffect(() => {
     let cancelled = false;
     const guardRoute = async () => {
-      await autoDetectServer();
-      const token = await ensureAuthenticated();
-      if (cancelled) return;
       const isAuthRoute = firstSegment === "login" || firstSegment === "signup";
-      if (token) {
+      // Route from local session state immediately. Refresh/auth API calls happen
+      // in the screen data loaders so a sleeping hosted backend cannot block the shell.
+      const [accessToken, refreshToken] = await Promise.all([getAccessToken(), getRefreshToken()]);
+      if (cancelled) return;
+      if (accessToken || refreshToken) {
         if (isAuthRoute) router.replace("/(tabs)");
         return;
       }
       if (isAuthRoute) return;
-      const needsSetup = await getSetupStatus();
-      if (!cancelled) router.replace(needsSetup ? "/signup" : "/login");
+      router.replace("/login");
     };
     void guardRoute();
     return () => { cancelled = true; };

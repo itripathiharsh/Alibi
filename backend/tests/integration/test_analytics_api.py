@@ -5,7 +5,7 @@ and chart endpoints against live database fixtures.
 """
 
 import uuid
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import uuid6
@@ -30,6 +30,59 @@ async def test_analytics_formula_endpoint(client):
     assert "weights" in data
     assert data["weights"]["completion_weight"] == 0.5
     assert len(data["rules"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_fr_dash_007_task_activity_returns_user_scoped_time_and_score(client, db_session):
+    """Task activity returns recorded durations and task scoring evidence for this user."""
+    now = datetime.now(UTC)
+    user = User(
+        id=uuid6.uuid7(),
+        email=f"task-activity-{uuid.uuid4().hex[:6]}@example.com",
+        display_name="Task Activity User",
+        password_hash="hash",
+    )
+    workspace = Workspace(id=uuid6.uuid7(), user_id=user.id, name="Personal", is_default=True)
+    device = Device(id=uuid6.uuid7(), user_id=user.id, name="Task Activity Test", platform="web")
+    db_session.add_all([user, workspace, device])
+    await db_session.flush()
+    task = Task(
+        id=uuid6.uuid7(),
+        user_id=user.id,
+        workspace_id=workspace.id,
+        title="Prepare project review",
+        status="completed",
+        priority=2,
+        completed_at=now - timedelta(minutes=10),
+        deadline_at=now + timedelta(hours=1),
+        estimate_final_min=60,
+        actual_min=60,
+    )
+    db_session.add(task)
+    await db_session.flush()
+    db_session.add(
+        TimeEntry(
+            id=uuid6.uuid7(),
+            user_id=user.id,
+            task_id=task.id,
+            started_at=now - timedelta(minutes=70),
+            ended_at=now - timedelta(minutes=10),
+            duration_min=60,
+            source="timer",
+        )
+    )
+    await db_session.commit()
+    headers = {
+        "Authorization": f"Bearer {create_access_token(user_id=user.id, device_id=device.id)}"
+    }
+
+    res = await client.get("/api/v1/analytics/task-activity?period=weekly", headers=headers)
+    assert res.status_code == 200
+    result = next(item for item in res.json() if item["task_id"] == str(task.id))
+    assert result["period_actual_min"] == 60
+    assert result["actual_min"] == 60
+    assert result["task_score"] == 100
+    assert result["score_basis"] == ["deadline_met", "estimate_accuracy"]
 
 
 @pytest.mark.asyncio

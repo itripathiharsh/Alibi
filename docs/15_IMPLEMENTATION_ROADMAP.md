@@ -383,7 +383,7 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M2b Early hosted deploy �
 ## M13 — Personal Android refresh, public signup, and organization web portal
 **Goal:** deliver the reference-led personal Android app and transition authenticated web into a professional-only organization portal with explicit member consent.
 **Read first:** `AGENTS.md`; 00, 01, 02, 03, 04, 05, 10, 12, 14, 16; `IMPLEMENTATION_STATUS.md`; `KNOWN_ISSUES.md`; `DECISIONS.md` ADR-020, ADR-022, ADR-023, ADR-024; the M13 plan; existing app, API, analytics and sharing code.
-**Entry criteria:** M12/v1.0 release complete; owner approved six mobile tabs, public individual-account signup, and the organization/consent product model (ADR-022/023/024). Schema and API changes are now in scope; no sync protocol or dependency change is planned.
+**Entry criteria:** M12/v1.0 release complete; owner approved six mobile tabs, public individual-account signup, and the organization/consent product model (ADR-022/023/024). Schema and API changes are in scope; sync protocol changes remain out of scope.
 **Tasks**
 1. Establish shared mobile tokens, branded header/backdrop, typography, and card treatments.
 2. Refresh Home, Tasks, Calendar, Insights, Assistant, and Settings; add API-backed Vault and Profile screens.
@@ -394,6 +394,7 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M2b Early hosted deploy �
 7. Replace authenticated web individual dashboard with a role-aware organization portal (overview, people/invites, insights, settings); keep public landing routes unchanged.
 8. Add public web invite review with explicit member consent and a self-service sharing/leave page; ensure owners and team leads never see non-professional data or unconsented history.
 9. Update generated API client, UI guidance, ADRs, status and known issues; do not copy screenshot example data.
+10. Add independent task timers, private two-hour on-device timer check-ins, task-level activity scoring and a year-long consistency heatmap (ADR-025).
 
 **AC**
 - AC-M13-1 Six requested destinations render in the requested order with clear selected state and accessible labels.
@@ -409,6 +410,10 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M2b Early hosted deploy �
 - AC-M13-11 Organization overview, people and insight pages use real APIs and SQL metrics; all team-lead/owner queries require active membership and filter professional class in SQL.
 - AC-M13-12 No task detail, description, notes, attachments, personal, academic, learning, uncategorized or pre-consent activity is exposed to the organization.
 - AC-M13-13 Public landing pages remain unchanged; signed-in web accounts without organization access are directed to join/create guidance and the Android app.
+- AC-M13-14 Multiple distinct task timers can run independently; duplicate timers on one task are rejected; legacy single-timer API remains compatible.
+- AC-M13-15 Each timer has a private local two-hour check-in that is cancelled when that timer stops; denying notification permission does not block time tracking.
+- AC-M13-16 Insights uses SQL-backed per-task minutes and a separate documented score, plus a 365-day activity heatmap; empty history remains empty.
+- AC-M13-17 Signup form and authenticated shell render without a server-discovery/setup-status request; explicit server discovery remains a user action.
 
 **QA:** mobile/web/API typechecks, migration upgrade/downgrade, API and two-account consent/IDOR tests, Android build, and manual review of mobile consent plus web role routes. Mark complete only with evidence recorded in `IMPLEMENTATION_STATUS.md` and an M13 report.
 

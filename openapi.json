@@ -2362,6 +2362,37 @@
         ]
       }
     },
+    "/api/v1/time-entries/running/all": {
+      "get": {
+        "tags": [
+          "time-tracking"
+        ],
+        "summary": "List Running Timers",
+        "description": "List all independent active task timers for the current account.",
+        "operationId": "list_running_timers_api_v1_time_entries_running_all_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TimeEntryResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Running Timers Api V1 Time Entries Running All Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/time-entries/{entry_id}": {
       "delete": {
         "tags": [
@@ -2588,6 +2619,113 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/task-activity": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Task Activity",
+        "description": "Return task-level actual time and transparent score where evidence exists.",
+        "operationId": "get_task_activity_api_v1_analytics_task_activity_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly",
+                "custom"
+              ],
+              "type": "string",
+              "description": "daily, weekly, monthly, or custom",
+              "default": "weekly",
+              "title": "Period"
+            },
+            "description": "daily, weekly, monthly, or custom"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskActivityItem"
+                  },
+                  "title": "Response Get Task Activity Api V1 Analytics Task Activity Get"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -9999,6 +10137,98 @@
           "created_at"
         ],
         "title": "TagResponse"
+      },
+      "TaskActivityItem": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Task Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "period_actual_min": {
+            "type": "integer",
+            "title": "Period Actual Min"
+          },
+          "actual_min": {
+            "type": "integer",
+            "title": "Actual Min"
+          },
+          "estimate_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Min"
+          },
+          "deadline_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "task_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Score"
+          },
+          "score_basis": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Score Basis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "title",
+          "status",
+          "period_actual_min",
+          "actual_min",
+          "estimate_min",
+          "deadline_at",
+          "completed_at",
+          "task_score",
+          "score_basis"
+        ],
+        "title": "TaskActivityItem"
       },
       "TaskCaptureRequest": {
         "properties": {

@@ -6,6 +6,7 @@ Formulas are versioned (`formula_version`, currently `1`) and served by `/analyt
 ## 1. Period definitions (user tz, default Asia/Kolkata)
 - Day: `[00:00, 24:00)` local. Week: Monday–Sunday. Month: calendar month. Custom: inclusive dates, max 366 days.
 - A time entry spanning midnight is split proportionally across days.
+- Different tasks may have active timers at once. Each task's duration sums only its own entries; when timers overlap, task effort can exceed wall-clock time.
 - "In period" for tasks:
   - *Due in period*: `deadline_at` within period.
   - *Completed in period*: `completed_at` within period.
@@ -47,6 +48,14 @@ A reschedule is *reasonable* if made ≥ 24 h before the then-current deadline, 
 For O, a task with only reasonable reschedules is judged against its **final** deadline; otherwise against its **original** deadline.
 Test: task rescheduled once 3 days ahead and completed by new deadline → counts on-time.
 
+### 3.2 Per-task execution score (FR-DASH-007)
+This score is separate from the overall Productivity Score v1 above. It is calculated for an individual completed task only:
+- Deadline component: 100 when completed on or before the task deadline, otherwise 0.
+- Estimate component: `max(0, 100 × (1 − abs(actual_min − estimate_final_min) / estimate_final_min))`, only when both an estimate and recorded actual minutes exist. Untracked time is not interpreted as zero.
+- Average the available components equally. If the task has no deadline or final estimate, use only the available component. If neither exists, return null and show “No score target”. Incomplete tasks always return null.
+- Actual minutes are the sum of that task's logged entries. Working longer never adds points; time only affects comparison with the user's estimate.
+- Task activity reports expose both period-overlapping minutes and lifetime actual minutes, plus which score components were available.
+
 ## 4. Visualisations (FR-DASH-003)
 | Chart | Data endpoint | Type |
 |-------|---------------|------|
@@ -55,6 +64,7 @@ Test: task rescheduled once 3 days ahead and completed by new deadline → count
 | Time distribution | minutes by category | donut (web) / bar (mobile) |
 | Daily activity timeline | /analytics/timeline | horizontal time bands |
 | Consistency heatmap | /analytics/heatmap (≤ 1 year) | calendar heatmap |
+| Task focus and score | /analytics/task-activity | task duration bars + completed task score |
 | Estimated vs actual | per completed task (scatter) + per category (bar pairs) | scatter/bar |
 | Category progress | completed vs open per category | stacked bar |
 

@@ -1,9 +1,9 @@
 # Implementation Status
 
-_Last updated: 2026-11-17 by agent (M13 scope expanded by owner to include organization web portal; v1.0.0 remains released)_
+_Last updated: 2026-11-18 by agent (M13 task-time tracking and startup responsiveness work; v1.0.0 remains released)_
 
 ## Current milestone
-**M13 — Personal Android refresh, public signup, and organization web portal** · state: **In progress** · entry criteria: ✅ M12/v1.0 release complete; six-tab navigation, public signup, and organization/consent product model approved by owner (ADR-022/023/024)
+**M13 — Personal Android refresh, public signup, organization web portal, and time-tracking UX** · state: **In progress** · entry criteria: ✅ M12/v1.0 release complete; six-tab navigation, public signup, organization/consent product model, concurrent task timers, and separate task score approved by owner (ADR-022/023/024/025)
 
 ## Milestones
 | Milestone | State | Started | Completed | Tag | Report |
@@ -27,7 +27,7 @@ _Last updated: 2026-11-17 by agent (M13 scope expanded by owner to include organ
 States: Not started · Planning · In progress · Blocked · In QA · Complete.
 
 ## Requirement progress
-See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: **124 / 131 previously passing; FR-AUTH-007 remains unverified. FR-ORG-001..006 implementation is in progress and has no test evidence yet.**
+See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: **124 / 134 previously passing; the three FR-TASK-021/FR-CAL-009/FR-DASH-007 additions are in progress. FR-AUTH-007 remains unverified. FR-ORG-001..006 implementation is in progress and has no test evidence yet.**
 
 ## Latest test evidence
 | Date | Commit | Suite | Result | Link |
@@ -42,10 +42,17 @@ See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: **124 / 131 prev
 | 2026-11-16 | M2 Full CI | Milestone M2 CI Pipeline | 41 tests passed (Hypothesis + Golden 160 items 100% exact match), Next.js build clean, 5 pkgs typechecked | `make.ps1 ci` & `docs/milestones/M2_REPORT.md` |
 | 2026-11-16 | M12 Full CI | Release v1.0.0 Full CI Pipeline | 91 backend tests passed, 5 sync-core tests passed, 6 workspace packages typechecked, web Next.js standalone clean | `make.ps1 ci` & `docs/milestones/M12_REPORT.md` |
 | 2026-11-16 | Release Build | Mobile Android APK & UI Motion Release | Assembled debug APK (139.4 MB, Hermes, C++ CMake, full ABI support); Web & Mobile tactile animations; 100% checks green | `assembleDebug` & `D:\alibi\apps\mobile\android\app\build\outputs\apk\debug\app-debug.apk` |
+| 2026-11-18 | M13 time tracking | Targeted backend tests | 10 passed, including concurrent timer, task score, and analytics endpoint tests | `uv run python -m pytest tests/unit/test_task_score.py tests/unit/test_time_tracking.py tests/integration/test_analytics_api.py -q` |
+| 2026-11-18 | M13 time tracking | Mobile and API client typechecks | Mobile `tsc --noEmit` passed; OpenAPI export and API-client codegen/typecheck passed | `pnpm --filter @alibi/mobile typecheck`; `make.ps1 openapi`; `make.ps1 client` |
+| 2026-11-18 | M13 time tracking | Android release APK | `assembleRelease` passed; APK is 61.3 MiB, v2 signature verified, contains Expo Notifications and Android notification permissions; signed with the repository's debug keystore | `apps/mobile/android/gradlew.bat -p apps/mobile/android assembleRelease --max-workers=1`; `aapt dump permissions`; `apksigner verify` |
 
 ## Current work
 - M0–M12 remain complete; v1.0.0 remains the released baseline.
 - M13 is refreshing mobile Home, Tasks, Calendar, Insights, Vault, Profile, capture, and event surfaces.
+- M13 adds independent per-task timers, Android two-hour local reminders, SQL-backed task activity/scoring and a 365-day activity heatmap. The existing overall productivity score is unchanged. Signup renders without a server probe; normal app navigation no longer runs automatic host discovery.
+- M13 local migration `0013` applied successfully. Targeted backend tests passed (10); mobile typecheck, generated API client checks, and Android release assembly passed. Physical-device notification delivery remains to verify.
+- Android release APK now builds successfully and is copied to `apk/ALIBI-0.1.0.apk` for the existing download link (SHA-256 `1EE0D4A0BBF932FA586B66137FEC9E73DCE6ED54C58246C0A601C3618716830C`). `apksigner verify` confirms the v2 signature. It uses the repository's debug signing key; production distribution still needs an owner-managed release key. No Android device/emulator was attached, so actual two-hour delivery/permission behavior is unverified.
+- Observed free-host cold start was 64.3 seconds. UI startup no longer waits for health discovery or setup-status, but first real data/signup requests still depend on Render waking (KI-013); no paid keep-alive has been enabled.
 - Backend account-owned tables and protected operations use authenticated `user_id`. Public signup provisions a separate default workspace and categories; write paths that accept category, project, workspace, task, or calendar-event IDs now validate ownership before saving. No teams or shared workspace are introduced.
 - M13 account check: mobile typecheck passed; public signup and owner-scoped writes are included in the rebuilt APK. Auth end-to-end tests have not been run and device visual review remains outstanding.
 - Owner selected six mobile tabs. ADR-022 and the mobile navigation guidance record that choice; web remains at four destinations.

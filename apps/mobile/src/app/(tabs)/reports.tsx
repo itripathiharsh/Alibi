@@ -25,7 +25,7 @@ import {
 import theme from "../../lib/theme";
 import { BrandHeader, SunriseArt } from "../../components/brand-ui";
 import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
-import { getServerUrl, autoDetectServer } from "../../lib/config";
+import { getServerUrl } from "../../lib/config";
 
 interface SummaryData {
   total_time_min: number;
@@ -40,6 +40,7 @@ interface ScoreData { score: number | null; insufficient_data: boolean }
 interface TimeDistribution { category_name: string; category_color: string; total_min: number; percentage: number }
 interface TrendPoint { date: string; completed_count: number }
 interface HeatmapDay { date: string; completed_count: number; minutes_logged: number }
+interface TaskActivity { task_id: string; title: string; status: string; period_actual_min: number; actual_min: number; estimate_min: number | null; task_score: number | null; score_basis: string[] }
 interface LearningData { peak_window?: string | null }
 
 interface ReportItem {
@@ -59,6 +60,7 @@ export default function ReportsScreen() {
   const [distribution, setDistribution] = useState<TimeDistribution[]>([]);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [heatmap, setHeatmap] = useState<HeatmapDay[]>([]);
+  const [taskActivity, setTaskActivity] = useState<TaskActivity[]>([]);
   const [learning, setLearning] = useState<LearningData | null>(null);
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,7 +71,6 @@ export default function ReportsScreen() {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      await autoDetectServer();
       let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
       if (!token) return;
@@ -81,8 +82,9 @@ export default function ReportsScreen() {
         `${baseUrl}/api/v1/analytics/productivity-score?period=${selectedPeriod}`,
         `${baseUrl}/api/v1/analytics/charts/time-distribution?period=${selectedPeriod}`,
         `${baseUrl}/api/v1/analytics/charts/completion-trend?period=${selectedPeriod}`,
-        `${baseUrl}/api/v1/analytics/charts/consistency-heatmap?days=35`,
+        `${baseUrl}/api/v1/analytics/charts/consistency-heatmap?days=365`,
         `${baseUrl}/api/v1/learning/profile`,
+        `${baseUrl}/api/v1/analytics/task-activity?period=${selectedPeriod}&limit=12`,
       ];
       const responses = await Promise.all(endpoints.map((url) => fetch(url, { headers }).catch(() => null)));
       if (responses[0]?.ok) setSummary(await responses[0].json());
@@ -92,6 +94,7 @@ export default function ReportsScreen() {
       if (responses[4]?.ok) setTrend(await responses[4].json());
       if (responses[5]?.ok) setHeatmap(await responses[5].json());
       if (responses[6]?.ok) setLearning(await responses[6].json());
+      if (responses[7]?.ok) setTaskActivity(await responses[7].json());
     } catch {
       // Degrade gracefully
     } finally {
@@ -107,7 +110,6 @@ export default function ReportsScreen() {
     if (isGenerating) return;
     setIsGenerating(true);
     try {
-      await autoDetectServer();
       let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
       if (!token) {
@@ -189,7 +191,10 @@ export default function ReportsScreen() {
 
   const hasData = summary && (summary.tasks_completed > 0 || summary.total_time_min > 0);
   const trendMaximum = Math.max(1, ...trend.map((point) => point.completed_count));
-  const heatmapDays = heatmap.slice(-28);
+  const heatmapDays = heatmap;
+  const heatmapOffset = heatmap.length ? (new Date(`${heatmap[0].date}T00:00:00`).getDay() + 6) % 7 : 0;
+  const heatmapCells: (HeatmapDay | null)[] = [...Array(heatmapOffset).fill(null), ...heatmapDays];
+  const heatmapWeeks = Array.from({ length: Math.ceil(heatmapCells.length / 7) }, (_, week) => heatmapCells.slice(week * 7, week * 7 + 7));
   const periodLabel = selectedPeriod === "daily" ? "today" : selectedPeriod === "weekly" ? "this week" : "this month";
 
   return (
@@ -265,13 +270,18 @@ export default function ReportsScreen() {
       </View>
 
       <View style={styles.chartCard}>
+        <View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Task focus & scores</Text><Text style={styles.chartSubtitle}>Time recorded per task · completed task score</Text></View><Clock size={19} color="#F47B25" /></View>
+        {isLoading ? <ActivityIndicator color={theme.colors.accent.amber} /> : taskActivity.length === 0 ? <Text style={styles.chartEmpty}>Start a task timer to see your work history here.</Text> : <View style={styles.distributionList}>{taskActivity.map((task) => <View key={task.task_id} style={styles.distributionRow}><View style={styles.distributionMeta}><Text style={styles.distributionName} numberOfLines={1}>{task.title}</Text><Text style={styles.distributionValue}>{task.task_score == null ? "—" : `${task.task_score} score`}</Text></View><View style={styles.track}><View style={[styles.fill, { width: `${Math.min(100, task.estimate_min ? Math.round(task.actual_min / task.estimate_min * 100) : task.status === "completed" ? 100 : 0)}%`, backgroundColor: "#F47B25" }]} /></View><Text style={styles.chartSubtitle}>{task.period_actual_min}m this period · {task.actual_min}m total</Text></View>)}</View>}
+      </View>
+
+      <View style={styles.chartCard}>
         <View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Task Progress</Text><Text style={styles.chartSubtitle}>Completed tasks · {periodLabel}</Text></View><BarChart3 size={19} color="#F47B25" /></View>
         {isLoading ? <ActivityIndicator color={theme.colors.accent.amber} /> : trend.length === 0 || trend.every((point) => point.completed_count === 0) ? <Text style={styles.chartEmpty}>Completed task history will appear here.</Text> : <View style={styles.trendChart}>{trend.slice(-10).map((point) => <View key={point.date} style={styles.trendColumn}><Text style={styles.trendCount}>{point.completed_count || ""}</Text><View style={[styles.trendBar, { height: Math.max(6, (point.completed_count / trendMaximum) * 94), backgroundColor: point.completed_count ? "#F47B25" : "#FCE2D1" }]} /><Text style={styles.trendDay}>{new Date(point.date).toLocaleDateString(undefined, { weekday: "short" })}</Text></View>)}</View>}
       </View>
 
       <View style={styles.chartCard}>
         <View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Focus Pattern</Text><Text style={styles.chartSubtitle}>Days with recorded activity</Text></View><Calendar size={19} color="#F47B25" /></View>
-        {isLoading ? <ActivityIndicator color={theme.colors.accent.amber} /> : heatmapDays.length === 0 || heatmapDays.every((day) => day.minutes_logged === 0 && day.completed_count === 0) ? <Text style={styles.chartEmpty}>Your activity pattern appears as you record work.</Text> : <View style={styles.heatmap}>{heatmapDays.map((day) => <View key={day.date} accessibilityLabel={`${day.date}: ${day.completed_count} completed, ${day.minutes_logged} minutes`} style={[styles.heatCell, { backgroundColor: day.minutes_logged > 0 || day.completed_count > 0 ? "#F47B25" : "#F7E6DB", opacity: day.minutes_logged > 0 || day.completed_count > 0 ? .42 + Math.min(.58, day.minutes_logged / 240) : .55 }]} />)}</View>}
+        {isLoading ? <ActivityIndicator color={theme.colors.accent.amber} /> : heatmapDays.length === 0 || heatmapDays.every((day) => day.minutes_logged === 0 && day.completed_count === 0) ? <Text style={styles.chartEmpty}>Your activity pattern appears as you record work.</Text> : <ScrollView horizontal showsHorizontalScrollIndicator={false}><View style={styles.heatmap}>{heatmapWeeks.map((week, weekIndex) => <View key={weekIndex} style={styles.heatWeek}>{week.map((day, dayIndex) => day ? <View key={day.date} accessibilityLabel={`${day.date}: ${day.completed_count} completed, ${day.minutes_logged} minutes`} style={[styles.heatCell, { backgroundColor: day.minutes_logged > 0 || day.completed_count > 0 ? "#F47B25" : "#F7E6DB", opacity: day.minutes_logged > 0 || day.completed_count > 0 ? .42 + Math.min(.58, day.minutes_logged / 240) : .55 }]} /> : <View key={`empty-${weekIndex}-${dayIndex}`} style={styles.heatCell} />)}</View>)}</View></ScrollView>}
       </View>
 
       <View style={[styles.chartCard, styles.learningCard]}><View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Your Learning Engine</Text><Text style={styles.chartSubtitle}>{learning?.peak_window ? `Recorded focus window: ${learning.peak_window}` : "Patterns build from your recorded work."}</Text></View><Sparkles size={20} color="#8B5CF6" /></View></View>
@@ -410,8 +420,9 @@ const styles = StyleSheet.create({
   trendCount: { color: theme.colors.text.secondary, fontSize: 9, height: 12 },
   trendBar: { width: 17, borderRadius: 7, minHeight: 6 },
   trendDay: { color: theme.colors.text.secondary, fontSize: 9 },
-  heatmap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  heatCell: { width: 18, height: 18, borderRadius: 5 },
+  heatmap: { flexDirection: "row", gap: 4 },
+  heatWeek: { gap: 4 },
+  heatCell: { width: 8, height: 8, borderRadius: 2 },
   learningCard: { backgroundColor: "#F7F3FF", borderColor: "#ECE5FF" },
   periodTabs: {
     flexDirection: "row",

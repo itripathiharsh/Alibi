@@ -76,6 +76,16 @@ async def get_running_timer(
     return await service.get_running_timer()
 
 
+@router.get("/running/all", response_model=list[TimeEntryResponse])
+async def list_running_timers(
+    auth: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+) -> list[TimeEntry]:
+    """List all independent active task timers for the current account."""
+    service = TimeService(db, auth.user_id)
+    return await service.get_running_timers()
+
+
 @router.get("", response_model=list[TimeEntryResponse])
 async def list_time_entries(
     task_id: uuid.UUID,

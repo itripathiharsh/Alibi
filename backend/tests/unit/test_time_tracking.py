@@ -1,4 +1,4 @@
-"""Unit and property-based tests for time tracking and actual_min consistency (AC-M2-5)."""
+"""Unit and property-based tests for concurrent task timers and actual_min consistency."""
 
 import uuid
 from datetime import datetime
@@ -16,8 +16,8 @@ from app.services.time_service import TimeService
 
 
 @pytest.mark.asyncio
-async def test_ac_m2_5_single_running_timer_enforcement() -> None:
-    """AC-M2-5: Only one running timer allowed per user; starting another raises 409 Conflict."""
+async def test_fr_task_021_independent_task_timers_and_same_task_conflict() -> None:
+    """Different tasks may run concurrently; duplicate timer on a task remains a conflict."""
     user_id = uuid.uuid4()
     mock_session = AsyncMock()
     service = TimeService(mock_session, user_id)
@@ -25,40 +25,44 @@ async def test_ac_m2_5_single_running_timer_enforcement() -> None:
     task_1 = uuid.uuid4()
     task_2 = uuid.uuid4()
 
-    # In-memory timer storage
-    active_timer: TimeEntry | None = None
+    active_timers: dict[uuid.UUID, TimeEntry] = {}
 
-    async def mock_get_running() -> TimeEntry | None:
-        return active_timer
+    async def mock_get_running_for_task(task_id: uuid.UUID) -> TimeEntry | None:
+        return active_timers.get(task_id)
 
     async def mock_start(
         task_id: uuid.UUID, started_at: datetime | None = None, entry_id: uuid.UUID | None = None
     ) -> TimeEntry:
-        nonlocal active_timer
         active_timer = TimeEntry(
             id=entry_id or uuid.uuid4(),
             user_id=user_id,
             task_id=task_id,
             started_at=started_at or datetime.now(),
         )
+        active_timers[task_id] = active_timer
         return active_timer
 
-    service.time_repo.get_running_timer = AsyncMock(side_effect=mock_get_running)
+    service.time_repo.get_running_timer_for_task = AsyncMock(side_effect=mock_get_running_for_task)
     service.time_repo.start_timer = AsyncMock(side_effect=mock_start)
-    service.task_repo.get_by_id = AsyncMock(
-        return_value=Task(
-            id=task_1, user_id=user_id, workspace_id=uuid.uuid4(), title="Task", status="pending"
-        )
-    )
 
-    # Start timer 1 -> succeeds
+    async def mock_get_task(task_id: uuid.UUID) -> Task:
+        return Task(
+            id=task_id, user_id=user_id, workspace_id=uuid.uuid4(), title="Task", status="pending"
+        )
+
+    service.task_repo.get_by_id = AsyncMock(side_effect=mock_get_task)
+
+    # Start timers for two separate tasks -> both succeed and remain independent.
     t1 = await service.start_timer(task_1)
     assert t1.task_id == task_1
+    t2 = await service.start_timer(task_2)
+    assert t2.task_id == task_2
+    assert set(active_timers) == {task_1, task_2}
 
-    # Start timer 2 while timer 1 is running -> 409 Conflict
+    # Starting a duplicate timer for one task is still rejected.
     with pytest.raises(ConflictError) as exc_info:
-        await service.start_timer(task_2)
-    assert "already running" in str(exc_info.value.detail)
+        await service.start_timer(task_1)
+    assert "already running for this task" in str(exc_info.value.detail)
 
 
 # Hypothesis property-based state machine test for actual_min = sum(durations)

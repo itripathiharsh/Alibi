@@ -1,4 +1,4 @@
-"""Time tracking service enforcing single running timer and actual_min consistency (AC-M2-5)."""
+"""Time tracking service for independent task timers and actual_min consistency."""
 
 import uuid
 from datetime import datetime
@@ -22,8 +22,12 @@ class TimeService:
         self.task_repo = TaskRepository(session, user_id)
 
     async def get_running_timer(self) -> TimeEntry | None:
-        """Retrieve the user's active timer if currently running."""
+        """Retrieve the most recently started timer for legacy clients."""
         return await self.time_repo.get_running_timer()
+
+    async def get_running_timers(self) -> list[TimeEntry]:
+        """Retrieve every active timer owned by the user."""
+        return list(await self.time_repo.list_running_timers())
 
     async def start_timer(
         self,
@@ -31,11 +35,11 @@ class TimeService:
         started_at: datetime | None = None,
         entry_id: uuid.UUID | None = None,
     ) -> TimeEntry:
-        """Start a new timer on a task. Fails with 409 Conflict if another timer is already running."""
-        running = await self.time_repo.get_running_timer()
+        """Start a task timer; separate tasks may be timed at the same time."""
+        running = await self.time_repo.get_running_timer_for_task(task_id)
         if running:
             raise ConflictError(
-                f"A timer is already running for task {running.task_id} since {running.started_at}."
+                f"A timer is already running for this task since {running.started_at}."
             )
 
         task = await self.task_repo.get_by_id(task_id)

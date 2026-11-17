@@ -1,7 +1,7 @@
 """TimeEntry domain model (doc 03 §3.3)."""
 
-from datetime import datetime
 import uuid
+from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
@@ -28,10 +28,11 @@ class TimeEntry(Base, SyncableMixin):
             "duration_min IS NULL OR (duration_min >= 1 AND duration_min <= 1440)",
             name="chk_time_entry_duration",
         ),
-        # Partial unique index ensuring at most ONE running timer per user (AC-M2-5)
+        # Multiple tasks may run concurrently, but one task cannot acquire duplicate timers.
         Index(
-            "uq_time_entries_running_timer",
+            "uq_time_entries_running_task",
             "user_id",
+            "task_id",
             unique=True,
             postgresql_where=text("ended_at IS NULL AND deleted_at IS NULL"),
         ),
@@ -75,4 +76,3 @@ class TimeEntry(Base, SyncableMixin):
         Text,
         nullable=True,
     )
-

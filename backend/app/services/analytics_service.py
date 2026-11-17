@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics.task_score import calculate_task_score
 from app.models.category import Category
 from app.models.task import Task
 from app.models.time_entry import TimeEntry
@@ -25,6 +26,7 @@ from app.schemas.analytics import (
     ProductivityScoreResponse,
     ScoreFormulaResponse,
     SummaryMetricsResponse,
+    TaskActivityItem,
     TimeDistributionItem,
 )
 
@@ -291,15 +293,19 @@ class AnalyticsService:
             start_utc, end_utc = resolve_period(period, tz_str, from_date, to_date)
 
         # Fetch candidate tasks for score calculation
-        tasks_query = select(Task).outerjoin(Category, Category.id == Task.category_id).where(
-            and_(
-                Task.user_id == user_id,
-                Task.deleted_at.is_(None),
-                Task.status != "cancelled",
-                or_(
-                    and_(Task.completed_at >= start_utc, Task.completed_at < end_utc),
-                    and_(Task.deadline_at >= start_utc, Task.deadline_at < end_utc),
-                ),
+        tasks_query = (
+            select(Task)
+            .outerjoin(Category, Category.id == Task.category_id)
+            .where(
+                and_(
+                    Task.user_id == user_id,
+                    Task.deleted_at.is_(None),
+                    Task.status != "cancelled",
+                    or_(
+                        and_(Task.completed_at >= start_utc, Task.completed_at < end_utc),
+                        and_(Task.deadline_at >= start_utc, Task.deadline_at < end_utc),
+                    ),
+                )
             )
         )
         if sharing_class is not None:
@@ -621,6 +627,94 @@ class AnalyticsService:
             cur += timedelta(days=1)
 
         return items
+
+    async def get_task_activity(
+        self,
+        user_id: uuid.UUID,
+        period: PeriodType = "weekly",
+        from_date: date | None = None,
+        to_date: date | None = None,
+        tz_str: str = "Asia/Kolkata",
+        limit: int = 20,
+    ) -> list[TaskActivityItem]:
+        """Return SQL-grounded per-task durations and completed-task scores."""
+        start_utc, end_utc = resolve_period(period, tz_str, from_date, to_date)
+        now_utc = datetime.now(zoneinfo.ZoneInfo("UTC"))
+        entry_on = and_(
+            TimeEntry.task_id == Task.id,
+            TimeEntry.user_id == user_id,
+            TimeEntry.deleted_at.is_(None),
+            TimeEntry.started_at < end_utc,
+            func.coalesce(TimeEntry.ended_at, now_utc) > start_utc,
+        )
+        overlap_min = func.coalesce(
+            func.sum(
+                func.extract(
+                    "epoch",
+                    func.least(func.coalesce(TimeEntry.ended_at, now_utc), end_utc)
+                    - func.greatest(TimeEntry.started_at, start_utc),
+                )
+                / 60
+            ),
+            0,
+        )
+        query = (
+            select(
+                Task.id,
+                Task.title,
+                Task.status,
+                Task.actual_min,
+                Task.estimate_final_min,
+                Task.deadline_at,
+                Task.completed_at,
+                overlap_min.label("period_actual_min"),
+            )
+            .outerjoin(TimeEntry, entry_on)
+            .where(
+                Task.user_id == user_id,
+                Task.deleted_at.is_(None),
+                or_(
+                    and_(Task.completed_at >= start_utc, Task.completed_at < end_utc),
+                    TimeEntry.id.is_not(None),
+                ),
+            )
+            .group_by(
+                Task.id,
+                Task.title,
+                Task.status,
+                Task.actual_min,
+                Task.estimate_final_min,
+                Task.deadline_at,
+                Task.completed_at,
+            )
+            .order_by(Task.completed_at.desc().nulls_last(), overlap_min.desc())
+            .limit(limit)
+        )
+        rows = (await self.session.execute(query)).all()
+        result: list[TaskActivityItem] = []
+        for row in rows:
+            actual_min = int(row.actual_min or 0)
+            score, basis = calculate_task_score(
+                completed_at=row.completed_at,
+                deadline_at=row.deadline_at,
+                estimate_min=row.estimate_final_min,
+                actual_min=actual_min,
+            )
+            result.append(
+                TaskActivityItem(
+                    task_id=row.id,
+                    title=row.title,
+                    status=row.status,
+                    period_actual_min=int(row.period_actual_min or 0),
+                    actual_min=actual_min,
+                    estimate_min=row.estimate_final_min,
+                    deadline_at=row.deadline_at,
+                    completed_at=row.completed_at,
+                    task_score=score,
+                    score_basis=basis,
+                )
+            )
+        return result
 
     async def get_est_vs_actual(
         self,

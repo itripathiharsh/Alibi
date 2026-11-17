@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { BookOpen, FileText, Link as LinkIcon, Plus, Search, Send, Sparkles, X } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { ensureAuthenticated } from "../../lib/auth";
-import { autoDetectServer, getServerUrl } from "../../lib/config";
+import { getServerUrl } from "../../lib/config";
 import { BrandHeader, SunriseArt } from "../../components/brand-ui";
 
 type VaultNote = { id: string; title: string; body: string; source_type: string; occurred_on: string; privacy_class: string };
@@ -34,7 +34,6 @@ export default function VaultScreen() {
   const loadNotes = useCallback(async () => {
     setError(null);
     try {
-      await autoDetectServer();
       const token = await ensureAuthenticated();
       const response = await fetch(`${getServerUrl()}/api/v1/vault/notes?limit=50`, { headers: { Authorization: `Bearer ${token}` } });
       if (!response.ok) throw new Error("Could not load your vault. Try again.");
@@ -54,7 +53,6 @@ export default function VaultScreen() {
     setSearching(true);
     setError(null);
     try {
-      await autoDetectServer();
       const token = await ensureAuthenticated();
       const response = await fetch(`${getServerUrl()}/api/v1/vault/search`, {
         method: "POST",
@@ -74,7 +72,6 @@ export default function VaultScreen() {
     if (!title.trim() || !body.trim() || saving) return;
     setSaving(true);
     try {
-      await autoDetectServer();
       const token = await ensureAuthenticated();
       const response = await fetch(`${getServerUrl()}/api/v1/vault/notes`, {
         method: "POST",

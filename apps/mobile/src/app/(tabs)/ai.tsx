@@ -29,7 +29,7 @@ import {
 import theme from "../../lib/theme";
 import { BrandHeader, SunriseArt } from "../../components/brand-ui";
 import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
-import { getServerUrl, autoDetectServer } from "../../lib/config";
+import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 
 interface Message {
@@ -66,7 +66,6 @@ export default function AIScreen() {
 
   useEffect(() => {
     // Proactively detect server on mount
-    autoDetectServer().catch(() => {});
   }, []);
 
   const handleVoiceDictation = async () => {
@@ -124,7 +123,6 @@ export default function AIScreen() {
     }, 100);
 
     try {
-      await autoDetectServer();
       let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
 

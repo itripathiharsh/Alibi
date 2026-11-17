@@ -33,8 +33,9 @@ import {
 import theme from "../../lib/theme";
 import { BrandHeader, SunriseArt } from "../../components/brand-ui";
 import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
-import { getServerUrl, autoDetectServer } from "../../lib/config";
+import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
+import { cancelTaskTimerReminder, scheduleTaskTimerReminder, syncTaskTimerReminders } from "../../lib/timer-reminders";
 
 const VIEWS = ["today", "upcoming", "backlog", "completed"] as const;
 
@@ -139,7 +140,8 @@ export default function TasksScreen() {
   const router = useRouter();
   const [activeView, setActiveView] = useState<(typeof VIEWS)[number]>("today");
   const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [runningTimer, setRunningTimer] = useState<RunningTimer | null>(null);
+  const [runningTimers, setRunningTimers] = useState<RunningTimer[]>([]);
+  const [clockNow, setClockNow] = useState(Date.now());
   const [isLoading, setIsLoading] = useState(true);
 
   // Capture modal
@@ -197,7 +199,6 @@ export default function TasksScreen() {
 
   const fetchTasks = useCallback(async () => {
     try {
-      await autoDetectServer();
       let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
       if (!token) return;
@@ -218,14 +219,14 @@ export default function TasksScreen() {
         setTasks(data);
       }
 
-      // Check running timer
       if (token) {
-        const timerRes = await fetch(`${baseUrl}/api/v1/time-entries/running`, {
+        const timerRes = await fetch(`${baseUrl}/api/v1/time-entries/running/all`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (timerRes.ok) {
           const timerData = await timerRes.json();
-          setRunningTimer(timerData);
+          setRunningTimers(timerData);
+          void syncTaskTimerReminders(timerData);
         }
       }
     } catch {
@@ -239,11 +240,15 @@ export default function TasksScreen() {
     fetchTasks();
   }, [fetchTasks]);
 
+  useEffect(() => {
+    const interval = setInterval(() => setClockNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleCapture = async () => {
     if (!captureText.trim() || isCapturing) return;
     setIsCapturing(true);
     try {
-      await autoDetectServer();
       let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
       if (!token) {
@@ -351,6 +356,17 @@ export default function TasksScreen() {
       }
 
       if (res.ok) {
+        if (nextStatus === "completed") {
+          const timer = runningTimers.find((item) => item.task_id === task.id);
+          if (timer) {
+            await fetch(`${baseUrl}/api/v1/time-entries/${timer.id}/stop`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({}),
+            });
+            await cancelTaskTimerReminder(timer.id);
+          }
+        }
         fetchTasks();
       }
     } catch {
@@ -364,9 +380,10 @@ export default function TasksScreen() {
       const baseUrl = getServerUrl();
       if (!token) return;
 
-      if (runningTimer && runningTimer.task_id === task.id) {
+      const activeTimer = runningTimers.find((timer) => timer.task_id === task.id);
+      if (activeTimer) {
         // Stop timer
-        let res = await fetch(`${baseUrl}/api/v1/time-entries/${runningTimer.id}/stop`, {
+        let res = await fetch(`${baseUrl}/api/v1/time-entries/${activeTimer.id}/stop`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -377,7 +394,7 @@ export default function TasksScreen() {
         if (res.status === 401) {
           token = await ensureAuthenticated(true);
           if (token) {
-            res = await fetch(`${baseUrl}/api/v1/time-entries/${runningTimer.id}/stop`, {
+            res = await fetch(`${baseUrl}/api/v1/time-entries/${activeTimer.id}/stop`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -388,7 +405,8 @@ export default function TasksScreen() {
           }
         }
         if (res.ok) {
-          setRunningTimer(null);
+          setRunningTimers((previous) => previous.filter((timer) => timer.id !== activeTimer.id));
+          await cancelTaskTimerReminder(activeTimer.id);
           fetchTasks();
         }
       } else {
@@ -416,7 +434,8 @@ export default function TasksScreen() {
         }
         if (res.ok) {
           const entry = await res.json();
-          setRunningTimer(entry);
+          setRunningTimers((previous) => [...previous.filter((timer) => timer.task_id !== task.id), entry]);
+          void scheduleTaskTimerReminder({ timerId: entry.id, taskId: entry.task_id, startedAt: entry.started_at });
           fetchTasks();
         } else {
           const errData = await res.json().catch(() => ({}));
@@ -474,7 +493,10 @@ export default function TasksScreen() {
         {!isLoading &&
           tasks.map((task) => {
             const isDone = task.status === "completed";
-            const isTimerRunning = runningTimer?.task_id === task.id;
+            const taskTimer = runningTimers.find((timer) => timer.task_id === task.id);
+            const isTimerRunning = Boolean(taskTimer);
+            const elapsedSeconds = taskTimer ? Math.max(0, Math.floor((clockNow - Date.parse(taskTimer.started_at)) / 1000)) : 0;
+            const elapsedLabel = `${Math.floor(elapsedSeconds / 3600)}h ${Math.floor((elapsedSeconds % 3600) / 60).toString().padStart(2, "0")}m`;
 
             return (
               <View key={task.id} style={styles.taskCard}>
@@ -511,15 +533,19 @@ export default function TasksScreen() {
                         pressed && { transform: [{ scale: 0.92 }] },
                       ]}
                       onPress={() => handleTimerAction(task)}
+                      accessibilityLabel={isTimerRunning ? `Stop timer for ${task.title}` : `Start focus on ${task.title}`}
                     >
                       {isTimerRunning ? (
                         <Square size={16} color="#FFFFFF" />
                       ) : (
                         <Play size={16} color={theme.colors.accent.amber} />
                       )}
+                      <Text style={[styles.timerBtnLabel, isTimerRunning && { color: "#FFFFFF" }]}>{isTimerRunning ? "Stop" : "Start"}</Text>
                     </Pressable>
                   )}
                 </View>
+
+                {taskTimer && <Text style={styles.timerElapsed}>●  Focus running · {elapsedLabel}</Text>}
 
                 {/* Metadata tags */}
                 <View style={styles.taskMetaRow}>
@@ -908,6 +934,9 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
   },
   timerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
     padding: 8,
     borderRadius: 8,
     backgroundColor: theme.colors.background.base,
@@ -918,6 +947,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.danger,
     borderColor: theme.colors.danger,
   },
+  timerBtnLabel: { fontSize: 11, fontWeight: "700", color: theme.colors.accent.amber },
+  timerElapsed: { marginLeft: 32, marginTop: -4, fontSize: 12, fontWeight: "700", color: theme.colors.accent.emerald },
   taskMetaRow: {
     flexDirection: "row",
     flexWrap: "wrap",

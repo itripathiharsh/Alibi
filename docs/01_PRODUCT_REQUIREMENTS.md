@@ -68,6 +68,7 @@ email/Slack integrations; payments; push notifications via a paid service; psych
 | FR-TASK-014 | Task origin recorded: manual, voice, ai_recommendation, meeting, external_assignment, recurring | M |
 | FR-TASK-015 | Activity history: every state change is an append-only `task_events` row, viewable per task | M |
 | FR-TASK-016 | Time tracking: start/stop timer and manual time entries; actual time = sum of entries | M |
+| FR-TASK-021 | Each task has an independent start/stop timer; multiple different tasks can run concurrently and actual minutes remain per-task sums | M |
 | FR-TASK-017 | Task dependencies (blocked-by) | S |
 | FR-TASK-018 | Recurring responsibilities via RRULE; instances generated ahead (14 days) | M |
 | FR-TASK-019 | Search and filter tasks by text, category, project, tag, status, date | M |
@@ -84,6 +85,7 @@ email/Slack integrations; payments; push notifications via a paid service; psych
 | FR-CAL-006 | Availability computation from working hours − fixed events − accepted blocks | M |
 | FR-CAL-007 | Drag/move work blocks manually (owner action, never AI) | S |
 | FR-CAL-008 | One-way import from Google Calendar (ICS URL or OAuth) | C |
+| FR-CAL-009 | Android schedules a private local check-in notification two hours after each task timer starts; stopping that timer cancels only its reminder | M |
 
 ### 2.4 Dashboard & analytics (DASH)
 | ID | Req | P |
@@ -94,6 +96,7 @@ email/Slack integrations; payments; push notifications via a paid service; psych
 | FR-DASH-004 | Every metric computed from DB records via documented formulas (doc 10) | M |
 | FR-DASH-005 | Productivity score transparent: UI shows components and formula; no reward for long hours; no penalty for reasonable rescheduling | M |
 | FR-DASH-006 | Metrics with insufficient data show "Not enough data" instead of 0 | M |
+| FR-DASH-007 | Insights show per-task recorded time, a separate evidence-based task score, and a 365-day activity heatmap | M |
 
 ### 2.5 Personal Learning Engine (LEARN)
 | ID | Req | P |

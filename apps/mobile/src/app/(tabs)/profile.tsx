@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { BarChart3, BookOpen, Brain, CalendarDays, CheckCircle2, ChevronRight, CircleHelp, LockKeyhole, LogOut, Settings, SlidersHorizontal, Sparkles, Timer, type LucideIcon } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { ensureAuthenticated, getUserProfile, logoutMobile, type MobileUserProfile } from "../../lib/auth";
-import { autoDetectServer, getServerUrl } from "../../lib/config";
+import { getServerUrl } from "../../lib/config";
 import { BrandHeader, SunriseArt } from "../../components/brand-ui";
 
 type ProfileSummary = { tasks_completed: number; tasks_pending: number; tasks_overdue: number; total_time_min: number; efficiency: number | null };
@@ -21,7 +21,6 @@ export default function ProfileScreen() {
   const loadProfile = useCallback(async () => {
     setLoading(true);
     try {
-      await autoDetectServer();
       const token = await ensureAuthenticated();
       const headers = { Authorization: `Bearer ${token}` };
       const baseUrl = getServerUrl();

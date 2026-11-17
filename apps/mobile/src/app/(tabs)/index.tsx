@@ -38,8 +38,9 @@ import {
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
-import { getServerUrl, autoDetectServer } from "../../lib/config";
+import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
+import { cancelTaskTimerReminder } from "../../lib/timer-reminders";
 
 interface TaskItem {
   id: string;
@@ -78,7 +79,7 @@ interface UserProfile {
 
 interface RunningTimer {
   id: string;
-  task_id?: string;
+  task_id: string;
   started_at: string;
 }
 
@@ -93,7 +94,8 @@ export default function DashboardScreen() {
   const [learningTip, setLearningTip] = useState<string>(
     "ALIBI will surface a pattern after it has enough recorded work."
   );
-  const [runningTimer, setRunningTimer] = useState<RunningTimer | null>(null);
+  const [runningTimers, setRunningTimers] = useState<RunningTimer[]>([]);
+  const [timerNow, setTimerNow] = useState(Date.now());
   const [timerSeconds, setTimerSeconds] = useState(25 * 60);
   const [isTimerActive, setIsTimerActive] = useState(false);
 
@@ -160,7 +162,6 @@ export default function DashboardScreen() {
   // Fetch all live dashboard data
   const fetchDashboardData = useCallback(async () => {
     try {
-      await autoDetectServer();
       const token = (await getAccessToken()) || (await ensureAuthenticated());
       const baseUrl = getServerUrl();
       const headers: Record<string, string> = { Accept: "application/json" };
@@ -171,7 +172,7 @@ export default function DashboardScreen() {
         fetch(`${baseUrl}/api/v1/tasks?view=today`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/analytics/summary?period=daily`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/analytics/productivity-score?period=daily`, { headers }).catch(() => null),
-        fetch(`${baseUrl}/api/v1/time-entries/running`, { headers }).catch(() => null),
+        fetch(`${baseUrl}/api/v1/time-entries/running/all`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/learning/profile`, { headers }).catch(() => null),
       ]);
 
@@ -189,8 +190,7 @@ export default function DashboardScreen() {
       }
       if (timerRes && timerRes.ok) {
         const timerData = await timerRes.json();
-        setRunningTimer(timerData);
-        if (timerData) setIsTimerActive(true);
+        setRunningTimers(timerData);
       }
       if (learnRes && learnRes.ok) {
         const profile = await learnRes.json();
@@ -209,6 +209,11 @@ export default function DashboardScreen() {
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  useEffect(() => {
+    const interval = setInterval(() => setTimerNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Pomodoro focus timer countdown
   useEffect(() => {
@@ -238,53 +243,39 @@ export default function DashboardScreen() {
     try {
       const baseUrl = getServerUrl();
       const token = await ensureAuthenticated();
-      await fetch(`${baseUrl}/api/v1/tasks/${taskId}/status`, {
-        method: "PATCH",
+      const res = await fetch(`${baseUrl}/api/v1/tasks/${taskId}/status`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ status: newStatus }),
       });
+      if (!res.ok) throw new Error("Task status could not be updated.");
+      if (newStatus === "completed") {
+        const timer = runningTimers.find((item) => item.task_id === taskId);
+        if (timer) {
+          await fetch(`${baseUrl}/api/v1/time-entries/${timer.id}/stop`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          await cancelTaskTimerReminder(timer.id);
+          setRunningTimers((current) => current.filter((item) => item.id !== timer.id));
+        }
+      }
       fetchDashboardData();
-    } catch {}
+    } catch {
+      setTodayTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: currentStatus as TaskItem["status"] } : t)));
+    }
   };
 
   // Toggle focus timer
   const handleToggleTimer = async () => {
-    const baseUrl = getServerUrl();
-    const token = await ensureAuthenticated();
     if (isTimerActive) {
       setIsTimerActive(false);
-      if (runningTimer) {
-        await fetch(`${baseUrl}/api/v1/time-entries/${runningTimer.id}/stop`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        }).catch(() => {});
-        setRunningTimer(null);
-      }
     } else {
       setIsTimerActive(true);
       if (timerSeconds === 0) setTimerSeconds(25 * 60);
-      try {
-        const firstTaskId = todayTasks[0]?.id;
-        const res = await fetch(`${baseUrl}/api/v1/time-entries/start`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            task_id: firstTaskId,
-            source: "manual",
-            note: "Deep Work Session",
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setRunningTimer(data);
-        }
-      } catch {}
     }
   };
 
@@ -629,6 +620,16 @@ export default function DashboardScreen() {
 
           {/* Right Column: Focus Card + Today's Plan */}
           <View style={styles.rightColumn}>
+            {runningTimers.length > 0 && (
+              <View style={styles.focusCard}>
+                <Text style={styles.focusTitle}>Working now · {runningTimers.length}</Text>
+                {runningTimers.map((timer) => {
+                  const task = todayTasks.find((item) => item.id === timer.task_id);
+                  const minutes = Math.max(0, Math.floor((timerNow - Date.parse(timer.started_at)) / 60000));
+                  return <Text key={timer.id} style={styles.focusSubtitle} numberOfLines={1}>{task?.title || "Task in progress"} · {Math.floor(minutes / 60)}h {minutes % 60}m</Text>;
+                })}
+              </View>
+            )}
             {/* Focus Pomodoro Card */}
             <View style={styles.focusCard}>
               <View style={styles.focusHeaderRow}>
