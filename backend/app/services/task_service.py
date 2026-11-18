@@ -86,7 +86,7 @@ class TaskService:
         if category_hint and not await self.category_repo.get_by_id(self.user_id, category_hint):
             raise NotFoundError("Category not found.")
 
-        initial_status = status if status in ("pending", "completed") else "pending"
+        initial_status = status if status in ("pending", "in_progress", "completed", "cancelled") else "pending"
         initial_completed_at = now if initial_status == "completed" else None
 
         # Step 1: Persist initial task with raw_input (AC-M2-1 guarantee)

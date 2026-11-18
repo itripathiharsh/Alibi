@@ -402,8 +402,9 @@ export default function TasksScreen() {
         setCaptureVisible(false);
         fetchTasks();
       } else {
-        const errJson = await res.json().catch(() => ({}));
-        Alert.alert("Capture Error", errJson.detail || "Failed to parse and capture task.");
+        const errJson = await res.json().catch(() => ({})) as any;
+        const paramErrors = errJson.invalid_params?.map((p: any) => `${p.name}: ${p.reason}`).join("\n");
+        Alert.alert("Capture Error", paramErrors || errJson.detail || "Failed to parse and capture task.");
       }
     } catch (err: unknown) {
       const profile = offlineProfileId ? { id: offlineProfileId } : await getUserProfile();

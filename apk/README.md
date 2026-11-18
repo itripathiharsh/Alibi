@@ -10,7 +10,7 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **Build Date**: November 19, 2026
 - **Variant**: Android release APK, Hermes
 - **Signing**: Signed with the repository's current Android debug keystore. This is installable for direct distribution/testing, but it is not a Play Store production signature.
-- **SHA-256**: `79F2B0EDD831197BC713C246EEF5A1F1C4BB9D34C05EEE0F2AB0EF8A504D900C`
+- **SHA-256**: `FC3E8E815A1D141B456C272B661484C50AD7C31D5FCFF8793B670B449F31A7B6`
 - **Build verification**: `assembleRelease` succeeded; APK v2 signature verified; dynamic focus timer, calendar activity indicators, recurring tasks, deadline reminders, and task extraction review sheets included.
 
 ---

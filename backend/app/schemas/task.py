@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class SubtaskCreateRequest(BaseModel):
@@ -41,8 +41,57 @@ class TaskCaptureRequest(BaseModel):
     captured_at: datetime | None = None
     category_hint: uuid.UUID | None = None
     id: uuid.UUID | None = None
-    status: str | None = Field(None, pattern="^(pending|completed)$")
+    status: str | None = Field(None, pattern="^(pending|in_progress|completed|cancelled)$")
     deadline_at: datetime | None = None
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def validate_id(cls, v: Any) -> uuid.UUID | None:
+        if v is None or v == "" or str(v).strip().lower() in ("null", "undefined", "none", "----"):
+            return None
+        if isinstance(v, uuid.UUID):
+            return v
+        try:
+            return uuid.UUID(str(v).strip())
+        except (ValueError, AttributeError, TypeError):
+            return None
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def validate_status(cls, v: Any) -> str | None:
+        if not v or str(v).strip().lower() in ("null", "undefined", "none", ""):
+            return "pending"
+        v_str = str(v).strip().lower()
+        if v_str in ("pending", "in_progress", "completed", "cancelled"):
+            return v_str
+        return "pending"
+
+    @field_validator("origin", mode="before")
+    @classmethod
+    def validate_origin(cls, v: Any) -> str:
+        valid_origins = ("manual", "voice", "ai_recommendation", "meeting", "external_assignment", "recurring")
+        if not v or str(v).strip().lower() not in valid_origins:
+            return "manual"
+        return str(v).strip().lower()
+
+    @field_validator("deadline_at", mode="before")
+    @classmethod
+    def validate_deadline_at(cls, v: Any) -> datetime | None:
+        if v is None or v == "" or str(v).strip().lower() in ("null", "undefined", "none"):
+            return None
+        if isinstance(v, datetime):
+            return v
+        try:
+            clean_str = str(v).strip().replace("Z", "+00:00")
+            return datetime.fromisoformat(clean_str)
+        except (ValueError, TypeError, AttributeError):
+            return None
+
+    @field_validator("raw_input", mode="before")
+    @classmethod
+    def validate_raw_input(cls, v: Any) -> str:
+        s = str(v).strip() if v is not None else ""
+        return s or "Untitled Task"
 
 
 class TaskExtractionProposalResponse(BaseModel):
@@ -81,6 +130,31 @@ class TaskCreateRequest(BaseModel):
     tags: list[str] = Field(default_factory=list)
     subtasks: list[str] = Field(default_factory=list)
     id: uuid.UUID | None = None
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def validate_id(cls, v: Any) -> uuid.UUID | None:
+        if v is None or v == "" or str(v).strip().lower() in ("null", "undefined", "none", "----"):
+            return None
+        if isinstance(v, uuid.UUID):
+            return v
+        try:
+            return uuid.UUID(str(v).strip())
+        except (ValueError, AttributeError, TypeError):
+            return None
+
+    @field_validator("deadline_at", mode="before")
+    @classmethod
+    def validate_deadline_at(cls, v: Any) -> datetime | None:
+        if v is None or v == "" or str(v).strip().lower() in ("null", "undefined", "none"):
+            return None
+        if isinstance(v, datetime):
+            return v
+        try:
+            clean_str = str(v).strip().replace("Z", "+00:00")
+            return datetime.fromisoformat(clean_str)
+        except (ValueError, TypeError, AttributeError):
+            return None
 
 
 class TaskUpdateRequest(BaseModel):

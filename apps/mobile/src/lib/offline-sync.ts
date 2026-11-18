@@ -106,9 +106,28 @@ async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 }
 
 export function makeOfflineId(): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    try {
+      const generated = globalThis.crypto.randomUUID();
+      if (typeof generated === "string" && generated.length === 36) {
+        return generated;
+      }
+    } catch {
+      // Fallback below
+    }
+  }
+
   const bytes = new Uint8Array(16);
-  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(bytes);
-  else for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    try {
+      globalThis.crypto.getRandomValues(bytes);
+    } catch {
+      for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+    }
+  } else {
+    for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+
   let timestamp = Date.now();
   for (let index = 5; index >= 0; index -= 1) {
     bytes[index] = timestamp & 0xff;
@@ -116,7 +135,11 @@ export function makeOfflineId(): string {
   }
   bytes[6] = (bytes[6] & 0x0f) | 0x70;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
+
+  let hex = "";
+  for (let i = 0; i < 16; i += 1) {
+    hex += bytes[i].toString(16).padStart(2, "0");
+  }
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 

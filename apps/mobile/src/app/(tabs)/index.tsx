@@ -91,6 +91,62 @@ interface RunningTimer {
   source?: string;
 }
 
+function computeDeadlineIso(
+  dateChoice: "today" | "tomorrow" | "next_week" | "custom" | null,
+  customDate: string,
+  timeChoice: string | null,
+  customTime: string
+): string | null {
+  if (!dateChoice) return null;
+  const target = new Date();
+  if (dateChoice === "tomorrow") {
+    target.setDate(target.getDate() + 1);
+  } else if (dateChoice === "next_week") {
+    target.setDate(target.getDate() + 7);
+  } else if (dateChoice === "custom") {
+    if (!customDate.trim()) return null;
+    const parts = customDate.trim().split("-");
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
+      target.setFullYear(year, month, day);
+    } else {
+      return null;
+    }
+  }
+
+  let hours = 23;
+  let mins = 59;
+  if (timeChoice === "09:00") {
+    hours = 9;
+    mins = 0;
+  } else if (timeChoice === "14:00") {
+    hours = 14;
+    mins = 0;
+  } else if (timeChoice === "18:00") {
+    hours = 18;
+    mins = 0;
+  } else if (timeChoice === "21:00") {
+    hours = 21;
+    mins = 0;
+  } else if (timeChoice === "custom" && customTime.trim()) {
+    const parts = customTime.trim().split(":");
+    if (parts.length >= 2) {
+      const h = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      if (!isNaN(h) && !isNaN(m)) {
+        hours = h;
+        mins = m;
+      }
+    }
+  }
+
+  target.setHours(hours, mins, 0, 0);
+  return target.toISOString();
+}
+
 export default function DashboardScreen() {
   const router = useRouter();
 
@@ -495,42 +551,17 @@ export default function DashboardScreen() {
   const handleCaptureSubmit = async () => {
     if (!captureText.trim() || isCapturing) return;
     setIsCapturing(true);
-    const profile = await getUserProfile();
-    const taskId = makeOfflineId();
+    let profile: Awaited<ReturnType<typeof getUserProfile>> = null;
+    let taskId: string | null = null;
     let deadlineIso: string | null = null;
     try {
+      profile = await getUserProfile();
+      taskId = makeOfflineId();
+      deadlineIso = computeDeadlineIso(selectedDate, customDateStr, selectedTime, customTimeStr);
       const baseUrl = getServerUrl();
-      // Compute ISO deadline
-      if (selectedDate) {
-        const target = new Date();
-        if (selectedDate === "tomorrow") target.setDate(target.getDate() + 1);
-        else if (selectedDate === "next_week") target.setDate(target.getDate() + 7);
-        else if (selectedDate === "custom" && customDateStr.trim()) {
-          const parts = customDateStr.trim().split("-");
-          if (parts.length === 3) {
-            target.setFullYear(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-          }
-        }
-        let hours = 23;
-        let mins = 59;
-        if (selectedTime === "09:00") { hours = 9; mins = 0; }
-        else if (selectedTime === "14:00") { hours = 14; mins = 0; }
-        else if (selectedTime === "18:00") { hours = 18; mins = 0; }
-        else if (selectedTime === "21:00") { hours = 21; mins = 0; }
-        else if (selectedTime === "custom" && customTimeStr.trim()) {
-          const tp = customTimeStr.trim().split(":");
-          if (tp.length >= 2) {
-            hours = parseInt(tp[0], 10) || 0;
-            mins = parseInt(tp[1], 10) || 0;
-          }
-        }
-        target.setHours(hours, mins, 0, 0);
-        deadlineIso = target.toISOString();
-      }
-
       const token = await ensureAuthenticated();
       if (!token) {
-        if (!profile) return;
+        if (!profile?.id) return;
         const task = await createTaskOffline(profile.id, {
           id: taskId,
           title: captureText.trim(),
@@ -544,11 +575,11 @@ export default function DashboardScreen() {
       }
 
       const payload: Record<string, any> = {
-        id: taskId,
         raw_input: captureText.trim(),
         origin: isListening ? "voice" : "manual",
-        status: taskStatus,
+        status: taskStatus || "pending",
       };
+      if (taskId) payload.id = taskId;
       if (deadlineIso) payload.deadline_at = deadlineIso;
 
       const res = await fetch(`${baseUrl}/api/v1/tasks/capture`, {
@@ -567,13 +598,14 @@ export default function DashboardScreen() {
         setCaptureVisible(false);
         fetchDashboardData();
       } else {
-        const errJson = await res.json().catch(() => ({}));
-        Alert.alert("Capture Error", errJson.detail || "Failed to parse task.");
+        const errJson = await res.json().catch(() => ({})) as any;
+        const paramErrors = errJson.invalid_params?.map((p: any) => `${p.name}: ${p.reason}`).join("\n");
+        Alert.alert("Capture Error", paramErrors || errJson.detail || "Failed to parse task.");
       }
     } catch (err: any) {
-      if (profile) {
+      if (profile?.id) {
         const task = await createTaskOffline(profile.id, {
-          id: taskId,
+          id: taskId || makeOfflineId(),
           title: captureText.trim(),
           deadline_at: deadlineIso,
           origin: "manual",
