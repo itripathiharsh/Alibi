@@ -32,7 +32,7 @@ Public marketing routes (`/`, `/features`, `/how-it-works`, `/why-alibi`, `/docs
 2. Type/speak → "Save". Task appears instantly in list with a subtle "understanding…" shimmer.
 3. Confirm sheet slides up (only if extraction found something to confirm): fields as chips —
    `Category: Professional 92%` · `Deadline: Fri 14 Nov, 18:00 ("by Friday")` · `Estimate: ~1h 45m (from 6 similar)` · `Priority: —`.
-   Primary button **"Looks right"**; tapping a chip edits it inline. Dismissing = keep raw task, no fields applied.
+   Each suggested field starts as an explicit choice. The user can accept, edit, or reject fields individually; dismissing keeps the saved raw task and applies none of the suggestions.
 
 Rules: evidence text for every AI field (the quoted phrase or "based on N similar tasks"). Low-confidence (< 0.6) fields shown unselected.
 Clarification appears as one question chip, never a blocking dialog. Voice: live waveform, max 120 s, "Cancel" always visible.
@@ -44,9 +44,9 @@ Every data screen implements: **loading** (skeleton), **empty** (one-line guidan
 | Screen | Key elements |
 |--------|--------------|
 | Today | Open tasks due today or overdue, active in-progress tasks, scheduled blocks in time order, "Plan my day" button. Undated pending tasks stay in Backlog until started or scheduled. |
-| Task detail | Diary-like title and completion control; start/pause timer; actual time vs estimate; each recorded session's start/end and duration; per-session bars based only on recorded time; subtasks, notes, evidence, dependencies, history, predictions with "why" |
-| Calendar | Day/week; legend: fixed event (solid, lock icon), work block (tinted, task color), deadline (flag marker), actual time (hatched strip) |
-| Proposal review | Diff list: new blocks (+), displacements (↔, require individual tick), unscheduled tasks with reasons; Accept all / selected / Reject |
+| Task detail | Diary-like title and completion control; start/pause timer; actual time vs estimate; each recorded session's start/end and duration; per-session bars based only on recorded time; subtasks, notes, evidence, dependencies, history, predictions with "why"; explicit repeat-rule setup and stop action |
+| Calendar | Day/week; legend: fixed event (solid, lock icon), work block (tinted, task color), deadline (flag marker), actual time (hatched strip); proposed daily or weekly work blocks are selectable and only saved after confirmation |
+| Proposal review | Diff list: new blocks (+), displacements (↔, require individual tick), unscheduled tasks with reasons; Accept all / selected / Reject. Extracted task fields are also individually reviewable before application. |
 | Dashboard | Score ring with "How is this calculated?" sheet, 6 tiles, charts, every chart has data table toggle (a11y) |
 | Assistant | Chat with source chips under each answer; tapping opens record; "Not found in your records" style when ungrounded |
 | Vault | Search box, filters (date, category, project, source), results with snippets |
@@ -55,6 +55,7 @@ Every data screen implements: **loading** (skeleton), **empty** (one-line guidan
 | Share dialog | Recipient label, expiry, included classes (warning when adding personal/academic), copy link (shown once) |
 | Sync conflicts | Side-by-side field values, choose |
 | AI settings | Provider cards: status dot, key set (••••1234), test button, models, fallback drag order, "Disable all external AI" master switch |
+| Profile settings (mobile) | Editable work hours by weekday, deadline reminder lead time, private notification controls; saved preferences are used by planning and local reminders |
 
 ## 4. Design system
 - **Typography:** Inter (web via self-hosted font files, mobile via expo-font) — scale 12/14/16/20/24/32; tabular numerals for metrics.

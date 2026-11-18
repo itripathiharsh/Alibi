@@ -128,7 +128,7 @@ class SchedulingProposalService:
                     task_id=task_id,
                     kind="work_block",
                     source="ai_accepted",
-                    title=prop.get("title", "Focus Work Block"),
+                    title=prop["title"],
                     start_at=start_dt,
                     end_at=end_dt,
                     is_all_day=False,

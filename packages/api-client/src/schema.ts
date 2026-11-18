@@ -1364,6 +1364,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/recurrences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Recurrences */
+        get: operations["list_recurrences_api_v1_recurrences_get"];
+        put?: never;
+        /**
+         * Create Recurrence
+         * @description Create a recurrence only after the user chooses a task and frequency.
+         */
+        post: operations["create_recurrence_api_v1_recurrences_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recurrences/{recurrence_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Recurrence */
+        delete: operations["delete_recurrence_api_v1_recurrences__recurrence_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/vault/notes": {
         parameters: {
             query?: never;
@@ -3283,6 +3321,58 @@ export interface components {
              * @default 1
              */
             horizon_days: number;
+        };
+        /** RecurrenceCreateRequest */
+        RecurrenceCreateRequest: {
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+            /**
+             * Frequency
+             * @enum {string}
+             */
+            frequency: "daily" | "weekly" | "monthly";
+            /**
+             * Interval
+             * @default 1
+             */
+            interval: number;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Until At */
+            until_at?: string | null;
+        };
+        /** RecurrenceResponse */
+        RecurrenceResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Task Id */
+            task_id: string | null;
+            /** Title */
+            title: string;
+            /** Frequency */
+            frequency: string;
+            /** Interval */
+            interval: number;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Until At */
+            until_at: string | null;
+            /** Active */
+            active: boolean;
+            /** Generated Until */
+            generated_until: string | null;
         };
         /** RefreshRequest */
         RefreshRequest: {
@@ -6713,6 +6803,99 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ConflictResponse"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_recurrences_api_v1_recurrences_get: {
+        parameters: {
+            query?: {
+                task_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurrenceResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_recurrence_api_v1_recurrences_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecurrenceCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurrenceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_recurrence_api_v1_recurrences__recurrence_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recurrence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

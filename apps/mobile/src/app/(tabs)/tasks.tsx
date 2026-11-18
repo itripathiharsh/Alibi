@@ -29,6 +29,7 @@ import {
   Mic,
   History,
   Pause,
+  Repeat2,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, SunriseArt } from "../../components/brand-ui";
@@ -36,7 +37,11 @@ import { getAccessToken, ensureAuthenticated, getUserProfile } from "../../lib/a
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder, scheduleTaskTimerReminder, syncTaskTimerReminders } from "../../lib/timer-reminders";
+import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
 import { loadLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
+import { CaptureReviewSheet } from "../../components/capture-review-sheet";
+import { decideTaskExtraction, type TaskExtractionProposal } from "../../lib/task-extraction";
+import { RepeatTaskSheet, type RepeatFrequency, type RepeatRuleSummary } from "../../components/repeat-task-sheet";
 import {
   cacheRunningTimers,
   cacheTaskView,
@@ -175,11 +180,17 @@ export default function TasksScreen() {
   const [taskTimeEntries, setTaskTimeEntries] = useState<TaskTimeEntry[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState(false);
+  const [repeatTask, setRepeatTask] = useState<TaskItem | null>(null);
+  const [repeatRule, setRepeatRule] = useState<RepeatRuleSummary | null>(null);
+  const [isLoadingRepeat, setIsLoadingRepeat] = useState(false);
+  const [isSavingRepeat, setIsSavingRepeat] = useState(false);
 
   // Capture modal
   const [captureVisible, setCaptureVisible] = useState(false);
   const [captureText, setCaptureText] = useState("");
   const [isCapturing, setIsCapturing] = useState(false);
+  const [pendingExtraction, setPendingExtraction] = useState<TaskExtractionProposal | null>(null);
+  const [isReviewingExtraction, setIsReviewingExtraction] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [taskStatus, setTaskStatus] = useState<"pending" | "completed">("pending");
   const [selectedDate, setSelectedDate] = useState<"today" | "tomorrow" | "next_week" | "custom" | null>(null);
@@ -266,6 +277,8 @@ export default function TasksScreen() {
         const data = await res.json() as TaskItem[];
         if (profile) await cacheTaskView(profile.id, activeView, data);
         setTasks(data);
+        const lead = profile?.settings?.reminder_lead_min;
+        void syncTaskDeadlineReminders(data, typeof lead === "number" ? lead : DEFAULT_DEADLINE_REMINDER_LEAD_MIN);
         setSelectedTask((current) => current ? data.find((item: TaskItem) => item.id === current.id) ?? current : current);
         if (profile && token) void syncMobileAccount(profile.id, token, baseUrl).catch(() => undefined);
       }
@@ -364,6 +377,7 @@ export default function TasksScreen() {
       if (res.ok) {
         const result = await res.json();
         const capturedTask = result.task;
+        if (result.extraction) setPendingExtraction(result.extraction as TaskExtractionProposal);
         if (capturedTask) {
           setTasks((prev) => [
             {
@@ -409,6 +423,30 @@ export default function TasksScreen() {
       }
     } finally {
       setIsCapturing(false);
+    }
+  };
+
+  const submitExtractionDecision = async (
+    acceptedFields: Record<string, unknown>,
+    rejectedFields: string[],
+  ) => {
+    if (!pendingExtraction || isReviewingExtraction) return;
+    setIsReviewingExtraction(true);
+    try {
+      await decideTaskExtraction({
+        taskId: pendingExtraction.task_id,
+        acceptedFields,
+        rejectedFields,
+      });
+      setPendingExtraction(null);
+      await fetchTasks();
+    } catch (error: unknown) {
+      Alert.alert(
+        "Review not saved",
+        error instanceof Error ? error.message : "Please try reviewing the task again.",
+      );
+    } finally {
+      setIsReviewingExtraction(false);
     }
   };
 
@@ -579,8 +617,31 @@ export default function TasksScreen() {
     }
   };
 
+  const loadTaskRecurrence = useCallback(async (task: TaskItem) => {
+    setRepeatRule(null);
+    setIsLoadingRepeat(true);
+    try {
+      const token = await ensureAuthenticated();
+      if (!token) {
+        setRepeatRule(null);
+        return;
+      }
+      const response = await fetch(`${getServerUrl()}/api/v1/recurrences?task_id=${encodeURIComponent(task.id)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Could not load the repeat schedule.");
+      const rules = await response.json() as RepeatRuleSummary[];
+      setRepeatRule(rules[0] ?? null);
+    } catch {
+      setRepeatRule(null);
+    } finally {
+      setIsLoadingRepeat(false);
+    }
+  }, []);
+
   const loadTaskHistory = useCallback(async (task: TaskItem) => {
     setSelectedTask(task);
+    void loadTaskRecurrence(task);
     setTaskTimeEntries([]);
     setHistoryError(false);
     setIsLoadingHistory(true);
@@ -615,7 +676,64 @@ export default function TasksScreen() {
     } finally {
       setIsLoadingHistory(false);
     }
-  }, []);
+  }, [loadTaskRecurrence]);
+
+  const createRepeatSchedule = async (frequency: RepeatFrequency, interval: number) => {
+    if (!repeatTask || isSavingRepeat) return;
+    setIsSavingRepeat(true);
+    try {
+      const token = await ensureAuthenticated();
+      if (!token) throw new Error("Sign in to save a repeat schedule.");
+      const firstDue = repeatTask.deadline_at ? new Date(repeatTask.deadline_at) : new Date();
+      const now = Date.now();
+      const nextOccurrence = new Date(firstDue);
+      do {
+        if (frequency === "daily") nextOccurrence.setDate(nextOccurrence.getDate() + interval);
+        else if (frequency === "weekly") nextOccurrence.setDate(nextOccurrence.getDate() + 7 * interval);
+        else nextOccurrence.setMonth(nextOccurrence.getMonth() + interval);
+      } while (nextOccurrence.getTime() <= now);
+
+      const response = await fetch(`${getServerUrl()}/api/v1/recurrences`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ task_id: repeatTask.id, frequency, interval, starts_at: nextOccurrence.toISOString() }),
+      });
+      const result = await response.json() as RepeatRuleSummary & { detail?: string };
+      if (!response.ok) throw new Error(result.detail ?? "Could not save the repeat schedule.");
+      setRepeatRule(result);
+      void fetchTasks();
+    } catch (error: unknown) {
+      Alert.alert("Repeat schedule not saved", error instanceof Error ? error.message : "Please try again.");
+    } finally {
+      setIsSavingRepeat(false);
+    }
+  };
+
+  const stopRepeatSchedule = (ruleId: string) => {
+    Alert.alert("Stop future repeats?", "Tasks already created from this schedule will stay in your list.", [
+      { text: "Keep schedule", style: "cancel" },
+      { text: "Stop repeats", style: "destructive", onPress: () => {
+        void (async () => {
+          setIsSavingRepeat(true);
+          try {
+            const token = await ensureAuthenticated();
+            if (!token) throw new Error("Sign in to update the repeat schedule.");
+            const response = await fetch(`${getServerUrl()}/api/v1/recurrences/${ruleId}`, {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) throw new Error("Could not stop the repeat schedule.");
+            setRepeatRule(null);
+            setRepeatTask(null);
+          } catch (error: unknown) {
+            Alert.alert("Repeat schedule unchanged", error instanceof Error ? error.message : "Please try again.");
+          } finally {
+            setIsSavingRepeat(false);
+          }
+        })();
+      } },
+    ]);
+  };
 
   useEffect(() => {
     if (!taskId || isLoading || openedTaskId.current === taskId) return;
@@ -1057,6 +1175,14 @@ export default function TasksScreen() {
         </View>
       </Modal>
 
+      <CaptureReviewSheet
+        extraction={pendingExtraction}
+        visible={Boolean(pendingExtraction)}
+        busy={isReviewingExtraction}
+        onApply={(fields, rejectedFields) => { void submitExtractionDecision(fields, rejectedFields); }}
+        onKeepOriginal={(rejectedFields) => { void submitExtractionDecision({}, rejectedFields); }}
+      />
+
       <Modal visible={Boolean(selectedTask)} transparent animationType="slide" onRequestClose={() => setSelectedTask(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.detailContent}>
@@ -1086,6 +1212,11 @@ export default function TasksScreen() {
                     : <><Play size={15} color="#FFFFFF" /><Text style={styles.detailActionText}>Start focus</Text></>}
                 </Pressable>
               </View>
+              <Pressable style={styles.repeatScheduleButton} onPress={() => { setRepeatTask(selectedTask); void loadTaskRecurrence(selectedTask); }} accessibilityRole="button">
+                <Repeat2 size={17} color={theme.colors.accent.amber} />
+                <Text style={styles.repeatScheduleLabel}>Repeat this task</Text>
+                <Text style={styles.repeatScheduleHint}>{isLoadingRepeat ? "Loading…" : repeatRule ? `Every ${repeatRule.interval > 1 ? `${repeatRule.interval} ` : ""}${repeatRule.frequency}` : "Set a schedule"}</Text>
+              </Pressable>
               <Text style={styles.historyTitle}>Sessions</Text>
               {isLoadingHistory ? <ActivityIndicator size="small" color={theme.colors.accent.amber} /> : historyError ? (
                 <View style={styles.historyEmpty}>
@@ -1115,6 +1246,17 @@ export default function TasksScreen() {
           </View>
         </View>
       </Modal>
+
+      <RepeatTaskSheet
+        taskTitle={repeatTask?.title ?? ""}
+        rule={repeatRule}
+        visible={Boolean(repeatTask)}
+        busy={isSavingRepeat}
+        loading={isLoadingRepeat}
+        onClose={() => setRepeatTask(null)}
+        onCreate={(frequency, interval) => { void createRepeatSchedule(frequency, interval); }}
+        onStop={stopRepeatSchedule}
+      />
     </View>
   );
 }
@@ -1309,6 +1451,9 @@ const styles = StyleSheet.create({
   detailMetricLabel: { marginTop: 2, fontSize: 10, color: theme.colors.text.secondary },
   detailAction: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, backgroundColor: theme.colors.accent.amber, borderRadius: 12, paddingHorizontal: 12 },
   detailActionText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
+  repeatScheduleButton: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: theme.colors.border.subtle, borderRadius: 14, backgroundColor: theme.colors.surface.card },
+  repeatScheduleLabel: { color: theme.colors.text.primary, fontSize: 12, fontWeight: "800", flex: 1 },
+  repeatScheduleHint: { color: theme.colors.text.secondary, fontSize: 10, fontWeight: "700", textTransform: "capitalize" },
   historyTitle: { fontSize: 15, fontWeight: "700", color: theme.colors.text.primary, marginTop: 2 },
   historyList: { maxHeight: 300 },
   historyEmpty: { padding: 16, borderRadius: 12, backgroundColor: theme.colors.background.base, color: theme.colors.text.secondary, lineHeight: 20, fontSize: 13 },

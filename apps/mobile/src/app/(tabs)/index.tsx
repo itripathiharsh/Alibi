@@ -37,11 +37,14 @@ import {
   Tag as TagIcon,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
-import { getAccessToken, ensureAuthenticated, getUserProfile } from "../../lib/auth";
+import { getAccessToken, ensureAuthenticated, getUserProfile, saveUserProfile } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder, scheduleTaskTimerReminder } from "../../lib/timer-reminders";
+import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
 import { filterLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
+import { CaptureReviewSheet } from "../../components/capture-review-sheet";
+import { decideTaskExtraction, type TaskExtractionProposal } from "../../lib/task-extraction";
 import { cacheRunningTimers, cacheTaskView, createTaskOffline, getCachedTaskView, getLocalTimers, makeOfflineId, removeLocalTimer, startTaskTimerOffline, stopTaskTimerOffline, syncMobileAccount, updateTaskOffline } from "../../lib/offline-sync";
 
 interface TaskItem {
@@ -77,6 +80,8 @@ interface UserProfile {
   id?: string;
   email?: string;
   display_name?: string;
+  timezone?: string;
+  settings?: Record<string, unknown>;
 }
 
 interface RunningTimer {
@@ -109,6 +114,8 @@ export default function DashboardScreen() {
   const [captureVisible, setCaptureVisible] = useState(false);
   const [captureText, setCaptureText] = useState("");
   const [isCapturing, setIsCapturing] = useState(false);
+  const [pendingExtraction, setPendingExtraction] = useState<TaskExtractionProposal | null>(null);
+  const [isReviewingExtraction, setIsReviewingExtraction] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [taskStatus, setTaskStatus] = useState<"pending" | "completed">("pending");
   const [selectedDate, setSelectedDate] = useState<"today" | "tomorrow" | "next_week" | "custom" | null>(null);
@@ -200,18 +207,35 @@ export default function DashboardScreen() {
         fetch(`${baseUrl}/api/v1/notifications`, { headers }).catch(() => null),
       ]);
 
+      let reminderLeadMin = DEFAULT_DEADLINE_REMINDER_LEAD_MIN;
       if (userRes && userRes.ok) {
-        setUser(await userRes.json());
+        const userData = await userRes.json() as UserProfile;
+        setUser(userData);
+        if (userData.id && userData.email && userData.timezone) {
+          await saveUserProfile({
+            id: userData.id,
+            email: userData.email,
+            display_name: userData.display_name ?? null,
+            timezone: userData.timezone,
+            settings: userData.settings,
+          });
+        }
+        const configuredLead = userData.settings?.reminder_lead_min;
+        if (typeof configuredLead === "number" && Number.isFinite(configuredLead)) reminderLeadMin = configuredLead;
       }
+      const reminderTasks: TaskItem[] = [];
       if (tasksRes && tasksRes.ok) {
         const taskData = await tasksRes.json() as TaskItem[];
         setTodayTasks(taskData);
+        reminderTasks.push(...taskData);
         if (profile) await cacheTaskView(profile.id, "today", taskData);
       }
       if (upcomingRes && upcomingRes.ok) {
         const upData = await upcomingRes.json() as TaskItem[];
         setUpcomingTasks(upData);
+        reminderTasks.push(...upData);
       }
+      void syncTaskDeadlineReminders(reminderTasks, reminderLeadMin);
       if (notifsRes && notifsRes.ok) {
         const notifs = await notifsRes.json();
         setHasUnreadNotifications(Array.isArray(notifs) && notifs.some((n: any) => n.status !== "dismissed"));
@@ -537,6 +561,8 @@ export default function DashboardScreen() {
       });
 
       if (res.ok) {
+        const result = await res.json() as { extraction?: TaskExtractionProposal | null };
+        if (result.extraction) setPendingExtraction(result.extraction);
         resetModal();
         setCaptureVisible(false);
         fetchDashboardData();
@@ -560,6 +586,30 @@ export default function DashboardScreen() {
       }
     } finally {
       setIsCapturing(false);
+    }
+  };
+
+  const submitExtractionDecision = async (
+    acceptedFields: Record<string, unknown>,
+    rejectedFields: string[],
+  ) => {
+    if (!pendingExtraction || isReviewingExtraction) return;
+    setIsReviewingExtraction(true);
+    try {
+      await decideTaskExtraction({
+        taskId: pendingExtraction.task_id,
+        acceptedFields,
+        rejectedFields,
+      });
+      setPendingExtraction(null);
+      await fetchDashboardData();
+    } catch (error: unknown) {
+      Alert.alert(
+        "Review not saved",
+        error instanceof Error ? error.message : "Please try reviewing the task again.",
+      );
+    } finally {
+      setIsReviewingExtraction(false);
     }
   };
 
@@ -1340,6 +1390,13 @@ export default function DashboardScreen() {
           </View>
         </View>
       </Modal>
+      <CaptureReviewSheet
+        extraction={pendingExtraction}
+        visible={Boolean(pendingExtraction)}
+        busy={isReviewingExtraction}
+        onApply={(fields, rejectedFields) => { void submitExtractionDecision(fields, rejectedFields); }}
+        onKeepOriginal={(rejectedFields) => { void submitExtractionDecision({}, rejectedFields); }}
+      />
     </View>
   );
 }

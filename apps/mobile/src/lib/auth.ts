@@ -15,6 +15,7 @@ export interface MobileUserProfile {
   email: string;
   display_name: string | null;
   timezone: string;
+  settings?: Record<string, unknown>;
 }
 
 export async function saveTokens(accessToken: string, refreshToken: string): Promise<void> {

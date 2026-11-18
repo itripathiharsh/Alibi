@@ -30,6 +30,7 @@ This document defines conventions and the endpoint catalogue; schemas live in Py
 | not_found | 404 | Missing or not owned (never reveal existence) |
 | version_conflict | 409 | If-Match mismatch |
 | invalid_transition | 409 | Illegal status change |
+| conflict | 409 | Resource conflicts with existing state, such as an active repeat rule for the same task |
 | dependency_cycle | 409 | Would create cycle |
 | proposal_stale | 409 | Schedule inputs changed since proposal |
 | ai_unavailable | 503 | No provider reachable for the op (client must degrade) |
@@ -58,7 +59,7 @@ This document defines conventions and the endpoint catalogue; schemas live in Py
 | POST | /auth/refresh | `{refresh_token}` or cookie → new pair (rotation) |
 | POST | /auth/logout | revokes current device family |
 | GET | /auth/me | user + settings |
-| PATCH | /auth/me | display_name, timezone, settings (validated) |
+| PATCH | /auth/me | display_name, timezone, settings (validated; includes per-weekday `working_hours`, `min_block_min`, `max_daily_focus_min`, and `reminder_lead_min`) |
 | POST | /auth/change-password | `{current_password, new_password}` |
 | GET | /auth/devices · DELETE /auth/devices/{id} | list / revoke |
 
@@ -84,7 +85,11 @@ Category body: `{name, sharing_class, external_ai_allowed, color}`.
 | GET | /tasks/{id}/events | activity history (paginated) |
 | POST/PATCH/DELETE | /tasks/{id}/subtasks[/{sid}] | `POST /tasks/{id}/subtasks/reorder {ids[]}` |
 | POST/DELETE | /tasks/{id}/dependencies[/{dep_id}] | cycle check |
-| GET/POST | /recurrences · PATCH/DELETE /recurrences/{id} | RRULE validated with `dateutil.rrule` |
+| GET | /recurrences?task_id= | Active recurrence rules for the authenticated user; optional task filter |
+| POST | /recurrences | `{task_id, frequency: daily|weekly|monthly, interval: 1..52, starts_at, until_at?}`; explicitly creates a repeat rule from the selected task; duplicate active rule for the same task → 409 |
+| DELETE | /recurrences/{id} | Stops future generation; already generated tasks remain |
+
+Recurring tasks are generated ahead by nightly maintenance only after the user creates a rule. Generated instances copy the saved task fields and never create calendar work blocks. The schedule and capture flows require the user to accept proposed extracted fields or proposed calendar blocks before those changes are applied.
 
 ### 4.5 Time tracking
 | POST | /time-entries/start | `{id, task_id, started_at}` → 409 only if this task already has an active timer; other task timers are independent |

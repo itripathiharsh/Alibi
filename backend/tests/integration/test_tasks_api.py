@@ -83,11 +83,46 @@ async def test_ac_m2_1_capture_persists_raw_input_before_parsing(
     data = res.json()
 
     assert data["task"]["raw_input"] == raw_text
-    assert "Deploy security patch" in data["task"]["title"]
-    assert data["task"]["deadline_at"] is not None
-    assert "security" in data["task"]["tags"]
+    assert data["task"]["title"] == raw_text
+    assert data["task"]["deadline_at"] is None
+    assert "security" not in data["task"]["tags"]
     assert data["extraction_status"] == "proposed"
     assert data["extraction"] is not None
+    assert data["extraction"]["final_proposal"]["deadline_at"] is not None
+    assert "security" in data["extraction"]["final_proposal"]["tags"]
+
+
+# req: FR-TASK-003, FR-TASK-005
+@pytest.mark.asyncio
+async def test_extraction_fields_apply_only_after_user_decision(
+    auth_client: httpx.AsyncClient,
+) -> None:
+    """FR-TASK-005: extracted task fields remain a proposal until explicitly accepted."""
+    raw_text = "Prepare the launch brief by Friday 5pm #launch"
+    capture = await auth_client.post("/api/v1/tasks/capture", json={"raw_input": raw_text})
+    assert capture.status_code == 201, capture.text
+    captured = capture.json()
+    task_id = captured["task"]["id"]
+    proposal = captured["extraction"]["final_proposal"]
+
+    decision = await auth_client.post(
+        f"/api/v1/tasks/{task_id}/extraction/decision",
+        json={
+            "accepted_fields": {
+                "title": proposal["title"],
+                "deadline_at": proposal["deadline_at"],
+                "deadline_kind": proposal["deadline_kind"],
+                "tags": proposal["tags"],
+            }
+        },
+    )
+    assert decision.status_code == 200, decision.text
+    accepted = decision.json()
+    assert accepted["title"] == proposal["title"]
+    assert datetime.fromisoformat(
+        accepted["deadline_at"].replace("Z", "+00:00")
+    ) == datetime.fromisoformat(proposal["deadline_at"].replace("Z", "+00:00"))
+    assert "launch" in accepted["tags"]
 
 
 @pytest.mark.asyncio
@@ -220,7 +255,7 @@ async def test_ac_m2_8_recurrence_idempotency() -> None:
         rule = RecurrenceRule(
             id=uuid.uuid4(),
             user_id=user_id,
-            template={"title": "Daily Standup", "workspace_id": str(workspace_id)},
+            template={"title": "Daily Standup"},
             rrule="FREQ=DAILY;INTERVAL=1",
             dtstart=utc_now(),
             active=True,

@@ -120,51 +120,27 @@ class TaskService:
                 existing_projects=list(existing_projects),
             )
 
-            # Update task fields with grounded results
-            task.title = grounded.title
-            if deadline_at is not None:
-                task.deadline_at = deadline_at
-                task.deadline_kind = "hard"
-                task.deadline_source = "user"
-            else:
-                task.deadline_at = grounded.deadline_at
-                task.deadline_kind = grounded.deadline_kind
-                task.deadline_source = "extraction" if grounded.deadline_at else None
-
+            # Keep extracted fields in the proposal. The user's explicit capture fields
+            # (status/deadline) were persisted above; all derived values wait for review.
             if status is not None:
                 task.status = status
                 if status == "completed":
                     task.completed_at = now
-
-            task.priority = grounded.priority
-            task.estimate_user_min = grounded.estimate_min
-            task.estimate_final_min = grounded.estimate_min
-            if grounded.project_id:
-                task.project_id = grounded.project_id
             task.parse_status = "proposed"
 
-            # Sync tags
-            if grounded.tags:
-                await self.tag_repo.sync_task_tags(task.id, grounded.tags)
-
-            # Sync subtasks
-            if grounded.subtasks:
-                for idx, sub_title in enumerate(grounded.subtasks):
-                    sub = Subtask(
-                        id=uuid.uuid4(),
-                        user_id=self.user_id,
-                        task_id=task.id,
-                        title=sub_title,
-                        position=idx,
-                    )
-                    self.session.add(sub)
+            proposal_fields = grounded.to_dict()
+            if deadline_at is not None:
+                # The date picker is explicit user input and takes precedence over
+                # a different date inferred from the same text.
+                proposal_fields["deadline_at"] = deadline_at.isoformat()
+                proposal_fields["deadline_kind"] = "hard"
 
             # Record extraction proposal row
             extraction_row = await self.ai_extraction_repo.create(
                 task_id=task.id,
                 input_text=raw_input,
                 rules_result=rules_res.to_dict(),
-                final_proposal=grounded.to_dict(),
+                final_proposal=proposal_fields,
                 status="proposed",
             )
 

@@ -38,7 +38,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-TASK-016 | Time tracking: start/stop timer and manual time entries; actual time = sum of entries | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-021 | Independent per-task timers; different tasks may run concurrently, same-task duplicate timer rejected | M | M13 | 03§3.3, 04§4.5 | backend/tests/unit/test_time_tracking.py; mobile tasks screen | ◐ |
 | FR-TASK-017 | Task dependencies (blocked-by) | S | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
-| FR-TASK-018 | Recurring responsibilities via RRULE; instances generated ahead (14 days) | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
+| FR-TASK-018 | Recurring responsibilities via RRULE; instances generated ahead (14 days) | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/test_recurrences_api.py; service idempotency tests | ☑ |
 | FR-TASK-019 | Search and filter tasks by text, category, project, tag, status, date | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-020 | Soft delete with 30-day restore; hard delete from trash | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-CAL-001 | Internal calendar: day and week views | M | M8 | 09, 04§4.8 | backend/tests/integration/calendar/ + e2e | ☑ |

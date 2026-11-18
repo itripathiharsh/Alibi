@@ -83,3 +83,61 @@ def test_scheduling_is_deterministic() -> None:
 
     assert res1["proposals"] == res2["proposals"]
     assert res1["unscheduled"] == res2["unscheduled"]
+
+
+def test_schedule_uses_user_timezone_and_weekday_working_hours() -> None:
+    """FR-SCHED-002: User work windows are interpreted in their configured timezone."""
+    snapshot = {
+        "horizon_start": "2026-11-16T00:00:00Z",
+        "horizon_end": "2026-11-16T08:00:00Z",
+        "timezone": "Asia/Kolkata",
+        "working_hours": {
+            "monday": {"enabled": True, "start": "09:00", "end": "17:00"},
+            "saturday": {"enabled": False, "start": "09:00", "end": "17:00"},
+        },
+        "max_daily_focus_min": 60,
+        "tasks": [
+            {"id": "task-1", "title": "Review draft", "remaining_min": 60, "deadline_at": None}
+        ],
+        "blocked_intervals": [],
+    }
+
+    result = GreedyScheduler().solve(snapshot)
+    assert result["proposals"][0]["start_at"] == "2026-11-16T09:00:00+05:30"
+    assert result["proposals"][0]["end_at"] == "2026-11-16T10:00:00+05:30"
+
+
+def test_unestimated_task_is_not_given_a_fabricated_schedule_duration() -> None:
+    """FR-SCHED-002: Work without a recorded estimate stays unscheduled for review."""
+    snapshot = {
+        "horizon_start": "2026-11-17T09:00:00Z",
+        "horizon_end": "2026-11-17T18:00:00Z",
+        "working_hours": {"start": "09:00", "end": "18:00"},
+        "tasks": [{"id": "task-1", "title": "Review draft", "remaining_min": None}],
+        "blocked_intervals": [],
+    }
+
+    result = GreedyScheduler().solve(snapshot)
+    assert result["proposals"] == []
+    assert result["unscheduled"] == [
+        {"task_id": "task-1", "title": "Review draft", "needed_min": None, "reason": "NO_ESTIMATE"}
+    ]
+
+
+def test_learned_session_length_and_focus_window_shape_proposal() -> None:
+    """FR-LEARN-005: Reliable personal patterns influence block length and start time."""
+    snapshot = {
+        "horizon_start": "2026-11-17T00:00:00Z",
+        "horizon_end": "2026-11-17T14:00:00Z",
+        "timezone": "Asia/Kolkata",
+        "working_hours": {"tuesday": {"enabled": True, "start": "09:00", "end": "17:00"}},
+        "preferred_session_min": 45,
+        "preferred_hours": [14],
+        "tasks": [{"id": "task-1", "title": "Review draft", "remaining_min": 90}],
+        "blocked_intervals": [],
+    }
+
+    proposals = GreedyScheduler().solve(snapshot)["proposals"]
+    assert [item["duration_min"] for item in proposals] == [45, 45]
+    assert proposals[0]["start_at"] == "2026-11-17T14:00:00+05:30"
+    assert all("PREFERRED_WINDOW" in item["reasons"] for item in proposals)

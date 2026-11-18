@@ -14,7 +14,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.calendar import CalendarEvent
+from app.models.learning import MemoryProfile
 from app.models.task import Task
+from app.models.user import User
+from app.scheduling.config import DEFAULT_SESSION_BLOCK_MIN, normalized_working_hours
 
 
 class SchedulingInputBuilder:
@@ -30,6 +33,35 @@ class SchedulingInputBuilder:
         horizon_end: datetime,
     ) -> tuple[dict[str, Any], str]:
         """Query open tasks, fixed events, and generate deterministic sha256 input_hash."""
+        user = await self.db.get(User, user_id)
+        user_settings = user.settings if user else {}
+        timezone = user.timezone if user else "UTC"
+
+        profile_stmt = (
+            select(MemoryProfile)
+            .where(MemoryProfile.user_id == user_id)
+            .order_by(MemoryProfile.version.desc())
+            .limit(1)
+        )
+        profile = (await self.db.execute(profile_stmt)).scalar_one_or_none()
+        preferences = profile.profile.get("preferences", []) if profile else []
+        supported_preferences = [
+            preference
+            for preference in preferences
+            if isinstance(preference, dict) and float(preference.get("confidence", 0)) >= 0.6
+        ]
+        personal_preference = max(
+            supported_preferences,
+            key=lambda preference: float(preference.get("confidence", 0)),
+            default={},
+        )
+        preferred_session_min = personal_preference.get("preferred_session_min")
+        if not isinstance(preferred_session_min, int) or preferred_session_min <= 0:
+            preferred_session_min = DEFAULT_SESSION_BLOCK_MIN
+        preferred_hours = personal_preference.get("preferred_hours", [])
+        if not isinstance(preferred_hours, list):
+            preferred_hours = []
+
         # 1. Open tasks
         task_stmt = (
             select(Task)
@@ -44,9 +76,8 @@ class SchedulingInputBuilder:
 
         task_data = []
         for t in tasks:
-            remaining = max(
-                15, (t.estimate_final_min or t.estimate_user_min or 30) - (t.actual_min or 0)
-            )
+            estimate = t.estimate_final_min or t.estimate_user_min
+            remaining = max(15, estimate - (t.actual_min or 0)) if estimate else None
             task_data.append(
                 {
                     "id": str(t.id),
@@ -86,7 +117,14 @@ class SchedulingInputBuilder:
         snapshot = {
             "horizon_start": horizon_start.isoformat(),
             "horizon_end": horizon_end.isoformat(),
-            "working_hours": {"start": "09:00", "end": "18:00"},
+            "timezone": timezone,
+            "working_hours": normalized_working_hours(user_settings.get("working_hours")),
+            "min_block_min": user_settings.get("min_block_min", 30),
+            "max_daily_focus_min": user_settings.get("max_daily_focus_min", 480),
+            "preferred_session_min": min(preferred_session_min, 120),
+            "preferred_hours": [
+                hour for hour in preferred_hours if isinstance(hour, int) and 0 <= hour <= 23
+            ],
             "tasks": task_data,
             "blocked_intervals": event_data,
         }

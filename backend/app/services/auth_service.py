@@ -37,6 +37,7 @@ from app.repositories.device_repo import DeviceRepository
 from app.repositories.refresh_token_repo import RefreshTokenRepository
 from app.repositories.user_repo import UserRepository
 from app.repositories.workspace_repo import WorkspaceRepository
+from app.scheduling.config import DEFAULT_WORKING_HOURS
 
 
 class AuthService:
@@ -116,7 +117,7 @@ class AuthService:
             password_hash=pw_hash,
             display_name=display_name.strip() if display_name else None,
             timezone=settings.alibi_timezone,
-            settings={},
+            settings={"working_hours": DEFAULT_WORKING_HOURS},
         )
         try:
             async with self.session.begin_nested():

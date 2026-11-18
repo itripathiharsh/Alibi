@@ -8,7 +8,7 @@ Solver decides, humans approve. Fixed events are immovable. Accepted blocks are 
 - Working hours per weekday (user settings) + optional per-day overrides; quiet hours excluded.
 - Fixed events (expanded recurrences) → blocked intervals.
 - Existing accepted work blocks → blocked unless `allow_displacement` and listed as displaceable (then soft penalty + needs approval).
-- Tasks to schedule: open tasks in scope with `remaining_min = max(estimate_final or AI p50/p75 − actual_min, 15)`, deadline, priority, dependencies, category, preferred block length (learned), min block 30 (settings).
+- Tasks to schedule: open tasks in scope with remaining time derived from a user estimate or a confirmed estimate. A task with no usable estimate stays unscheduled with `NO_ESTIMATE`; the scheduler never invents a duration. Remaining time is `max(estimate_final or estimate_user − actual_min, 15)`, deadline, priority, dependencies, category, preferred block length (learned), and user-configured minimum block length.
 - Preferences: hour-of-day weights per category from learned_patterns (only if pattern confidence ≥ 0.6; else neutral).
 - Capacity: max focus minutes/day (settings) and realistic capacity (doc 07 §8, soft).
 
@@ -35,6 +35,8 @@ Time discretised in 15-min slots. For each task *t* split into up to `k_t = ceil
 
 ## 4. Greedy fallback (deterministic)
 Earliest-deadline-first, then priority, then creation date; place chunks in earliest free slot respecting all hard constraints; used when CP-SAT fails/times out or OR-Tools unavailable. Proposal labelled `solver_status=greedy`.
+
+**Implementation status:** the current solver dispatches to the deterministic greedy scheduler even when OR-Tools is installed. The CP-SAT formulation, dependency-aware optimization, and benchmark targets above remain an implementation gap; see the open issue in `KNOWN_ISSUES.md`.
 
 ## 5. Explanations (FR-SCHED-003)
 Each proposed block gets reason codes computed from the model (not the LLM):

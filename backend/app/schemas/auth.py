@@ -1,9 +1,10 @@
 """Pydantic schemas for Authentication, Users, and Devices."""
 
 import uuid
+from datetime import time
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 EMAIL_REGEX = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
 
@@ -92,6 +93,39 @@ class UpdateMeRequest(BaseModel):
     display_name: str | None = Field(default=None, max_length=100)
     timezone: str | None = Field(default=None, max_length=50)
     settings: dict[str, Any] | None = None
+
+
+class WorkingDaySettings(BaseModel):
+    enabled: bool
+    start: str = Field(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+    end: str = Field(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+
+    @model_validator(mode="after")
+    def end_after_start(self) -> "WorkingDaySettings":
+        if self.enabled and time.fromisoformat(self.end) <= time.fromisoformat(self.start):
+            raise ValueError("Working hours must end after they start.")
+        return self
+
+
+class UserSettings(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    working_hours: dict[str, WorkingDaySettings] | None = None
+    min_block_min: int | None = Field(default=None, ge=15, le=240)
+    max_daily_focus_min: int | None = Field(default=None, ge=30, le=1440)
+    reminder_lead_min: int | None = Field(default=None, ge=0, le=10080)
+
+    @field_validator("working_hours")
+    @classmethod
+    def validate_weekdays(
+        cls, value: dict[str, WorkingDaySettings] | None
+    ) -> dict[str, WorkingDaySettings] | None:
+        if value is None:
+            return value
+        weekdays = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
+        if set(value).difference(weekdays):
+            raise ValueError("Working hours must use weekday names.")
+        return value
 
 
 class DeviceResponse(BaseModel):

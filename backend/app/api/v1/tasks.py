@@ -5,11 +5,12 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AuthContext, get_auth_context, get_db
-from app.core.errors import NotFoundError
+from app.core.errors import ConflictError, NotFoundError
 from app.models.ai_extraction import AIExtraction
 from app.models.subtask import Subtask
 from app.models.task import Task
@@ -117,23 +118,125 @@ async def decide_task_extraction(
         raise NotFoundError("Task not found.")
 
     extraction = await extraction_repo.get_latest_for_task(task_id)
-    if extraction:
-        await extraction_repo.record_decision(
-            extraction_id=extraction.id,
-            user_decision=data.model_dump(),
-            status="accepted" if not data.rejected_fields else "corrected",
+    if not extraction:
+        raise NotFoundError("No extraction proposal found for task.")
+    if extraction.status != "proposed":
+        raise ConflictError("This extraction proposal has already been reviewed.")
+
+    # The proposal is untrusted input. Only task fields that can be reviewed here
+    # are accepted, and typed task fields are validated by the request schema.
+    allowed_fields = {
+        "title",
+        "category_id",
+        "project_id",
+        "priority",
+        "deadline_at",
+        "deadline_kind",
+        "estimate_user_min",
+        "tags",
+        "subtasks",
+    }
+    supplied_fields = set(data.accepted_fields) | set(data.corrected_fields)
+    unknown_fields = supplied_fields.difference(allowed_fields)
+    if unknown_fields or set(data.rejected_fields).difference(allowed_fields):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Extraction decision contains an unsupported field.",
         )
 
-    # Apply accepted and corrected fields to task
-    updates: dict[str, Any] = {}
-    updates.update(data.accepted_fields)
-    updates.update(data.corrected_fields)
+    updates: dict[str, Any] = {**data.accepted_fields, **data.corrected_fields}
     for field_name in data.rejected_fields:
         updates.pop(field_name, None)
 
+    task_fields = {key: value for key, value in updates.items() if key not in {"tags", "subtasks"}}
+    try:
+        validated_fields = TaskUpdateRequest.model_validate(task_fields).model_dump(
+            exclude_unset=True
+        )
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Extraction decision contains invalid task fields.",
+        ) from exc
+
+    tags: list[str] | None = None
+    if "tags" in updates:
+        candidate_tags = updates["tags"]
+        if not isinstance(candidate_tags, list) or any(
+            not isinstance(tag, str) or len(tag.strip()) > 100 for tag in candidate_tags
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Tags must be a list of strings no longer than 100 characters.",
+            )
+        tags = candidate_tags
+
+    subtasks: list[str] | None = None
+    if "subtasks" in updates:
+        candidate_subtasks = updates["subtasks"]
+        if not isinstance(candidate_subtasks, list) or any(
+            not isinstance(title, str) or len(title.strip()) > 255 for title in candidate_subtasks
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Suggested steps must be a list of task titles no longer than 255 characters.",
+            )
+        subtasks = candidate_subtasks
+
+    if "deadline_at" in validated_fields:
+        if validated_fields["deadline_at"] is None:
+            validated_fields["deadline_source"] = None
+        elif validated_fields["deadline_at"] != task.deadline_at:
+            validated_fields["deadline_source"] = "extraction"
+    if "estimate_user_min" in validated_fields:
+        validated_fields["estimate_final_min"] = validated_fields["estimate_user_min"]
+    task = await task_service.update_task(task_id, **validated_fields)
+
+    if tags is not None:
+        await TagRepository(db, auth.user_id).sync_task_tags(task_id, tags)
+
+    if subtasks is not None:
+        existing_subtasks = await SubtaskRepository(db, auth.user_id).list_for_task(task_id)
+        for existing in existing_subtasks:
+            await db.delete(existing)
+        for position, title in enumerate(subtasks):
+            if not title.strip():
+                continue
+            db.add(
+                Subtask(
+                    id=uuid.uuid4(),
+                    user_id=auth.user_id,
+                    task_id=task_id,
+                    title=title.strip(),
+                    position=position,
+                )
+            )
+
+    await task_service.task_event_repo.record_event(
+        task_id=task_id,
+        event_type="extraction_decision",
+        changes={
+            "accepted_fields": sorted(data.accepted_fields),
+            "corrected_fields": sorted(data.corrected_fields),
+            "rejected_fields": sorted(data.rejected_fields),
+        },
+        actor="user",
+    )
+
+    decision_status = (
+        "corrected"
+        if data.corrected_fields or data.rejected_fields
+        else "accepted"
+        if updates
+        else "rejected"
+    )
+    await extraction_repo.record_decision(
+        extraction_id=extraction.id,
+        user_decision=data.model_dump(),
+        status=decision_status,
+    )
     task.parse_status = "accepted"
-    if updates:
-        task = await task_service.update_task(task_id, **updates)
+    await db.flush()
 
     return await _enrich_task_response(task, db, auth.user_id)
 

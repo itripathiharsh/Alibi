@@ -17,6 +17,7 @@ from app.api.v1.learning import router as learning_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.organizations import router as organizations_router
 from app.api.v1.projects import router as projects_router
+from app.api.v1.recurrences import router as recurrences_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.scheduling import router as scheduling_router
 from app.api.v1.sync import router as sync_router
@@ -45,6 +46,7 @@ router.include_router(ai_router, prefix="/api/v1")
 router.include_router(voice_router, prefix="/api/v1")
 router.include_router(learning_router, prefix="/api/v1")
 router.include_router(scheduling_router, prefix="/api/v1")
+router.include_router(recurrences_router, prefix="/api/v1")
 router.include_router(vault_router, prefix="/api/v1")
 router.include_router(assistant_router, prefix="/api/v1")
 router.include_router(notifications_router, prefix="/api/v1")

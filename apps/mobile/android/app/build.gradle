@@ -193,7 +193,8 @@ tasks.matching { it.name.startsWith("createBundle") || it.name == "mergeDebugAss
         if (!useHermesEngine) {
             println "[build.gradle] Transpiling index.android.bundle with Babel for JavaScriptCore compatibility..."
             exec {
-                commandLine "node", file("${projectDir}/../../transpile_bundle_gradle.js").absolutePath
+                def bundleVariant = t.name.toLowerCase().contains("release") ? "Release" : "Debug"
+                commandLine "node", file("${projectDir}/../../transpile_bundle_gradle.js").absolutePath, bundleVariant
             }
         } else {
             println "[build.gradle] Skipping JavaScriptCore transpilation for Hermes bundle."

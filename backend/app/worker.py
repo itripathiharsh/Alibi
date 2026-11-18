@@ -9,6 +9,7 @@ from types import FrameType
 from app.core.config import settings
 from app.core.logging import logger, setup_logging
 from app.database.session import AsyncSessionLocal, ping_database
+from app.maintenance import create_local_maintenance_scheduler
 from app.services.job_service import JobService
 
 _shutdown_event = asyncio.Event()
@@ -63,6 +64,8 @@ async def run_worker() -> None:
         signal.signal(signal.SIGINT, _signal_handler)
         signal.signal(signal.SIGTERM, _signal_handler)
 
+    maintenance_scheduler = create_local_maintenance_scheduler()
+    maintenance_scheduler.start()
     try:
         while not _shutdown_event.is_set():
             await worker_job_cycle()
@@ -70,6 +73,7 @@ async def run_worker() -> None:
                 # Poll interval: wait 30s or until shutdown event is triggered
                 await asyncio.wait_for(_shutdown_event.wait(), timeout=30.0)
     finally:
+        maintenance_scheduler.shutdown(wait=False)
         logger.info("ALIBI Background Worker stopped")
 
 

@@ -7,11 +7,11 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **File**: [`ALIBI-0.1.0.apk`](./ALIBI-0.1.0.apk)
 - **Direct Download Link**: [Download ALIBI-0.1.0.apk (Raw)](https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk)
 - **Version**: `0.1.0`
-- **Build Date**: November 18, 2026
+- **Build Date**: November 19, 2026
 - **Variant**: Android release APK, Hermes
 - **Signing**: Signed with the repository's current Android debug keystore. This is installable for direct distribution/testing, but it is not a Play Store production signature.
-- **SHA-256**: `949ABE427B0ECB896C5173CA4C4923D66B1968516BEF7938B2D26F5EF451D176`
-- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified; dynamic focus timer and week calendar activity dots connected directly to API & offline SQLite sync.
+- **SHA-256**: `79F2B0EDD831197BC713C246EEF5A1F1C4BB9D34C05EEE0F2AB0EF8A504D900C`
+- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified; dynamic focus timer, calendar activity indicators, recurring tasks, deadline reminders, and task extraction review sheets included.
 
 ---
 

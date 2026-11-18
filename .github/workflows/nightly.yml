@@ -32,23 +32,12 @@ jobs:
           uv sync --frozen --no-dev
         working-directory: backend
 
-      - name: Run Recurrence Horizon Advancement & Soft Delete Purge
+      - name: Advance recurrence and refresh learning profiles
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ALIBI_SECRET_KEY: ${{ secrets.ALIBI_SECRET_KEY }}
           ALIBI_ENCRYPTION_KEY: ${{ secrets.ALIBI_ENCRYPTION_KEY }}
           ALIBI_MODE: hosted
-        run: |
-          echo "Running nightly maintenance tasks..."
-          uv run python -c "
-          import asyncio
-          from app.core.logging import logger
-          async def run_nightly():
-              logger.info('Starting nightly maintenance job')
-              # In hosted mode, recurrence horizon and expired jobs are processed
-              logger.info('Advancing recurrence horizons up to 14 days')
-              logger.info('Nightly maintenance complete')
-          asyncio.run(run_nightly())
-          "
+        run: uv run python -m app.maintenance
         working-directory: backend
 

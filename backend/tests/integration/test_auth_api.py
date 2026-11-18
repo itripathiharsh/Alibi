@@ -146,6 +146,32 @@ async def test_auth_full_lifecycle(client: AsyncClient, db_session: AsyncSession
     assert me_resp.status_code == 200
     assert me_resp.json()["email"] == "owner@alibi.local"
 
+    schedule_update = await client.patch(
+        "/api/v1/auth/me",
+        headers=auth_headers,
+        json={
+            "settings": {
+                "working_hours": {
+                    "monday": {"enabled": True, "start": "08:30", "end": "16:30"},
+                    "sunday": {"enabled": False, "start": "09:00", "end": "17:00"},
+                }
+            }
+        },
+    )
+    assert schedule_update.status_code == 200, schedule_update.text
+    assert schedule_update.json()["settings"]["working_hours"]["monday"]["start"] == "08:30"
+
+    invalid_schedule = await client.patch(
+        "/api/v1/auth/me",
+        headers=auth_headers,
+        json={
+            "settings": {
+                "working_hours": {"monday": {"enabled": True, "start": "17:00", "end": "09:00"}}
+            }
+        },
+    )
+    assert invalid_schedule.status_code == 422
+
     # /auth/devices
     dev_resp = await client.get("/api/v1/auth/devices", headers=auth_headers)
     assert dev_resp.status_code == 200

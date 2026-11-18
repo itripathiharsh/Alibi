@@ -5,7 +5,8 @@ Implements FR-AUTH-001..005, AC-M1-2, AC-M1-3, AC-M1-4, AC-M1-5, and AC-SEC-2.
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, Request, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AuthContext, get_auth_context, get_auth_service, get_current_user
@@ -26,6 +27,7 @@ from app.schemas.auth import (
     TokenResponse,
     UpdateMeRequest,
     UserProfile,
+    UserSettings,
 )
 from app.services.auth_service import AuthService
 
@@ -237,7 +239,14 @@ async def update_me(
     if payload.settings is not None:
         merged = dict(user.settings)
         merged.update(payload.settings)
-        user.settings = merged
+        try:
+            settings_model = UserSettings.model_validate(merged)
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="User settings contain invalid values.",
+            ) from exc
+        user.settings = settings_model.model_dump(exclude_unset=True, exclude_none=True)
 
     await session.flush()
     return UserProfile.model_validate(user)
