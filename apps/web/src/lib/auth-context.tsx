@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string, redirectTo?: string) => {
-    const { data, error } = await api.POST("/api/v1/auth/login", {
+    const { data, error, response } = await api.POST("/api/v1/auth/login", {
       body: {
         email,
         password,
@@ -79,6 +79,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error || !data) {
+      if (response?.status === 502 || response?.status === 503 || response?.status === 504) {
+        throw new Error("The server is waking up. Please wait 10-15 seconds and try again.");
+      }
       throw new Error((error as { detail?: string })?.detail || "Login failed");
     }
 
@@ -90,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setupOwner = async (email: string, password: string, displayName?: string) => {
-    const { error } = await api.POST("/api/v1/auth/setup", {
+    const { error, response } = await api.POST("/api/v1/auth/setup", {
       body: {
         email,
         password,
@@ -99,6 +102,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) {
+      if (response?.status === 502 || response?.status === 503 || response?.status === 504) {
+        throw new Error("The server is waking up. Please wait 10-15 seconds and try again.");
+      }
       throw new Error((error as { detail?: string })?.detail || "Setup failed");
     }
 
@@ -107,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signup = async (email: string, password: string, displayName?: string, redirectTo?: string) => {
-    const { error } = await api.POST("/api/v1/auth/signup", {
+    const { error, response } = await api.POST("/api/v1/auth/signup", {
       body: {
         email,
         password,
@@ -116,6 +122,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) {
+      if (response?.status === 502 || response?.status === 503 || response?.status === 504) {
+        throw new Error("The server is waking up. Please wait 10-15 seconds and try again.");
+      }
       throw new Error((error as { detail?: string })?.detail || "Could not create your account.");
     }
     await login(email, password, redirectTo);

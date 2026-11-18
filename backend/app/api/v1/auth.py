@@ -44,18 +44,27 @@ async def signup(
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> UserProfile:
     """Create an individual account with private default data (FR-AUTH-007)."""
-    client_ip = request.client.host if request.client else "unknown"
+    forwarded = request.headers.get("x-forwarded-for")
+    client_ip = (
+        forwarded.split(",")[0].strip()
+        if forwarded
+        else (request.client.host if request.client else "unknown")
+    )
     signup_rate_limiter.check(
         client_ip,
         detail="Too many account creation attempts.",
     )
-    signup_rate_limiter.record_failure(client_ip)
-    user = await auth_service.signup(
-        email=payload.email,
-        password=payload.password,
-        display_name=payload.display_name,
-    )
-    return UserProfile.model_validate(user)
+    try:
+        user = await auth_service.signup(
+            email=payload.email,
+            password=payload.password,
+            display_name=payload.display_name,
+        )
+        signup_rate_limiter.reset(client_ip)
+        return UserProfile.model_validate(user)
+    except Exception:
+        signup_rate_limiter.record_failure(client_ip)
+        raise
 
 
 @router.get(
