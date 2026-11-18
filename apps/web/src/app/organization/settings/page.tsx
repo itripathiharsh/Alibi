@@ -164,9 +164,8 @@ export default function OrganizationSettingsPage() {
             Use the app for personal tasks, calendar, capture, vault and individual productivity features.
           </p>
           <a
-            href="https://github.com/itripathiharsh/Alibi/blob/main/apk/ALIBI-0.1.0.apk"
-            target="_blank"
-            rel="noreferrer"
+            href="https://github.com/itripathiharsh/Alibi/raw/refs/heads/main/apk/ALIBI-0.1.0.apk"
+            download="ALIBI-0.1.0.apk"
             className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-[#092638] hover:bg-orange-50"
           >
             Download Android app <ArrowUpRight size={16} />
