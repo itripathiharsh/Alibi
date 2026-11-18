@@ -7098,7 +7098,7 @@
           },
           "new_password": {
             "type": "string",
-            "minLength": 12,
+            "minLength": 6,
             "title": "New Password"
           }
         },
@@ -9612,9 +9612,9 @@
           },
           "password": {
             "type": "string",
-            "minLength": 12,
+            "minLength": 6,
             "title": "Password",
-            "description": "Password must be at least 12 characters"
+            "description": "Password must be at least 6 characters"
           },
           "display_name": {
             "anyOf": [
@@ -9659,9 +9659,9 @@
           },
           "password": {
             "type": "string",
-            "minLength": 12,
+            "minLength": 6,
             "title": "Password",
-            "description": "Password must be at least 12 characters"
+            "description": "Password must be at least 6 characters"
           },
           "display_name": {
             "anyOf": [

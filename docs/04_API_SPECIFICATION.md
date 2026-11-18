@@ -62,7 +62,7 @@ This document defines conventions and the endpoint catalogue; schemas live in Py
 | POST | /auth/change-password | `{current_password, new_password}` |
 | GET | /auth/devices · DELETE /auth/devices/{id} | list / revoke |
 
-Password policy: ≥ 12 chars, checked against a bundled top-10k common list; no composition rules.
+Password policy: ≥ 6 chars, checked against the bundled common-password blacklist; no composition rules.
 
 ### 4.3 Categories, projects, tags
 CRUD: `GET/POST /categories`, `PATCH/DELETE /categories/{id}` (system: no delete → 409), same for `/projects`, `/tags`.

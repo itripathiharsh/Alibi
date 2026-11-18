@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View, Image } from "react-native";
 import { User } from "lucide-react-native";
 import theme from "../lib/theme";
 import { getAccessToken, getRefreshToken } from "../lib/auth";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 export default function RootLayout() {
   const router = useRouter();
@@ -32,7 +33,7 @@ export default function RootLayout() {
   }, [firstSegment, router]);
 
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar style="dark" backgroundColor={theme.colors.background.base} />
       <Stack
         screenOptions={{
@@ -96,7 +97,7 @@ export default function RootLayout() {
           options={{ presentation: "modal", headerTitle: "Create Account" }}
         />
       </Stack>
-    </>
+    </SafeAreaProvider>
   );
 }
 

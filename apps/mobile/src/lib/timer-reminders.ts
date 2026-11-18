@@ -1,9 +1,28 @@
 import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const REMINDER_KIND = "active_task_check_in";
 const ANDROID_CHANNEL_ID = "task-check-ins";
+const REMINDERS_ENABLED_KEY = "alibi_task_checkins_enabled";
+
+export async function areTaskTimerRemindersEnabled(): Promise<boolean> {
+  try {
+    return (await SecureStore.getItemAsync(REMINDERS_ENABLED_KEY)) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+export async function setTaskTimerRemindersEnabled(enabled: boolean): Promise<void> {
+  await SecureStore.setItemAsync(REMINDERS_ENABLED_KEY, String(enabled));
+  if (!enabled) {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
+    const reminders = scheduled.filter((request) => request.content.data?.kind === REMINDER_KIND);
+    await Promise.all(reminders.map((request) => Notifications.cancelScheduledNotificationAsync(request.identifier).catch(() => undefined)));
+  }
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -20,6 +39,7 @@ export async function scheduleTaskTimerReminder(input: {
   startedAt: string;
 }): Promise<boolean> {
   try {
+    if (!(await areTaskTimerRemindersEnabled())) return false;
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
         name: "Task check-ins",
@@ -74,6 +94,7 @@ export async function syncTaskTimerReminders(
   timers: { id: string; task_id: string; started_at: string }[],
 ): Promise<void> {
   try {
+    if (!(await areTaskTimerRemindersEnabled())) return;
     if ((await Notifications.getPermissionsAsync()).status !== "granted") return;
     const activeIds = new Set(timers.map((timer) => timer.id));
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();

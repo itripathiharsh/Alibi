@@ -12,32 +12,15 @@ import {
   Image,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { getServerUrl, pingServer, setServerUrl } from "../lib/config";
 import { loginMobile } from "../lib/auth";
 import theme from "../lib/theme";
 
 export default function MobileLoginScreen() {
   const router = useRouter();
-  const [serverInput, setServerInput] = useState(getServerUrl());
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isPinging, setIsPinging] = useState(false);
-  const [pingStatus, setPingStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const handlePing = async () => {
-    setIsPinging(true);
-    setPingStatus(null);
-    const trimmed = setServerUrl(serverInput);
-    const result = await pingServer(trimmed);
-    setIsPinging(false);
-    if (result.success && result.data) {
-      setPingStatus(`Connected: ${result.data.appName} v${result.data.version} (${result.data.responseTimeMs}ms)`);
-    } else {
-      setPingStatus(`Unreachable: ${result.error || "Check server address and network"}`);
-    }
-  };
 
   const handleLogin = async () => {
     setErrorMessage(null);
@@ -47,7 +30,6 @@ export default function MobileLoginScreen() {
     }
 
     setIsSubmitting(true);
-    setServerUrl(serverInput);
     const result = await loginMobile(email, password);
     setIsSubmitting(false);
 
@@ -80,37 +62,6 @@ export default function MobileLoginScreen() {
           </View>
         )}
 
-        {/* Server Configuration Section */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Backend Server URL</Text>
-          <View style={styles.serverRow}>
-            <TextInput
-              style={[styles.input, styles.serverInput]}
-              value={serverInput}
-              onChangeText={setServerInput}
-              placeholder="http://10.0.2.2:8000"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              style={styles.pingButton}
-              onPress={handlePing}
-              disabled={isPinging}
-            >
-              {isPinging ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.pingText}>Ping</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-          {pingStatus && (
-            <Text style={[styles.pingResult, pingStatus.startsWith("Connected") ? styles.pingSuccess : styles.pingFail]}>
-              {pingStatus}
-            </Text>
-          )}
-        </View>
-
         {/* Credentials Section */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Account Credentials</Text>
@@ -142,7 +93,7 @@ export default function MobileLoginScreen() {
               <Text style={styles.submitText}>Sign In</Text>
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => { setServerUrl(serverInput); router.push("/signup"); }} style={styles.signupLink} accessibilityRole="button"><Text style={styles.signupText}>Create your ALIBI account</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push("/signup")} style={styles.signupLink} accessibilityRole="button"><Text style={styles.signupText}>Create your ALIBI account</Text></TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -204,35 +155,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: theme.colors.text.primary,
     marginBottom: 10,
-  },
-  serverRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  serverInput: {
-    flex: 1,
-  },
-  pingButton: {
-    backgroundColor: "#102E42",
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  pingText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  pingResult: {
-    fontSize: 12,
-    marginTop: 8,
-  },
-  pingSuccess: {
-    color: "#16834B",
-  },
-  pingFail: {
-    color: "#B42318",
   },
   input: {
     backgroundColor: "#FFFFFF",

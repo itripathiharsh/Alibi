@@ -186,7 +186,7 @@ async def test_public_signup_isolates_accounts_and_rejects_duplicate_email(
         "/api/v1/auth/signup",
         json={
             "email": email_a,
-            "password": "UniqueStrongPassword!2026",
+            "password": "Alibi7",
             "display_name": "Account A",
         },
     )
@@ -224,7 +224,7 @@ async def test_public_signup_isolates_accounts_and_rejects_duplicate_email(
 
     login_a = await client.post(
         "/api/v1/auth/login",
-        json={"email": email_a, "password": "UniqueStrongPassword!2026"},
+        json={"email": email_a, "password": "Alibi7"},
     )
     assert login_a.status_code == 200
     access_a = login_a.json()["access_token"]

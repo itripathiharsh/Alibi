@@ -35,12 +35,15 @@ def test_argon2id_hashing_and_timing() -> None:
     assert duration < 0.40, f"Argon2id hashing took {duration:.3f}s, expected < 0.400s"
 
 
+# req: FR-AUTH-002
 def test_password_policy_validation() -> None:
-    """Verify password length >= 12 chars and blacklist checks (doc 04 §4.2)."""
-    # Too short (< 12)
+    """Verify the 6-character minimum and blacklist checks (FR-AUTH-002, doc 04 §4.2)."""
+    # Too short (< 6)
     with pytest.raises(AppException) as exc_info:
-        validate_password_strength("Short123!")
+        validate_password_strength("abc12")
     assert exc_info.value.code == "password_too_short"
+
+    validate_password_strength("abc123")
 
     # Common password in blacklist
     common = next(iter(COMMON_PASSWORDS_BLACKLIST))

@@ -8,7 +8,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | Req ID | Summary | P | Milestone | Spec | Test location (planned) | Status |
 |---|---|---|---|---|---|---|
 | FR-AUTH-001 | Owner account created via CLI `make create-user` or first-run setup screen (only when z… | M | M1 | 12, 04§4.2 | backend/tests/integration/auth/ | ☑ |
-| FR-AUTH-002 | Login with email + password; Argon2id hashing | M | M1 | 12, 04§4.2 | backend/tests/integration/auth/ | ☑ |
+| FR-AUTH-002 | Login with email + password (minimum 6 characters); Argon2id hashing | M | M1 | 12, 04§4.2 | backend/tests/unit/test_security.py; backend/tests/integration/test_auth_api.py | ☑ |
 | FR-AUTH-003 | Access token (15 min) + rotating refresh token (30 days); refresh-token reuse revokes t… | M | M1 | 12, 04§4.2 | backend/tests/integration/auth/ | ☑ |
 | FR-AUTH-004 | Device registration (name, platform) on login; owner can list and revoke devices | M | M1 | 12, 04§4.2 | backend/tests/integration/auth/ | ☑ |
 | FR-AUTH-005 | Password change invalidates all refresh tokens except current | M | M1 | 12, 04§4.2 | backend/tests/integration/auth/ | ☑ |
@@ -95,7 +95,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-KNOW-001 | Vault auto-ingests task descriptions, completion notes, work logs, project notes, meeti… | M | M7 | 08 | backend/tests/integration/knowledge/ | ☑ |
 | FR-KNOW-002 | Metadata: date, category, project, task ref, source, privacy class | M | M7 | 08 | backend/tests/integration/knowledge/ | ☑ |
 | FR-KNOW-003 | Search UI: keyword everywhere; semantic where embeddings available (ADR-020) | M | M7 | 08 | backend/tests/integration/knowledge/ | ☑ |
-| FR-KNOW-004 | Manual note creation (plain text/markdown, no rich editor) | M | M7 | 08 | backend/tests/integration/knowledge/ | ☑ |
+| FR-KNOW-004 | Manual plain-text note creation by typing or Android real-time dictation; no rich editor | M | M7 | 08; M13 | backend/tests/integration/knowledge/; Android device review | ◐ |
 | FR-KNOW-005 | Upload documents: PDF, DOCX, TXT, MD text extraction | S | M7 | 08 | backend/tests/integration/knowledge/ | ☑ |
 | FR-REP-001 | Report types EOD, weekly, monthly, custom | M | M9 | 10 | backend/tests/integration/reports/ | ☑ |
 | FR-REP-002 | Contents: period, completed, pending, overdue, projects, time, deliverables, achievemen… | M | M9 | 10 | backend/tests/integration/reports/ | ☑ |

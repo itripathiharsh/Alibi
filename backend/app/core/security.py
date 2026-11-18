@@ -41,8 +41,11 @@ def verify_password(password: str, hashed: str) -> bool:
         return False
 
 
-# 2. Password Strength & Policy Validator (doc 04 §4.2: >= 12 chars, top common blacklist)
+# 2. Password Strength & Policy Validator (doc 04 §4.2: >= 6 chars, common-password blacklist)
 COMMON_PASSWORDS_BLACKLIST = {
+    "123456",
+    "password",
+    "qwerty",
     "password1234",
     "password12345",
     "123456789012",
@@ -60,12 +63,12 @@ COMMON_PASSWORDS_BLACKLIST = {
 
 def validate_password_strength(password: str) -> None:
     """Validate password against policy requirements."""
-    if len(password) < 12:
+    if len(password) < 6:
         raise AppException(
             title="Validation Failed",
             status_code=422,
             code="password_too_short",
-            detail="Password must be at least 12 characters long.",
+            detail="Password must be at least 6 characters long.",
         )
     if password.lower() in COMMON_PASSWORDS_BLACKLIST:
         raise AppException(

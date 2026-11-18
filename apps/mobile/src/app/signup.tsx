@@ -16,7 +16,7 @@ export default function SignupScreen() {
 
   const submit = async () => {
     setError(null);
-    if (password.length < 12) { setError("Use a password with at least 12 characters."); return; }
+    if (password.length < 6) { setError("Use a password with at least 6 characters."); return; }
     if (password !== confirmPassword) { setError("The passwords do not match."); return; }
     setSaving(true);
     const result = await signupMobile(email, password, displayName);
@@ -35,7 +35,7 @@ export default function SignupScreen() {
         <Text style={styles.formHint}>Use this account on your devices to access the same private workspace.</Text>
         <Text style={styles.label}>Display name</Text><TextInput value={displayName} onChangeText={setDisplayName} placeholder="Your name" placeholderTextColor={theme.colors.text.muted} style={styles.input} autoCapitalize="words" />
         <Text style={styles.label}>Email address</Text><TextInput value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={theme.colors.text.muted} style={styles.input} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
-        <Text style={styles.label}>Password</Text><TextInput value={password} onChangeText={setPassword} placeholder="At least 12 characters" placeholderTextColor={theme.colors.text.muted} style={styles.input} secureTextEntry autoCapitalize="none" />
+        <Text style={styles.label}>Password</Text><TextInput value={password} onChangeText={setPassword} placeholder="At least 6 characters" placeholderTextColor={theme.colors.text.muted} style={styles.input} secureTextEntry autoCapitalize="none" />
         <Text style={styles.label}>Confirm password</Text><TextInput value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Enter password again" placeholderTextColor={theme.colors.text.muted} style={styles.input} secureTextEntry autoCapitalize="none" />
         <Pressable onPress={submit} disabled={saving || !email.trim() || !password || !confirmPassword} style={[styles.primaryButton, (saving || !email.trim() || !password || !confirmPassword) && styles.disabled]}>{saving ? <ActivityIndicator color="#FFFFFF" /> : <><UserPlus size={18} color="#FFFFFF" /><Text style={styles.primaryText}>Create account</Text></>}</Pressable>
       </View>

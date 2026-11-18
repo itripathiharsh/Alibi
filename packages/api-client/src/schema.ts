@@ -3507,7 +3507,7 @@ export interface components {
             email: string;
             /**
              * Password
-             * @description Password must be at least 12 characters
+             * @description Password must be at least 6 characters
              */
             password: string;
             /** Display Name */
@@ -3527,7 +3527,7 @@ export interface components {
             email: string;
             /**
              * Password
-             * @description Password must be at least 12 characters
+             * @description Password must be at least 6 characters
              */
             password: string;
             /** Display Name */

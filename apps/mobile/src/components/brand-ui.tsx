@@ -1,10 +1,12 @@
 import React from "react";
 import { Image, StyleSheet, View, type ViewStyle } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from "react-native-svg";
 import theme from "../lib/theme";
 
 export function BrandHeader({ right, style }: { right?: React.ReactNode; style?: ViewStyle }) {
-  return <View style={[styles.header, style]}>
+  const insets = useSafeAreaInsets();
+  return <View style={[styles.header, { paddingTop: insets.top }, style]}>
     <View style={styles.brand}>
       <Image source={require("../../assets/logo_full_light.png")} style={styles.logo} resizeMode="contain" accessibilityLabel="ALIBI" />
     </View>

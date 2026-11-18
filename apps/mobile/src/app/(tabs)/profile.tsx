@@ -67,7 +67,7 @@ export default function ProfileScreen() {
     <Pressable style={styles.learningCard} onPress={() => router.push("/ai")}><View style={styles.learningIcon}><Brain size={27} color="#F07820" /></View><View style={styles.learningContent}><Text style={styles.learningTitle}>Your ALIBI Profile</Text><Text style={styles.learningSubtitle}>Learning insights from your recorded work.</Text><View style={styles.learningPills}>{learning?.peak_window ? <Text style={styles.learningPill}>Peak: {learning.peak_window}</Text> : <Text style={styles.learningPill}>Patterns appear as ALIBI learns</Text>}</View></View><ChevronRight size={20} color="#506176" /></Pressable>
 
     <View style={styles.settingsCard}>
-      <ProfileRow icon={Settings} title="Server Connection" subtitle="API address and connection status" onPress={() => router.push("/settings")} />
+      <ProfileRow icon={Settings} title="App Settings" subtitle="Task reminders and account preferences" onPress={() => router.push("/settings")} />
       <ProfileRow icon={BarChart3} title="Insights & Reports" subtitle="Productivity trends and reports" onPress={() => router.push("/(tabs)/reports")} />
       <ProfileRow icon={BookOpen} title="Knowledge Vault" subtitle="Your saved notes and records" onPress={() => router.push("/(tabs)/vault")} />
       <ProfileRow icon={Brain} title="Ask ALIBI" subtitle="Answers grounded in your records" onPress={() => router.push("/ai")} last />

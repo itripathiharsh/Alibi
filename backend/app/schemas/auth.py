@@ -18,13 +18,13 @@ class SetupRequest(BaseModel):
         pattern=EMAIL_REGEX,
         description="Owner email address",
     )
-    password: str = Field(..., min_length=12, description="Password must be at least 12 characters")
+    password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
     display_name: str | None = Field(default=None, max_length=100)
 
 
 class SignupRequest(BaseModel):
     email: str = Field(..., pattern=EMAIL_REGEX, description="Account email address")
-    password: str = Field(..., min_length=12, description="Password must be at least 12 characters")
+    password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
     display_name: str | None = Field(default=None, max_length=100)
 
 
@@ -85,7 +85,7 @@ class TokenRefreshResponse(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str = Field(..., min_length=12)
+    new_password: str = Field(..., min_length=6)
 
 
 class UpdateMeRequest(BaseModel):

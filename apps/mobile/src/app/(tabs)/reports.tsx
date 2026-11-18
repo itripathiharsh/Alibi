@@ -113,7 +113,7 @@ export default function ReportsScreen() {
       let token = await ensureAuthenticated();
       const baseUrl = getServerUrl();
       if (!token) {
-        Alert.alert("Authentication", "Please connect to your backend in Settings.");
+        Alert.alert("Authentication", "Please sign in to create a report.");
         setIsGenerating(false);
         return;
       }
@@ -221,7 +221,7 @@ export default function ReportsScreen() {
       <View style={styles.summaryCard}>
         <View style={styles.cardHeader}>
           <BarChart3 size={18} color={theme.colors.accent.amber} />
-          <Text style={styles.cardTitle}>Verified Performance Metrics</Text>
+          <Text style={styles.summaryTitle}>Your progress</Text>
           <Pressable onPress={loadData} hitSlop={8} style={{ marginLeft: "auto" }}>
             <RefreshCw size={14} color={theme.colors.text.muted} />
           </Pressable>
@@ -264,27 +264,23 @@ export default function ReportsScreen() {
         )}
       </View>
 
-      <View style={styles.chartCard}>
+      <View style={styles.insightPanel}>
         <View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Time Distribution</Text><Text style={styles.chartSubtitle}>Logged time by category · {periodLabel}</Text></View><Clock size={19} color="#F47B25" /></View>
         {isLoading ? <ActivityIndicator color={theme.colors.accent.amber} /> : distribution.length === 0 ? <Text style={styles.chartEmpty}>Log time to see your category breakdown.</Text> : <View style={styles.distributionList}>{distribution.slice(0, 5).map((item) => <View key={item.category_name} style={styles.distributionRow}><View style={styles.distributionMeta}><View style={[styles.legendDot, { backgroundColor: item.category_color }]} /><Text style={styles.distributionName} numberOfLines={1}>{item.category_name}</Text><Text style={styles.distributionValue}>{Math.round(item.percentage)}%</Text></View><View style={styles.track}><View style={[styles.fill, { width: `${Math.max(0, Math.min(100, item.percentage))}%`, backgroundColor: item.category_color }]} /></View></View>)}</View>}
-      </View>
-
-      <View style={styles.chartCard}>
+        <View style={styles.panelDivider} />
         <View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Task focus & scores</Text><Text style={styles.chartSubtitle}>Time recorded per task · completed task score</Text></View><Clock size={19} color="#F47B25" /></View>
         {isLoading ? <ActivityIndicator color={theme.colors.accent.amber} /> : taskActivity.length === 0 ? <Text style={styles.chartEmpty}>Start a task timer to see your work history here.</Text> : <View style={styles.distributionList}>{taskActivity.map((task) => <View key={task.task_id} style={styles.distributionRow}><View style={styles.distributionMeta}><Text style={styles.distributionName} numberOfLines={1}>{task.title}</Text><Text style={styles.distributionValue}>{task.task_score == null ? "—" : `${task.task_score} score`}</Text></View><View style={styles.track}><View style={[styles.fill, { width: `${Math.min(100, task.estimate_min ? Math.round(task.actual_min / task.estimate_min * 100) : task.status === "completed" ? 100 : 0)}%`, backgroundColor: "#F47B25" }]} /></View><Text style={styles.chartSubtitle}>{task.period_actual_min}m this period · {task.actual_min}m total</Text></View>)}</View>}
       </View>
 
-      <View style={styles.chartCard}>
+      <View style={styles.insightPanel}>
         <View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Task Progress</Text><Text style={styles.chartSubtitle}>Completed tasks · {periodLabel}</Text></View><BarChart3 size={19} color="#F47B25" /></View>
         {isLoading ? <ActivityIndicator color={theme.colors.accent.amber} /> : trend.length === 0 || trend.every((point) => point.completed_count === 0) ? <Text style={styles.chartEmpty}>Completed task history will appear here.</Text> : <View style={styles.trendChart}>{trend.slice(-10).map((point) => <View key={point.date} style={styles.trendColumn}><Text style={styles.trendCount}>{point.completed_count || ""}</Text><View style={[styles.trendBar, { height: Math.max(6, (point.completed_count / trendMaximum) * 94), backgroundColor: point.completed_count ? "#F47B25" : "#FCE2D1" }]} /><Text style={styles.trendDay}>{new Date(point.date).toLocaleDateString(undefined, { weekday: "short" })}</Text></View>)}</View>}
-      </View>
-
-      <View style={styles.chartCard}>
+        <View style={styles.panelDivider} />
         <View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Focus Pattern</Text><Text style={styles.chartSubtitle}>Days with recorded activity</Text></View><Calendar size={19} color="#F47B25" /></View>
         {isLoading ? <ActivityIndicator color={theme.colors.accent.amber} /> : heatmapDays.length === 0 || heatmapDays.every((day) => day.minutes_logged === 0 && day.completed_count === 0) ? <Text style={styles.chartEmpty}>Your activity pattern appears as you record work.</Text> : <ScrollView horizontal showsHorizontalScrollIndicator={false}><View style={styles.heatmap}>{heatmapWeeks.map((week, weekIndex) => <View key={weekIndex} style={styles.heatWeek}>{week.map((day, dayIndex) => day ? <View key={day.date} accessibilityLabel={`${day.date}: ${day.completed_count} completed, ${day.minutes_logged} minutes`} style={[styles.heatCell, { backgroundColor: day.minutes_logged > 0 || day.completed_count > 0 ? "#F47B25" : "#F7E6DB", opacity: day.minutes_logged > 0 || day.completed_count > 0 ? .42 + Math.min(.58, day.minutes_logged / 240) : .55 }]} /> : <View key={`empty-${weekIndex}-${dayIndex}`} style={styles.heatCell} />)}</View>)}</View></ScrollView>}
       </View>
 
-      <View style={[styles.chartCard, styles.learningCard]}><View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Your Learning Engine</Text><Text style={styles.chartSubtitle}>{learning?.peak_window ? `Recorded focus window: ${learning.peak_window}` : "Patterns build from your recorded work."}</Text></View><Sparkles size={20} color="#8B5CF6" /></View></View>
+      <View style={[styles.insightPanel, styles.learningCard]}><View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Your Learning Engine</Text><Text style={styles.chartSubtitle}>{learning?.peak_window ? `Recorded focus window: ${learning.peak_window}` : "Patterns build from your recorded work."}</Text></View><Sparkles size={20} color="#8B5CF6" /></View></View>
 
       {/* Actionable Report Generator Card */}
       <View style={styles.card}>
@@ -402,7 +398,8 @@ const styles = StyleSheet.create({
   screenHeading: { paddingTop: 6, paddingBottom: 4 },
   screenTitle: { fontSize: 30, lineHeight: 36, fontWeight: "800", letterSpacing: -0.6, color: theme.colors.text.primary },
   screenSubtitle: { fontSize: 14, lineHeight: 20, color: theme.colors.text.secondary, marginTop: 1 },
-  chartCard: { padding: 16, borderRadius: 21, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: theme.colors.border.subtle, gap: 16, shadowColor: "#19354A", shadowOpacity: .04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
+  insightPanel: { padding: 16, borderRadius: 21, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: theme.colors.border.subtle, gap: 14, shadowColor: "#19354A", shadowOpacity: .04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
+  panelDivider: { height: 1, backgroundColor: "#E8EDF1", marginVertical: 3 },
   chartHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   chartTitle: { fontSize: 17, fontWeight: "800", color: theme.colors.text.primary },
   chartSubtitle: { color: theme.colors.text.secondary, fontSize: 11, lineHeight: 16, marginTop: 3 },
@@ -451,11 +448,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   summaryCard: {
-    backgroundColor: theme.colors.surface.card,
-    borderRadius: 14,
+    backgroundColor: "#102E42",
+    borderRadius: 22,
     padding: 16,
     borderWidth: 1,
-    borderColor: theme.colors.border.subtle,
+    borderColor: "#1E435A",
+    shadowColor: "#0B2030",
+    shadowOpacity: .14,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 3,
   },
   cardHeader: {
     flexDirection: "row",
@@ -468,6 +470,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
+  summaryTitle: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
   cardSubtitle: {
     color: theme.colors.text.secondary,
     fontSize: 12,
@@ -476,20 +479,26 @@ const styles = StyleSheet.create({
   },
   metricsGrid: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    paddingTop: 8,
+    flexWrap: "wrap",
+    gap: 8,
+    paddingTop: 2,
   },
   metricItem: {
-    alignItems: "center",
+    width: "48%",
+    flexGrow: 1,
+    alignItems: "flex-start",
+    padding: 11,
+    borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,.08)",
   },
   metricValue: {
-    fontSize: 20,
+    fontSize: 23,
     fontWeight: "800",
-    color: theme.colors.text.primary,
+    color: "#FFFFFF",
   },
   metricLabel: {
     fontSize: 11,
-    color: theme.colors.text.secondary,
+    color: "#C6D5DF",
     marginTop: 4,
   },
   awaitingBox: {
@@ -498,12 +507,12 @@ const styles = StyleSheet.create({
   awaitingTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: theme.colors.text.primary,
+    color: "#FFFFFF",
     marginBottom: 4,
   },
   awaitingSubtitle: {
     fontSize: 12,
-    color: theme.colors.text.secondary,
+    color: "#C6D5DF",
     lineHeight: 18,
   },
   card: {
