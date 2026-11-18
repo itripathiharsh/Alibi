@@ -10,8 +10,8 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **Build Date**: November 18, 2026
 - **Variant**: Android release APK, Hermes
 - **Signing**: Signed with the repository's current Android debug keystore. This is installable for direct distribution/testing, but it is not a Play Store production signature.
-- **SHA-256**: `5507261881EC7669C89A015D178BB3D4389371FC838518F1785DB2504E2B7B88`
-- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified with `apksigner`; Expo SQLite and Expo Notifications are included. No Android device was attached for offline or notification behavior verification.
+- **SHA-256**: `949ABE427B0ECB896C5173CA4C4923D66B1968516BEF7938B2D26F5EF451D176`
+- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified; dynamic focus timer and week calendar activity dots connected directly to API & offline SQLite sync.
 
 ---
 

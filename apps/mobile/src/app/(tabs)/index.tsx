@@ -40,9 +40,9 @@ import theme from "../../lib/theme";
 import { getAccessToken, ensureAuthenticated, getUserProfile } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
-import { cancelTaskTimerReminder } from "../../lib/timer-reminders";
+import { cancelTaskTimerReminder, scheduleTaskTimerReminder } from "../../lib/timer-reminders";
 import { filterLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
-import { cacheRunningTimers, cacheTaskView, createTaskOffline, getCachedTaskView, getLocalTimers, makeOfflineId, removeLocalTimer, stopTaskTimerOffline, syncMobileAccount, updateTaskOffline } from "../../lib/offline-sync";
+import { cacheRunningTimers, cacheTaskView, createTaskOffline, getCachedTaskView, getLocalTimers, makeOfflineId, removeLocalTimer, startTaskTimerOffline, stopTaskTimerOffline, syncMobileAccount, updateTaskOffline } from "../../lib/offline-sync";
 
 interface TaskItem {
   id: string;
@@ -92,6 +92,8 @@ export default function DashboardScreen() {
   // State
   const [user, setUser] = useState<UserProfile | null>(null);
   const [todayTasks, setTodayTasks] = useState<TaskItem[]>([]);
+  const [upcomingTasks, setUpcomingTasks] = useState<TaskItem[]>([]);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [score, setScore] = useState<ScoreData | null>(null);
   const [learningTip, setLearningTip] = useState<string>(
@@ -99,8 +101,6 @@ export default function DashboardScreen() {
   );
   const [runningTimers, setRunningTimers] = useState<RunningTimer[]>([]);
   const [timerNow, setTimerNow] = useState(Date.now());
-  const [timerSeconds, setTimerSeconds] = useState(25 * 60);
-  const [isTimerActive, setIsTimerActive] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -125,8 +125,8 @@ export default function DashboardScreen() {
     return "Good Evening,";
   }, []);
 
-  const displayName = user?.display_name || "there";
-  const userInitial = (displayName[0] || "H").toUpperCase();
+  const displayName = user?.display_name || (user?.email ? user.email.split("@")[0] : "") || "there";
+  const userInitial = (user?.display_name?.[0] || (user?.email ? user.email[0] : "") || "A").toUpperCase();
 
   const openCapture = () => {
     setCaptureVisible(true);
@@ -189,13 +189,15 @@ export default function DashboardScreen() {
       const headers: Record<string, string> = { Accept: "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const [userRes, tasksRes, sumRes, scoreRes, timerRes, learnRes] = await Promise.all([
+      const [userRes, tasksRes, upcomingRes, sumRes, scoreRes, timerRes, learnRes, notifsRes] = await Promise.all([
         fetch(`${baseUrl}/api/v1/auth/me`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/tasks?view=today`, { headers }).catch(() => null),
+        fetch(`${baseUrl}/api/v1/tasks?view=upcoming`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/analytics/summary?period=daily`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/analytics/productivity-score?period=daily`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/time-entries/running/all`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/learning/profile`, { headers }).catch(() => null),
+        fetch(`${baseUrl}/api/v1/notifications`, { headers }).catch(() => null),
       ]);
 
       if (userRes && userRes.ok) {
@@ -205,6 +207,14 @@ export default function DashboardScreen() {
         const taskData = await tasksRes.json() as TaskItem[];
         setTodayTasks(taskData);
         if (profile) await cacheTaskView(profile.id, "today", taskData);
+      }
+      if (upcomingRes && upcomingRes.ok) {
+        const upData = await upcomingRes.json() as TaskItem[];
+        setUpcomingTasks(upData);
+      }
+      if (notifsRes && notifsRes.ok) {
+        const notifs = await notifsRes.json();
+        setHasUnreadNotifications(Array.isArray(notifs) && notifs.some((n: any) => n.status !== "dismissed"));
       }
       if (sumRes && sumRes.ok) {
         setSummary(await sumRes.json());
@@ -246,18 +256,6 @@ export default function DashboardScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  // Pomodoro focus timer countdown
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-    if (isTimerActive && timerSeconds > 0) {
-      interval = setInterval(() => {
-        setTimerSeconds((prev) => (prev > 0 ? prev - 1 : 0));
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isTimerActive, timerSeconds]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
@@ -325,13 +323,113 @@ export default function DashboardScreen() {
     }
   };
 
-  // Toggle focus timer
-  const handleToggleTimer = async () => {
-    if (isTimerActive) {
-      setIsTimerActive(false);
-    } else {
-      setIsTimerActive(true);
-      if (timerSeconds === 0) setTimerSeconds(25 * 60);
+  // Live database-backed focus timer actions
+  const handleStartFocusTimer = async (taskId?: string) => {
+    const targetTaskId = taskId || todayTasks.find((t) => t.status !== "completed")?.id;
+    if (!targetTaskId) {
+      openCapture();
+      return;
+    }
+    const profile = await getUserProfile();
+    try {
+      const baseUrl = getServerUrl();
+      const token = await ensureAuthenticated();
+      if (!token) {
+        if (profile) {
+          const localTimer = await startTaskTimerOffline(profile.id, targetTaskId);
+          setRunningTimers((prev) => [localTimer, ...prev]);
+          await scheduleTaskTimerReminder({
+            timerId: localTimer.id,
+            taskId: targetTaskId,
+            startedAt: localTimer.started_at,
+          });
+        }
+        return;
+      }
+
+      const res = await fetch(`${baseUrl}/api/v1/time-entries/start`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          task_id: targetTaskId,
+          started_at: new Date().toISOString(),
+        }),
+      });
+
+      if (res.ok) {
+        const timerData = await res.json();
+        setRunningTimers((prev) => [timerData, ...prev]);
+        if (profile) await cacheRunningTimers(profile.id, [timerData, ...runningTimers]);
+        await scheduleTaskTimerReminder({
+          timerId: timerData.id,
+          taskId: targetTaskId,
+          startedAt: timerData.started_at,
+        });
+        setTodayTasks((prev) =>
+          prev.map((t) => (t.id === targetTaskId ? { ...t, status: "in_progress" } : t))
+        );
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        Alert.alert("Timer Error", errJson.detail || "Failed to start focus timer.");
+      }
+    } catch {
+      if (profile) {
+        const localTimer = await startTaskTimerOffline(profile.id, targetTaskId);
+        setRunningTimers((prev) => [localTimer, ...prev]);
+        await scheduleTaskTimerReminder({
+          timerId: localTimer.id,
+          taskId: targetTaskId,
+          startedAt: localTimer.started_at,
+        });
+      }
+    }
+  };
+
+  const handleStopActiveTimer = async (timer: RunningTimer) => {
+    const profile = await getUserProfile();
+    try {
+      const baseUrl = getServerUrl();
+      const token = await ensureAuthenticated();
+      if (!token || timer.source === "local") {
+        if (profile) {
+          await stopTaskTimerOffline(profile.id, timer.id);
+          await removeLocalTimer(profile.id, timer.id);
+          setRunningTimers((prev) => prev.filter((t) => t.id !== timer.id));
+          await cancelTaskTimerReminder(timer.id);
+        }
+        return;
+      }
+
+      const res = await fetch(`${baseUrl}/api/v1/time-entries/${timer.id}/stop`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ended_at: new Date().toISOString(),
+        }),
+      });
+
+      if (res.ok) {
+        if (profile) await removeLocalTimer(profile.id, timer.id);
+        setRunningTimers((prev) => prev.filter((t) => t.id !== timer.id));
+        await cancelTaskTimerReminder(timer.id);
+        fetchDashboardData();
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        Alert.alert("Timer Error", errJson.detail || "Failed to stop timer.");
+      }
+    } catch {
+      if (profile) {
+        await stopTaskTimerOffline(profile.id, timer.id);
+        await removeLocalTimer(profile.id, timer.id);
+        setRunningTimers((prev) => prev.filter((t) => t.id !== timer.id));
+        await cancelTaskTimerReminder(timer.id);
+      }
     }
   };
 
@@ -500,9 +598,60 @@ export default function DashboardScreen() {
       });
   }, [todayTasks]);
 
-  // Format timer minutes and seconds
-  const timerMin = String(Math.floor(timerSeconds / 60)).padStart(2, "0");
-  const timerSec = String(timerSeconds % 60).padStart(2, "0");
+  const activeTimer = runningTimers[0] || null;
+  const activeTimerTask = useMemo(() => {
+    if (!activeTimer) return null;
+    return (
+      todayTasks.find((t) => t.id === activeTimer.task_id) ||
+      upcomingTasks.find((t) => t.id === activeTimer.task_id) ||
+      null
+    );
+  }, [activeTimer, todayTasks, upcomingTasks]);
+
+  const nextPendingTask = useMemo(() => {
+    return todayTasks.find((t) => t.status !== "completed") || null;
+  }, [todayTasks]);
+
+  const allWeekTasks = useMemo(() => {
+    return [...todayTasks, ...upcomingTasks];
+  }, [todayTasks, upcomingTasks]);
+
+  const { focusDisplayTimer, focusDisplaySubtitle, focusProgressPct } = useMemo(() => {
+    if (activeTimer) {
+      const elapsedSec = Math.max(0, Math.floor((timerNow - Date.parse(activeTimer.started_at)) / 1000));
+      const hrs = Math.floor(elapsedSec / 3600);
+      const mins = Math.floor((elapsedSec % 3600) / 60);
+      const secs = elapsedSec % 60;
+      const formatted = hrs > 0
+        ? `${hrs}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`
+        : `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+      const targetMin = activeTimerTask?.estimate_user_min || 25;
+      const targetSec = targetMin * 60;
+      const pct = Math.min(100, Math.round((elapsedSec / targetSec) * 100));
+      const title = activeTimerTask?.title || "Deep Work";
+      const extraCount = runningTimers.length > 1 ? ` (+${runningTimers.length - 1} more)` : "";
+      return {
+        focusDisplayTimer: formatted,
+        focusDisplaySubtitle: `${title}${extraCount}`,
+        focusProgressPct: pct,
+      };
+    }
+
+    if (nextPendingTask) {
+      const targetMin = nextPendingTask.estimate_user_min || 25;
+      return {
+        focusDisplayTimer: `${String(targetMin).padStart(2, "0")}:00`,
+        focusDisplaySubtitle: nextPendingTask.title,
+        focusProgressPct: 0,
+      };
+    }
+
+    return {
+      focusDisplayTimer: "00:00",
+      focusDisplaySubtitle: "All caught up today! 🎉",
+      focusProgressPct: 100,
+    };
+  }, [activeTimer, activeTimerTask, nextPendingTask, timerNow, runningTimers.length]);
 
   return (
     <View style={styles.container}>
@@ -513,9 +662,13 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.topRightActions}>
-          <Pressable style={styles.bellBtn} accessibilityLabel="Notifications">
+          <Pressable
+            style={styles.bellBtn}
+            onPress={() => router.push("/(tabs)/profile")}
+            accessibilityLabel="Notifications"
+          >
             <Bell size={20} color={theme.colors.text.primary} />
-            <View style={styles.notificationDot} />
+            {hasUnreadNotifications && <View style={styles.notificationDot} />}
           </Pressable>
 
           <Pressable
@@ -702,26 +855,22 @@ export default function DashboardScreen() {
 
           {/* Right Column: Focus Card + Today's Plan */}
           <View style={styles.rightColumn}>
-            {runningTimers.length > 0 && (
-              <View style={styles.focusCard}>
-                <Text style={styles.focusTitle}>Working now · {runningTimers.length}</Text>
-                {runningTimers.map((timer) => {
-                  const task = todayTasks.find((item) => item.id === timer.task_id);
-                  const minutes = Math.max(0, Math.floor((timerNow - Date.parse(timer.started_at)) / 60000));
-                  return <Text key={timer.id} style={styles.focusSubtitle} numberOfLines={1}>{task?.title || "Task in progress"} · {Math.floor(minutes / 60)}h {minutes % 60}m</Text>;
-                })}
-              </View>
-            )}
-            {/* Focus Pomodoro Card */}
+            {/* Unified Focus Card (Live active timer or next-up task starter) */}
             <View style={styles.focusCard}>
               <View style={styles.focusHeaderRow}>
                 <Text style={styles.focusTitle}>Focus</Text>
                 <Pressable
                   style={styles.playBtn}
-                  onPress={handleToggleTimer}
-                  accessibilityLabel="Start focus timer"
+                  onPress={() => {
+                    if (activeTimer) {
+                      handleStopActiveTimer(activeTimer);
+                    } else {
+                      handleStartFocusTimer();
+                    }
+                  }}
+                  accessibilityLabel={activeTimer ? "Pause active timer" : "Start focus timer"}
                 >
-                  {isTimerActive ? (
+                  {activeTimer ? (
                     <Pause size={14} color="#FFFFFF" />
                   ) : (
                     <Play size={14} color="#FFFFFF" fill="#FFFFFF" />
@@ -730,16 +879,18 @@ export default function DashboardScreen() {
               </View>
 
               <Text style={styles.focusTimerText}>
-                {timerMin}:{timerSec}
+                {focusDisplayTimer}
               </Text>
-              <Text style={styles.focusSubtitle}>Deep Work</Text>
+              <Text style={styles.focusSubtitle} numberOfLines={1}>
+                {focusDisplaySubtitle}
+              </Text>
 
               {/* Progress bar */}
               <View style={styles.focusProgressBarTrack}>
                 <View
                   style={[
                     styles.focusProgressBarFill,
-                    { width: `${((25 * 60 - timerSeconds) / (25 * 60)) * 100}%` },
+                    { width: `${focusProgressPct}%` },
                   ]}
                 />
               </View>
@@ -869,14 +1020,27 @@ export default function DashboardScreen() {
             <View style={styles.miniCalNumsRow}>
               {weekDates.map((date, idx) => {
                 const isToday = date.toDateString() === new Date().toDateString();
-                const hasTask = idx === 1 || idx === 4 || idx === 6; // Activity indicators
+                const tasksForDate = allWeekTasks.filter((t) => {
+                  if (!t.deadline_at) {
+                    return isToday;
+                  }
+                  const d = new Date(t.deadline_at);
+                  return (
+                    d.getFullYear() === date.getFullYear() &&
+                    d.getMonth() === date.getMonth() &&
+                    d.getDate() === date.getDate()
+                  );
+                });
+                const hasTask = tasksForDate.length > 0;
+                const allDone = hasTask && tasksForDate.every((t) => t.status === "completed");
                 return (
                   <View key={idx} style={styles.miniCalNumCol}>
-                    <View
+                    <Pressable
                       style={[
                         styles.miniCalNumBox,
                         isToday && styles.miniCalNumBoxToday,
                       ]}
+                      onPress={() => router.push("/calendar")}
                     >
                       <Text
                         style={[
@@ -886,18 +1050,13 @@ export default function DashboardScreen() {
                       >
                         {date.getDate()}
                       </Text>
-                    </View>
+                    </Pressable>
                     {hasTask && (
                       <View
                         style={[
                           styles.miniCalDot,
                           {
-                            backgroundColor:
-                              idx === 1
-                                ? "#F97316"
-                                : idx === 4
-                                ? "#10B981"
-                                : "#F97316",
+                            backgroundColor: allDone ? "#10B981" : "#F97316",
                           },
                         ]}
                       />
