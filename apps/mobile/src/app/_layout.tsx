@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View, Image } from "react-native";
 import { User } from "lucide-react-native";
 import theme from "../lib/theme";
 import { getAccessToken, getRefreshToken } from "../lib/auth";
+import { scheduleDailyWittyReminders, scheduleInactivityNudge } from "../lib/notification-witty-engine";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 export default function RootLayout() {
@@ -29,6 +30,8 @@ export default function RootLayout() {
       router.replace("/login");
     };
     void guardRoute();
+    void scheduleDailyWittyReminders();
+    void scheduleInactivityNudge();
     return () => { cancelled = true; };
   }, [firstSegment, router]);
 
@@ -85,6 +88,8 @@ export default function RootLayout() {
             headerShown: false,
           }}
         />
+        <Stack.Screen name="capture" options={{ presentation: "modal", headerShown: false }} />
+        <Stack.Screen name="focus" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen
           name="login"
           options={{

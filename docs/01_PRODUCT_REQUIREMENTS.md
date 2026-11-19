@@ -198,6 +198,19 @@ email/Slack integrations; payments; push notifications via a paid service; psych
 | FR-NOTIF-002 | Daily plan prompt (configurable time) | S |
 | FR-NOTIF-003 | Quiet hours | S |
 
+### 2.13 Individual workflow & execution (PROD)
+| ID | Req | P |
+|----|-----|---|
+| FR-PROD-001 | Morning kickoff suggests up to three open tasks from account-owned status, deadlines, deadline kind, and saved priority; suggestions do not become pinned priorities until the user confirms | M |
+| FR-PROD-002 | Optional end-of-day review shows SQL-backed completions and unfinished work; each next-workday, backlog, cancel, or done action is explicitly selected and audited | M |
+| FR-PROD-003 | Android shows a private ongoing focus timer with pause and mark-done actions; task title stays hidden unless the user opts in | M |
+| FR-PROD-004 | Android home widget and Quick Settings tile open typed or voice quick capture, with voice capture started when requested | M |
+| FR-PROD-005 | User may opt in to calendar focus blocks derived from their own recorded work sessions; existing calendar events are skipped and never moved | M |
+| FR-PROD-006 | Vault notes and tasks can be linked in both directions; completing a linked task appends a factual completion record to its note | M |
+| FR-PROD-007 | Weekly retrospective uses SQL-backed period counts and saves the user's reflection as a private Vault note | M |
+| FR-PROD-008 | Android task list supports haptic feedback and multi-select completion, reschedule, tag, and delete actions | M |
+| FR-PROD-009 | Android offers optional locally generated ambient focus audio that requires no network or audio dependency | M |
+
 ## 3. Non-functional requirements
 | ID | Requirement | Target |
 |----|-------------|--------|

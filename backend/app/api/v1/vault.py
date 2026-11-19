@@ -10,22 +10,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import AuthContext, get_auth_context, get_db
 from app.core.errors import NotFoundError
 from app.core.uuid import generate_uuid7
+from app.models.task import Task
 from app.models.vault import Note
 from app.repositories.category_repo import CategoryRepository
 from app.repositories.project_repo import ProjectRepository
 from app.schemas.vault import (
     NoteCreateRequest,
+    NoteResponse,
     NoteTaskConversionRequest,
     NoteTaskConversionResponse,
-    NoteResponse,
     VaultSearchRequest,
     VaultSearchResultResponse,
 )
-from app.vault.ingest import VaultIngestionService
-from app.vault.search import VaultSearchService
-from app.models.task import Task
 from app.services.task_service import TaskService
+from app.vault.ingest import VaultIngestionService
 from app.vault.links import attach_task_to_note
+from app.vault.search import VaultSearchService
 
 router = APIRouter(prefix="/vault", tags=["Knowledge Vault"])
 

@@ -1,6 +1,7 @@
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+import { getNotificationCopy } from "./notification-witty-engine";
 
 const ENABLED_KEY = "alibi_deadline_reminders_enabled";
 const REMINDER_KIND = "task_deadline";
@@ -26,7 +27,7 @@ export async function setTaskDeadlineRemindersEnabled(enabled: boolean): Promise
 
 /** Keep private, on-device deadline reminders aligned with the user's saved tasks. */
 export async function syncTaskDeadlineReminders(
-  tasks: { id: string; status: string; deadline_at: string | null }[],
+  tasks: { id: string; status: string; deadline_at: string | null; title?: string }[],
   leadMinutes: number,
 ): Promise<void> {
   try {
@@ -56,10 +57,12 @@ export async function syncTaskDeadlineReminders(
       await Promise.all(notices.filter((request) => request !== existing).map((request) => Notifications.cancelScheduledNotificationAsync(request.identifier).catch(() => undefined)));
       if (existing || !Number.isFinite(fireAt) || fireAt <= Date.now()) continue;
 
+      const copy = await getNotificationCopy("DEADLINE_CRUNCH", { taskTitle: task.title });
+
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "Task deadline coming up",
-          body: "Open ALIBI to review your next deadline.",
+          title: copy.title,
+          body: copy.body,
           data: { kind: REMINDER_KIND, taskId: task.id, fireAt },
           sound: false,
         },

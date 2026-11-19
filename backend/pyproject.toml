@@ -84,6 +84,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 pythonpath = ["."]
+markers = ["req(id): requirement ID covered by this test"]
 
 [tool.importlinter]
 root_package = "app"

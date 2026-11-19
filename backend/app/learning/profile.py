@@ -84,7 +84,6 @@ class PLEProfileCompiler:
                     "session_count": p.session_count,
                     "confidence": p.confidence,
                     "postponement_rate": p.postponement_rate,
-                    "confidence": p.confidence,
                 }
                 for p in preferences
             ],

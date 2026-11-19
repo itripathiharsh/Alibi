@@ -968,6 +968,119 @@
         }
       }
     },
+    "/api/v1/tasks/daily-kickoff": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Get Daily Kickoff",
+        "description": "Suggest up to three open tasks using deadlines, status and saved priority.",
+        "operationId": "get_daily_kickoff_api_v1_tasks_daily_kickoff_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyKickoffResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/tasks/end-of-day": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Get End Of Day Review",
+        "description": "Return real completions and unfinished due/scheduled work for the user's local day.",
+        "operationId": "get_end_of_day_review_api_v1_tasks_end_of_day_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndOfDayReviewResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/tasks/{task_id}/end-of-day-action": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Apply End Of Day Action",
+        "description": "Apply one explicit user-selected tomorrow, backlog or cancel action.",
+        "operationId": "apply_end_of_day_action_api_v1_tasks__task_id__end_of_day_action_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndOfDayActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndOfDayActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tasks/capture": {
       "post": {
         "tags": [
@@ -3892,6 +4005,53 @@
         ]
       }
     },
+    "/api/v1/scheduling/focus-protection": {
+      "post": {
+        "tags": [
+          "Scheduling"
+        ],
+        "summary": "Set Focus Protection",
+        "description": "Opt in to fixed focus blocks derived from actual timer history and work hours.",
+        "operationId": "set_focus_protection_api_v1_scheduling_focus_protection_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FocusProtectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FocusProtectionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/scheduling/proposals/generate": {
       "post": {
         "tags": [
@@ -4446,6 +4606,114 @@
                     "$ref": "#/components/schemas/NoteResponse"
                   },
                   "title": "Response List Notes Api V1 Vault Notes Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/vault/notes/{note_id}": {
+      "get": {
+        "tags": [
+          "Knowledge Vault"
+        ],
+        "summary": "Get Note",
+        "description": "Fetch one private Vault note for task-to-note navigation.",
+        "operationId": "get_note_api_v1_vault_notes__note_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Note Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/vault/notes/{note_id}/convert-task": {
+      "post": {
+        "tags": [
+          "Knowledge Vault"
+        ],
+        "summary": "Convert Note To Task",
+        "description": "Create a task from a user-selected note line and link it to the source note.",
+        "operationId": "convert_note_to_task_api_v1_vault_notes__note_id__convert_task_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Note Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteTaskConversionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteTaskConversionResponse"
                 }
               }
             }
@@ -7511,6 +7779,28 @@
         ],
         "title": "ConsistencyHeatmapItem"
       },
+      "DailyKickoffResponse": {
+        "properties": {
+          "local_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Local Date"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/KickoffSuggestion"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "local_date",
+          "suggestions"
+        ],
+        "title": "DailyKickoffResponse"
+      },
       "DeviceInfo": {
         "properties": {
           "id": {
@@ -7726,6 +8016,140 @@
         ],
         "title": "DurationPredictionResponse"
       },
+      "EndOfDayActionRequest": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "tomorrow",
+              "backlog",
+              "cancel"
+            ],
+            "title": "Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "EndOfDayActionRequest"
+      },
+      "EndOfDayActionResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Task Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "tomorrow",
+              "backlog",
+              "cancel"
+            ],
+            "title": "Action"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "deadline_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline At"
+          },
+          "reschedule_count": {
+            "type": "integer",
+            "title": "Reschedule Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "action",
+          "status",
+          "deadline_at",
+          "reschedule_count"
+        ],
+        "title": "EndOfDayActionResponse"
+      },
+      "EndOfDayReviewResponse": {
+        "properties": {
+          "local_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Local Date"
+          },
+          "completed_count": {
+            "type": "integer",
+            "title": "Completed Count"
+          },
+          "unfinished": {
+            "items": {
+              "$ref": "#/components/schemas/EndOfDayTask"
+            },
+            "type": "array",
+            "title": "Unfinished"
+          }
+        },
+        "type": "object",
+        "required": [
+          "local_date",
+          "completed_count",
+          "unfinished"
+        ],
+        "title": "EndOfDayReviewResponse"
+      },
+      "EndOfDayTask": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "deadline_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline At"
+          },
+          "reschedule_count": {
+            "type": "integer",
+            "title": "Reschedule Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "status",
+          "deadline_at",
+          "reschedule_count"
+        ],
+        "title": "EndOfDayTask"
+      },
       "EstVsActualItem": {
         "properties": {
           "task_id": {
@@ -7926,6 +8350,74 @@
         ],
         "title": "EvidenceTextOrLinkRequest"
       },
+      "FocusProtectionRequest": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "FocusProtectionRequest"
+      },
+      "FocusProtectionResponse": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "focus_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus Start"
+          },
+          "session_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Min"
+          },
+          "session_count": {
+            "type": "integer",
+            "title": "Session Count",
+            "default": 0
+          },
+          "blocks_created": {
+            "type": "integer",
+            "title": "Blocks Created",
+            "default": 0
+          },
+          "conflicts_skipped": {
+            "type": "integer",
+            "title": "Conflicts Skipped",
+            "default": 0
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "message"
+        ],
+        "title": "FocusProtectionResponse"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -8074,6 +8566,63 @@
           "active"
         ],
         "title": "InvitePreviewResponse"
+      },
+      "KickoffSuggestion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "deadline_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline At"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "status",
+          "priority",
+          "deadline_at",
+          "reasons"
+        ],
+        "title": "KickoffSuggestion"
       },
       "LearnedPatternResponse": {
         "properties": {
@@ -8506,6 +9055,58 @@
           "updated_at"
         ],
         "title": "NoteResponse"
+      },
+      "NoteTaskConversionRequest": {
+        "properties": {
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "task_text": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Task Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_text"
+        ],
+        "title": "NoteTaskConversionRequest"
+      },
+      "NoteTaskConversionResponse": {
+        "properties": {
+          "note_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Note Id"
+          },
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Task Id"
+          },
+          "task_title": {
+            "type": "string",
+            "title": "Task Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "note_id",
+          "task_id",
+          "task_title"
+        ],
+        "title": "NoteTaskConversionResponse"
       },
       "NotificationCreateRequest": {
         "properties": {
@@ -10628,7 +11229,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^(pending|completed)$"
+                "pattern": "^(pending|in_progress|completed|cancelled)$"
               },
               {
                 "type": "null"
@@ -10972,6 +11573,36 @@
         ],
         "title": "TaskHistoryEventResponse"
       },
+      "TaskNoteSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "occurred_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Occurred On"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "source_type",
+          "occurred_on"
+        ],
+        "title": "TaskNoteSummary"
+      },
       "TaskRescheduleRequest": {
         "properties": {
           "new_deadline_at": {
@@ -11262,6 +11893,13 @@
             "type": "array",
             "title": "Subtasks"
           },
+          "linked_notes": {
+            "items": {
+              "$ref": "#/components/schemas/TaskNoteSummary"
+            },
+            "type": "array",
+            "title": "Linked Notes"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -11432,6 +12070,20 @@
               }
             ],
             "title": "Estimate User Min"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
           }
         },
         "type": "object",

@@ -34,6 +34,14 @@ class FocusSessionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> stopSession()
+            ACTION_AUDIO_START -> {
+                FocusAmbientAudio.start(this, intent.getStringExtra(EXTRA_AUDIO_STYLE).orEmpty())
+                publishNotification(startImmediately = true, audioActive = true)
+            }
+            ACTION_AUDIO_STOP -> {
+                FocusAmbientAudio.stop()
+                publishNotification(startImmediately = true, audioActive = false)
+            }
             ACTION_START -> {
                 taskId = intent.getStringExtra(EXTRA_TASK_ID).orEmpty()
                 taskTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
@@ -61,13 +69,14 @@ class FocusSessionService : Service() {
         )
     }
 
-    private fun publishNotification(startImmediately: Boolean = false) {
+    private fun publishNotification(startImmediately: Boolean = false, audioActive: Boolean = false) {
         val notification = buildNotification()
         if (startImmediately && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 NOTIFICATION_ID,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
+                    if (audioActive) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK else 0,
             )
         } else if (startImmediately) {
             startForeground(NOTIFICATION_ID, notification)
@@ -150,11 +159,14 @@ class FocusSessionService : Service() {
     companion object {
         const val ACTION_START = "com.alibi.app.focus.START"
         const val ACTION_STOP = "com.alibi.app.focus.STOP"
+        const val ACTION_AUDIO_START = "com.alibi.app.focus.AUDIO_START"
+        const val ACTION_AUDIO_STOP = "com.alibi.app.focus.AUDIO_STOP"
         const val EXTRA_TASK_ID = "task_id"
         const val EXTRA_TITLE = "task_title"
         const val EXTRA_STARTED_AT = "started_at"
         const val EXTRA_DURATION_MIN = "duration_min"
         const val EXTRA_SHOW_TITLE = "show_task_title"
+        const val EXTRA_AUDIO_STYLE = "audio_style"
         private const val CHANNEL_ID = "alibi-focus-session"
         private const val NOTIFICATION_ID = 4102
     }

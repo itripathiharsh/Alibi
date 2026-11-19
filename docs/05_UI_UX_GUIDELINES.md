@@ -57,6 +57,16 @@ Every data screen implements: **loading** (skeleton), **empty** (one-line guidan
 | AI settings | Provider cards: status dot, key set (••••1234), test button, models, fallback drag order, "Disable all external AI" master switch |
 | Profile settings (mobile) | Editable work hours by weekday, deadline reminder lead time, private notification controls; saved preferences are used by planning and local reminders |
 
+### 3a. Personal workflow surfaces (FR-PROD)
+- **Morning kickoff:** show SQL-ranked suggestions in a one-screen sheet from 06:00–10:00 in the account timezone, at most once per day. Every row can be selected or swapped; suggestions remain a draft until “Lock in Top 3” is tapped.
+- **Sunset sweep:** offer the optional review after the user's configured workday. Show the actual completion/unfinished counts and separate Next workday, Backlog, Done, and Drop controls. Confirm cancellation and moving all tasks. Never change the rest of the task list in the background.
+- **Focus timer:** the Android foreground notification keeps the lock-screen title private by default, shows progress/elapsed time and offers Pause and Mark done. Starting/stopping a timer remains available if notification permission is denied.
+- **Quick capture:** home widget and Quick Settings tile open the compact capture screen; the voice shortcut starts on-device recognition immediately. Captured text is reviewed before save and uses the regular authenticated capture API or the local outbox offline.
+- **Focus protection:** enabling the setting is an explicit calendar write. Explain the learned hour, session sample count, and workday range before adding blocks. Existing events are skipped, never displaced. Disabling removes only ALIBI-generated focus blocks.
+- **Vault bridge:** note detail parses unfinished Markdown checklist lines as selectable task text. A linked task shows its source note in Task detail; completion writes the actual task title and timestamp to that note.
+- **Weekly retrospective:** the weekly Insights view shows database counts, asks what worked/blocked/comes next, and writes a personal Vault note only when the user saves.
+- **Batch actions and audio:** long-press enters multi-select; show the selection count and clearly name each action. Trash and multi-task EOD moves ask for confirmation; haptics and locally generated ambient sound are optional and never transmit task data.
+
 ## 4. Design system
 - **Typography:** Inter (web via self-hosted font files, mobile via expo-font) — scale 12/14/16/20/24/32; tabular numerals for metrics.
 - **Spacing:** 4-pt grid. **Radius:** 8 (controls), 12 (cards), 20 (sheets).

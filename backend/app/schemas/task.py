@@ -69,7 +69,14 @@ class TaskCaptureRequest(BaseModel):
     @field_validator("origin", mode="before")
     @classmethod
     def validate_origin(cls, v: Any) -> str:
-        valid_origins = ("manual", "voice", "ai_recommendation", "meeting", "external_assignment", "recurring")
+        valid_origins = (
+            "manual",
+            "voice",
+            "ai_recommendation",
+            "meeting",
+            "external_assignment",
+            "recurring",
+        )
         if not v or str(v).strip().lower() not in valid_origins:
             return "manual"
         return str(v).strip().lower()
@@ -166,6 +173,7 @@ class TaskUpdateRequest(BaseModel):
     deadline_at: datetime | None = None
     deadline_kind: str | None = Field(None, pattern="^(hard|soft)$")
     estimate_user_min: int | None = Field(None, ge=1, le=10080)
+    tags: list[str] | None = None
 
 
 class TaskStatusUpdateRequest(BaseModel):

@@ -352,6 +352,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/daily-kickoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Daily Kickoff
+         * @description Suggest up to three open tasks using deadlines, status and saved priority.
+         */
+        get: operations["get_daily_kickoff_api_v1_tasks_daily_kickoff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/end-of-day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get End Of Day Review
+         * @description Return real completions and unfinished due/scheduled work for the user's local day.
+         */
+        get: operations["get_end_of_day_review_api_v1_tasks_end_of_day_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}/end-of-day-action": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply End Of Day Action
+         * @description Apply one explicit user-selected tomorrow, backlog or cancel action.
+         */
+        post: operations["apply_end_of_day_action_api_v1_tasks__task_id__end_of_day_action_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/capture": {
         parameters: {
             query?: never;
@@ -1260,6 +1320,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/scheduling/focus-protection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Focus Protection
+         * @description Opt in to fixed focus blocks derived from actual timer history and work hours.
+         */
+        post: operations["set_focus_protection_api_v1_scheduling_focus_protection_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/scheduling/proposals/generate": {
         parameters: {
             query?: never;
@@ -1420,6 +1500,46 @@ export interface paths {
          * @description Manually create and chunk a note in the personal knowledge vault.
          */
         post: operations["create_note_api_v1_vault_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vault/notes/{note_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Note
+         * @description Fetch one private Vault note for task-to-note navigation.
+         */
+        get: operations["get_note_api_v1_vault_notes__note_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vault/notes/{note_id}/convert-task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Convert Note To Task
+         * @description Create a task from a user-selected note line and link it to the source note.
+         */
+        post: operations["convert_note_to_task_api_v1_vault_notes__note_id__convert_task_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2578,6 +2698,16 @@ export interface components {
             /** Minutes Logged */
             minutes_logged: number;
         };
+        /** DailyKickoffResponse */
+        DailyKickoffResponse: {
+            /**
+             * Local Date
+             * Format: date
+             */
+            local_date: string;
+            /** Suggestions */
+            suggestions: components["schemas"]["KickoffSuggestion"][];
+        };
         /** DeviceInfo */
         DeviceInfo: {
             /** Id */
@@ -2655,6 +2785,61 @@ export interface components {
             /** Explanation */
             explanation?: string | null;
         };
+        /** EndOfDayActionRequest */
+        EndOfDayActionRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "tomorrow" | "backlog" | "cancel";
+        };
+        /** EndOfDayActionResponse */
+        EndOfDayActionResponse: {
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "tomorrow" | "backlog" | "cancel";
+            /** Status */
+            status: string;
+            /** Deadline At */
+            deadline_at: string | null;
+            /** Reschedule Count */
+            reschedule_count: number;
+        };
+        /** EndOfDayReviewResponse */
+        EndOfDayReviewResponse: {
+            /**
+             * Local Date
+             * Format: date
+             */
+            local_date: string;
+            /** Completed Count */
+            completed_count: number;
+            /** Unfinished */
+            unfinished: components["schemas"]["EndOfDayTask"][];
+        };
+        /** EndOfDayTask */
+        EndOfDayTask: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            /** Deadline At */
+            deadline_at: string | null;
+            /** Reschedule Count */
+            reschedule_count: number;
+        };
         /** EstVsActualItem */
         EstVsActualItem: {
             /**
@@ -2729,6 +2914,37 @@ export interface components {
              * @default false
              */
             is_deliverable: boolean;
+        };
+        /** FocusProtectionRequest */
+        FocusProtectionRequest: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** FocusProtectionResponse */
+        FocusProtectionResponse: {
+            /** Enabled */
+            enabled: boolean;
+            /** Focus Start */
+            focus_start?: string | null;
+            /** Session Min */
+            session_min?: number | null;
+            /**
+             * Session Count
+             * @default 0
+             */
+            session_count: number;
+            /**
+             * Blocks Created
+             * @default 0
+             */
+            blocks_created: number;
+            /**
+             * Conflicts Skipped
+             * @default 0
+             */
+            conflicts_skipped: number;
+            /** Message */
+            message: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2820,6 +3036,24 @@ export interface components {
             expires_at: string;
             /** Active */
             active: boolean;
+        };
+        /** KickoffSuggestion */
+        KickoffSuggestion: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            /** Priority */
+            priority: number | null;
+            /** Deadline At */
+            deadline_at: string | null;
+            /** Reasons */
+            reasons: string[];
         };
         /** LearnedPatternResponse */
         LearnedPatternResponse: {
@@ -3004,6 +3238,28 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** NoteTaskConversionRequest */
+        NoteTaskConversionRequest: {
+            /** Task Id */
+            task_id?: string | null;
+            /** Task Text */
+            task_text: string;
+        };
+        /** NoteTaskConversionResponse */
+        NoteTaskConversionResponse: {
+            /**
+             * Note Id
+             * Format: uuid
+             */
+            note_id: string;
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+            /** Task Title */
+            task_title: string;
         };
         /** NotificationCreateRequest */
         NotificationCreateRequest: {
@@ -4029,6 +4285,23 @@ export interface components {
              */
             occurred_at: string;
         };
+        /** TaskNoteSummary */
+        TaskNoteSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Source Type */
+            source_type: string;
+            /**
+             * Occurred On
+             * Format: date
+             */
+            occurred_on: string;
+        };
         /** TaskRescheduleRequest */
         TaskRescheduleRequest: {
             /** New Deadline At */
@@ -4105,6 +4378,8 @@ export interface components {
             tags?: string[];
             /** Subtasks */
             subtasks?: components["schemas"]["SubtaskResponse"][];
+            /** Linked Notes */
+            linked_notes?: components["schemas"]["TaskNoteSummary"][];
             /**
              * Created At
              * Format: date-time
@@ -4145,6 +4420,8 @@ export interface components {
             deadline_kind?: string | null;
             /** Estimate User Min */
             estimate_user_min?: number | null;
+            /** Tags */
+            tags?: string[] | null;
         };
         /** TimeByCategoryItem */
         TimeByCategoryItem: {
@@ -5032,6 +5309,81 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_daily_kickoff_api_v1_tasks_daily_kickoff_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyKickoffResponse"];
+                };
+            };
+        };
+    };
+    get_end_of_day_review_api_v1_tasks_end_of_day_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndOfDayReviewResponse"];
+                };
+            };
+        };
+    };
+    apply_end_of_day_action_api_v1_tasks__task_id__end_of_day_action_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndOfDayActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndOfDayActionResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -6618,6 +6970,39 @@ export interface operations {
             };
         };
     };
+    set_focus_protection_api_v1_scheduling_focus_protection_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FocusProtectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FocusProtectionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     generate_schedule_proposal_api_v1_scheduling_proposals_generate_post: {
         parameters: {
             query?: never;
@@ -6959,6 +7344,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_note_api_v1_vault_notes__note_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    convert_note_to_task_api_v1_vault_notes__note_id__convert_task_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteTaskConversionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteTaskConversionResponse"];
                 };
             };
             /** @description Validation Error */

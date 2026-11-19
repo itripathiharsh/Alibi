@@ -255,3 +255,25 @@ No new third-party package or database migration is introduced; these dependenci
 
 ### Owner authorization
 The owner explicitly instructed the agent to finish the outstanding whole-app audit fixes on 2026-11-18. No sync envelope or conflict-rule change is part of this implementation.
+
+## ADR-027 — Personal workflow automation and Vault/task bridge
+- Status: Accepted by the owner's explicit “implement it all” instruction on 2026-11-19
+- Date: 2026-11-19
+- Requirement IDs affected: FR-PROD-001..009, FR-TASK-011, FR-KNOW-001..004
+
+### Context
+The owner supplied an end-to-end product evaluation and asked for its individual productivity recommendations to be implemented. The evaluation called for a data-grounded daily kickoff, an optional end-of-day sweep, background focus controls, Android quick capture, PLE-based focus protection, Vault/task links, weekly reflection and small task-list/focus-session improvements.
+
+### Decision
+1. Use existing SQL task fields to rank kickoff suggestions. Suggestions stay local draft state until the user confirms their three priorities.
+2. End-of-day counts come from SQL in the user's timezone. Tomorrow/backlog/cancel/done are distinct explicit actions; next-workday updates use the existing reschedule service and event history.
+3. Use a small Android-native foreground service, widget and Quick Settings tile, with the existing React Native/Expo runtime. Task titles remain hidden in the notification unless the user enables them. Quick capture opens the existing authenticated capture path and uses on-device speech.
+4. PLE focus protection is disabled by default. Turning it on is an explicit schedule write based on actual recorded sessions and configured work hours; existing calendar events are skipped. Turning it off deletes only ALIBI-generated focus blocks.
+5. Add one account-scoped link table for many-to-many task/note links. Task creation from a note is user-selected; task completion appends the actual task title and timestamp to linked note text and refreshes its local search chunks.
+6. Weekly retrospective metrics reuse the existing SQL analytics API; the user's own reflection is saved only on request as a personal Vault note. Batch task actions, haptics and ambient audio use existing APIs/platform capabilities and add no dependency or external service.
+
+### Consequences
+Migration 0014 is additive and reversible; no existing user-data columns are dropped or renamed. The sync operation envelope, productivity score formula, external AI routing, and default sharing scope are unchanged. No schedule is altered until the user enables focus protection or chooses an end-of-day action. Android foreground service, widget/tile delivery and audio still require device QA.
+
+### Owner authorization
+The owner supplied the evaluation and explicitly instructed “implement it all” and build the APK on 2026-11-19. That instruction authorizes this additive workflow scope and the opt-in focus-block behavior described here.

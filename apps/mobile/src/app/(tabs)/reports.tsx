@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Share,
+  TextInput,
 } from "react-native";
 import {
   BarChart3,
@@ -67,6 +68,10 @@ export default function ReportsScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<"daily" | "weekly" | "monthly">("daily");
   const [includePersonal, setIncludePersonal] = useState(false);
+  const [reviewWorked, setReviewWorked] = useState("");
+  const [reviewBlocked, setReviewBlocked] = useState("");
+  const [reviewNext, setReviewNext] = useState("");
+  const [savingReview, setSavingReview] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -105,6 +110,46 @@ export default function ReportsScreen() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const saveWeeklyRetrospective = async () => {
+    if (savingReview || ![reviewWorked, reviewBlocked, reviewNext].some((value) => value.trim())) return;
+    setSavingReview(true);
+    try {
+      const token = await ensureAuthenticated();
+      if (!token) throw new Error("Sign in to save your private weekly review.");
+      const today = new Date();
+      const occurredOn = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      const lines = [
+        "Weekly retrospective",
+        "",
+        summary ? `Recorded this week: ${summary.tasks_completed} completed, ${summary.total_time_min} minutes logged, ${summary.tasks_pending} pending, ${summary.tasks_overdue} overdue.` : "Weekly activity summary was unavailable when this review was saved.",
+        "",
+        `What worked: ${reviewWorked.trim() || "Not recorded"}`,
+        `What got stuck: ${reviewBlocked.trim() || "Not recorded"}`,
+        `Next week priorities: ${reviewNext.trim() || "Not recorded"}`,
+      ];
+      const response = await fetch(`${getServerUrl()}/api/v1/vault/notes`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `Weekly review · ${occurredOn}`,
+          body: lines.join("\n"),
+          source_type: "manual",
+          privacy_class: "personal",
+          occurred_on: occurredOn,
+        }),
+      });
+      if (!response.ok) throw new Error("Could not save the weekly review. Try again.");
+      setReviewWorked("");
+      setReviewBlocked("");
+      setReviewNext("");
+      Alert.alert("Review saved", "Your weekly retrospective is in your private Vault.");
+    } catch (error) {
+      Alert.alert("Weekly review", error instanceof Error ? error.message : "Could not save the review.");
+    } finally {
+      setSavingReview(false);
+    }
+  };
 
   const handleGenerateReport = async () => {
     if (isGenerating) return;
@@ -264,6 +309,34 @@ export default function ReportsScreen() {
         )}
       </View>
 
+      {selectedPeriod === "weekly" && (
+        <View style={styles.retrospectiveCard}>
+          <View style={styles.chartHeader}>
+            <View>
+              <Text style={styles.chartTitle}>Weekly retrospective</Text>
+              <Text style={styles.chartSubtitle}>Reflect on your week and keep the next steps in your private Vault.</Text>
+            </View>
+            <Sparkles size={20} color="#8B5CF6" />
+          </View>
+          {summary ? (
+            <View style={styles.reviewFacts}>
+              <Text style={styles.reviewFact}>{summary.tasks_completed} completed</Text>
+              <Text style={styles.reviewFact}>{summary.total_time_min} minutes logged</Text>
+              <Text style={styles.reviewFact}>{summary.tasks_pending} pending</Text>
+              <Text style={styles.reviewFact}>{summary.tasks_overdue} overdue</Text>
+            </View>
+          ) : (
+            <Text style={styles.chartEmpty}>Weekly counts will appear when the report data loads.</Text>
+          )}
+          <TextInput value={reviewWorked} onChangeText={setReviewWorked} placeholder="What worked well?" placeholderTextColor={theme.colors.text.muted} multiline style={styles.reviewInput} />
+          <TextInput value={reviewBlocked} onChangeText={setReviewBlocked} placeholder="What got stuck?" placeholderTextColor={theme.colors.text.muted} multiline style={styles.reviewInput} />
+          <TextInput value={reviewNext} onChangeText={setReviewNext} placeholder="What are your priorities for next week?" placeholderTextColor={theme.colors.text.muted} multiline style={styles.reviewInput} />
+          <Pressable disabled={savingReview || ![reviewWorked, reviewBlocked, reviewNext].some((value) => value.trim())} onPress={() => void saveWeeklyRetrospective()} style={[styles.reviewSave, (savingReview || ![reviewWorked, reviewBlocked, reviewNext].some((value) => value.trim())) && { opacity: 0.55 }]}>
+            <Text style={styles.reviewSaveText}>{savingReview ? "Saving review…" : "Save private review"}</Text>
+          </Pressable>
+        </View>
+      )}
+
       <View style={styles.insightPanel}>
         <View style={styles.chartHeader}><View><Text style={styles.chartTitle}>Time Distribution</Text><Text style={styles.chartSubtitle}>Logged time by category · {periodLabel}</Text></View><Clock size={19} color="#F47B25" /></View>
         {isLoading ? <ActivityIndicator color={theme.colors.accent.amber} /> : distribution.length === 0 ? <Text style={styles.chartEmpty}>Log time to see your category breakdown.</Text> : <View style={styles.distributionList}>{distribution.slice(0, 5).map((item) => <View key={item.category_name} style={styles.distributionRow}><View style={styles.distributionMeta}><View style={[styles.legendDot, { backgroundColor: item.category_color }]} /><Text style={styles.distributionName} numberOfLines={1}>{item.category_name}</Text><Text style={styles.distributionValue}>{Math.round(item.percentage)}%</Text></View><View style={styles.track}><View style={[styles.fill, { width: `${Math.max(0, Math.min(100, item.percentage))}%`, backgroundColor: item.category_color }]} /></View></View>)}</View>}
@@ -399,6 +472,12 @@ const styles = StyleSheet.create({
   screenTitle: { fontSize: 30, lineHeight: 36, fontWeight: "800", letterSpacing: -0.6, color: theme.colors.text.primary },
   screenSubtitle: { fontSize: 14, lineHeight: 20, color: theme.colors.text.secondary, marginTop: 1 },
   insightPanel: { padding: 16, borderRadius: 21, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: theme.colors.border.subtle, gap: 14, shadowColor: "#19354A", shadowOpacity: .04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
+  retrospectiveCard: { padding: 16, borderRadius: 21, backgroundColor: "#FAF7FF", borderWidth: 1, borderColor: "#ECE5FF", gap: 12 },
+  reviewFacts: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  reviewFact: { color: "#4C3F72", backgroundColor: "#F0EAFE", borderRadius: 11, paddingHorizontal: 10, paddingVertical: 7, fontSize: 11, fontWeight: "700" },
+  reviewInput: { minHeight: 72, borderRadius: 13, borderWidth: 1, borderColor: "#E4DDF3", backgroundColor: "#FFFFFF", padding: 12, color: theme.colors.text.primary, textAlignVertical: "top", fontSize: 13 },
+  reviewSave: { minHeight: 48, alignItems: "center", justifyContent: "center", backgroundColor: "#6045A1", borderRadius: 14 },
+  reviewSaveText: { color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
   panelDivider: { height: 1, backgroundColor: "#E8EDF1", marginVertical: 3 },
   chartHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   chartTitle: { fontSize: 17, fontWeight: "800", color: theme.colors.text.primary },

@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import AuthContext, get_auth_context, get_db
 from app.calendar_service.conflicts import CalendarConflictService
 from app.core.errors import NotFoundError
+from app.learning.preferences import PLEPreferenceLearner
 from app.models.calendar import CalendarEvent, ScheduleRecommendation
 from app.models.user import User
-from app.learning.preferences import PLEPreferenceLearner
 from app.repositories.task_repo import TaskRepository
 from app.scheduling.proposal_service import SchedulingProposalService
 from app.schemas.notification import ConflictDetectRequest, ConflictResponse
@@ -81,8 +81,10 @@ async def set_focus_protection(
             await db.scalars(
                 select(CalendarEvent).where(
                     CalendarEvent.user_id == user.id,
-                    CalendarEvent.start_at < datetime.combine(end_day, time.max, tzinfo=tz).astimezone(UTC),
-                    CalendarEvent.end_at > datetime.combine(today, time.min, tzinfo=tz).astimezone(UTC),
+                    CalendarEvent.start_at
+                    < datetime.combine(end_day, time.max, tzinfo=tz).astimezone(UTC),
+                    CalendarEvent.end_at
+                    > datetime.combine(today, time.min, tzinfo=tz).astimezone(UTC),
                     CalendarEvent.title != generated_title,
                 )
             )
@@ -102,7 +104,9 @@ async def set_focus_protection(
         if not (work_start <= focus_start < work_end):
             continue
         available_min = int(
-            (datetime.combine(work_date, work_end) - datetime.combine(work_date, focus_start)).total_seconds()
+            (
+                datetime.combine(work_date, work_end) - datetime.combine(work_date, focus_start)
+            ).total_seconds()
             / 60
         )
         duration_min = min(preference.preferred_session_min, available_min)

@@ -19,6 +19,12 @@ from app.repositories.ai_extraction_repo import AIExtractionRepository
 from app.repositories.subtask_repo import SubtaskRepository
 from app.repositories.tag_repo import TagRepository
 from app.repositories.task_repo import TaskRepository
+from app.schemas.productivity import (
+    DailyKickoffResponse,
+    EndOfDayActionRequest,
+    EndOfDayActionResponse,
+    EndOfDayReviewResponse,
+)
 from app.schemas.task import (
     SubtaskCreateRequest,
     SubtaskReorderRequest,
@@ -30,16 +36,11 @@ from app.schemas.task import (
     TaskExtractionDecisionRequest,
     TaskExtractionProposalResponse,
     TaskHistoryEventResponse,
+    TaskNoteSummary,
     TaskRescheduleRequest,
     TaskResponse,
     TaskStatusUpdateRequest,
     TaskUpdateRequest,
-)
-from app.schemas.productivity import (
-    DailyKickoffResponse,
-    EndOfDayActionRequest,
-    EndOfDayActionResponse,
-    EndOfDayReviewResponse,
 )
 from app.services.dependency_service import DependencyService
 from app.services.productivity_workflow import ProductivityWorkflowService
@@ -75,9 +76,7 @@ async def apply_end_of_day_action(
     db: AsyncSession = Depends(get_db),
 ) -> EndOfDayActionResponse:
     """Apply one explicit user-selected tomorrow, backlog or cancel action."""
-    return await ProductivityWorkflowService(db).apply_end_of_day_action(
-        auth.user, task_id, body
-    )
+    return await ProductivityWorkflowService(db).apply_end_of_day_action(auth.user, task_id, body)
 
 
 async def _enrich_task_response(
@@ -96,7 +95,9 @@ async def _enrich_task_response(
     resp.tags = [t.name for t in tags]
     resp.subtasks = [SubtaskResponse.model_validate(s) for s in subtasks]
     linked_notes = await linked_notes_for_tasks(db, user_id, [task.id])
-    resp.linked_notes = linked_notes.get(task.id, [])
+    resp.linked_notes = [
+        TaskNoteSummary.model_validate(note) for note in linked_notes.get(task.id, [])
+    ]
     return resp
 
 
@@ -342,7 +343,9 @@ async def list_tasks(
     note_links = await linked_notes_for_tasks(db, auth.user_id, [task.id for task in tasks])
     for t in tasks:
         enriched = await _enrich_task_response(t, db, auth.user_id)
-        enriched.linked_notes = note_links.get(t.id, [])
+        enriched.linked_notes = [
+            TaskNoteSummary.model_validate(note) for note in note_links.get(t.id, [])
+        ]
         result.append(enriched)
     return result
 

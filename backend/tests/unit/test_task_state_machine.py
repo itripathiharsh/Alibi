@@ -3,7 +3,7 @@ Exhaustively tests all 16 state pairs across ('pending', 'in_progress', 'complet
 """
 
 import uuid
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -19,6 +19,9 @@ async def test_ac_m2_3_status_transition_table_16_pairs() -> None:
     """AC-M2-3: All valid transitions succeed, all invalid -> 409 Conflict."""
     user_id = uuid.uuid4()
     mock_session = AsyncMock()
+    mock_session.execute = AsyncMock(
+        return_value=Mock(scalars=Mock(return_value=Mock(all=Mock(return_value=[]))))
+    )
 
     service = TaskService(mock_session, user_id)
 

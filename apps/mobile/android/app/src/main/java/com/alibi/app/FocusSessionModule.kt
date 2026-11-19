@@ -40,11 +40,18 @@ class FocusSessionModule(private val context: ReactApplicationContext) :
 
     @ReactMethod
     fun startAmbient(style: String) {
-        FocusAmbientAudio.start(context.applicationContext, style)
+        val intent = Intent(context, FocusSessionService::class.java).apply {
+            action = FocusSessionService.ACTION_AUDIO_START
+            putExtra(FocusSessionService.EXTRA_AUDIO_STYLE, style)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
+        else context.startService(intent)
     }
 
     @ReactMethod
     fun stopAmbient() {
-        FocusAmbientAudio.stop()
+        context.startService(Intent(context, FocusSessionService::class.java).apply {
+            action = FocusSessionService.ACTION_AUDIO_STOP
+        })
     }
 }

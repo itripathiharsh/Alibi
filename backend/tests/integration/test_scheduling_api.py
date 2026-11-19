@@ -1,6 +1,7 @@
 """Integration tests for Scheduling and Proposal API (AC-SCH-3, AC-SCH-4)."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -77,3 +78,79 @@ async def test_scheduling_proposal_lifecycle_and_stale_rejection(
     events = events_res.json()
     assert any(e["kind"] == "fixed_event" and e["title"] == "Dentist Appointment" for e in events)
     assert any(e["kind"] == "work_block" and e["source"] == "ai_accepted" for e in events)
+
+
+@pytest.mark.req("FR-PROD-005")
+@pytest.mark.asyncio
+async def test_focus_protection_uses_recorded_sessions_and_preserves_calendar_events(
+    auth_client: httpx.AsyncClient,
+) -> None:
+    """FR-PROD-005: Only learned focus hours create blocks, and existing events stay in place."""
+    from app.scheduling.config import DEFAULT_WORKING_HOURS
+
+    ist = ZoneInfo("Asia/Kolkata")
+    now = datetime.now(UTC).astimezone(ist)
+    settings = await auth_client.patch(
+        "/api/v1/auth/me",
+        json={"settings": {"working_hours": DEFAULT_WORKING_HOURS}},
+    )
+    assert settings.status_code == 200, settings.text
+
+    task_response = await auth_client.post("/api/v1/tasks", json={"title": "Recorded focus work"})
+    assert task_response.status_code == 201, task_response.text
+    task_id = task_response.json()["id"]
+    for days_ago in (1, 2, 3):
+        start = datetime.combine(
+            now.date() - timedelta(days=days_ago),
+            time(10, 0),
+            tzinfo=ist,
+        )
+        entry = await auth_client.post(
+            "/api/v1/time-entries",
+            json={"task_id": task_id, "started_at": start.isoformat(), "duration_min": 45},
+        )
+        assert entry.status_code == 201, entry.text
+
+    conflict_day = now.date() + timedelta(days=1)
+    while conflict_day.weekday() >= 5:
+        conflict_day += timedelta(days=1)
+    event_start = datetime.combine(conflict_day, time(10, 0), tzinfo=ist)
+    event = await auth_client.post(
+        "/api/v1/scheduling/events",
+        json={
+            "title": "Existing appointment",
+            "kind": "fixed_event",
+            "start_at": event_start.isoformat(),
+            "end_at": (event_start + timedelta(hours=1)).isoformat(),
+        },
+    )
+    assert event.status_code == 201, event.text
+
+    enabled = await auth_client.post(
+        "/api/v1/scheduling/focus-protection",
+        json={"enabled": True},
+    )
+    assert enabled.status_code == 200, enabled.text
+    result = enabled.json()
+    assert result["session_count"] == 3
+    assert result["focus_start"].startswith("10:00")
+    assert result["blocks_created"] > 0
+    assert result["conflicts_skipped"] >= 1
+
+    events = await auth_client.get("/api/v1/scheduling/events")
+    assert events.status_code == 200, events.text
+    calendar_events = events.json()
+    assert any(item["title"] == "Existing appointment" for item in calendar_events)
+    protected = [item for item in calendar_events if item["title"] == "ALIBI protected focus time"]
+    assert protected
+    assert all(item["kind"] == "fixed_event" for item in protected)
+
+    disabled = await auth_client.post(
+        "/api/v1/scheduling/focus-protection",
+        json={"enabled": False},
+    )
+    assert disabled.status_code == 200, disabled.text
+    events_after_disable = await auth_client.get("/api/v1/scheduling/events")
+    assert all(
+        item["title"] != "ALIBI protected focus time" for item in events_after_disable.json()
+    )

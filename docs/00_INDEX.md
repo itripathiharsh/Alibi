@@ -16,7 +16,7 @@
 | 12 | SECURITY_AND_PRIVACY | Auth, crypto, privacy, backups | Threat model |
 | 13 | DEPLOYMENT_AND_INFRASTRUCTURE | ₹0 hosted runtime (ADR-018) + local dev stack, benchmarks | Running the system |
 | 14 | TESTING_AND_ACCEPTANCE | Test strategy, QA scope, gates | Quality bar |
-| 15 | IMPLEMENTATION_ROADMAP | M0–M12 tasks, acceptance, exit gates | Order of work |
+| 15 | IMPLEMENTATION_ROADMAP | M0–M13 tasks, acceptance, exit gates | Order of work |
 | 16 | REQUIREMENTS_TRACEABILITY | Req → milestone → test mapping | Coverage proof |
 | — | IMPLEMENTATION_STATUS | Live progress | Current state |
 | — | DECISIONS | ADR log | Why things are the way they are |

@@ -83,6 +83,9 @@ Category body: `{name, sharing_class, external_ai_allowed, color}`.
 | POST | /tasks/{id}/reschedule | `{new_deadline_at?, reason?}` → increments reschedule_count, logs event |
 | DELETE | /tasks/{id} | soft delete; `POST /tasks/{id}/restore`; `DELETE /tasks/{id}?hard=true` only from trash |
 | GET | /tasks/{id}/events | activity history (paginated) |
+| GET | /tasks/daily-kickoff | up to three SQL-ranked open-task suggestions; no task changes are written |
+| GET | /tasks/end-of-day | local-day completion count and unfinished due, scheduled, or in-progress tasks |
+| POST | /tasks/{id}/end-of-day-action | `{action: tomorrow|backlog|cancel}`; only applies the user's explicit choice; tomorrow uses the next configured workday and logs a reschedule event |
 | POST/PATCH/DELETE | /tasks/{id}/subtasks[/{sid}] | `POST /tasks/{id}/subtasks/reorder {ids[]}` |
 | POST/DELETE | /tasks/{id}/dependencies[/{dep_id}] | cycle check |
 | GET | /recurrences?task_id= | Active recurrence rules for the authenticated user; optional task filter |
@@ -119,6 +122,7 @@ Hosted mode (ADR-020): these endpoints return 503 `ai_unavailable` unless extern
 | GET | /scheduling/proposals/{id} | |
 | POST | /scheduling/proposals/{id}/decision | `{accept_block_ids[], reject_block_ids[], accept_displacement_ids[]}` → applied blocks; 409 proposal_stale if `input_hash` changed |
 | GET | /scheduling/proposals?status=proposed | pending proposals |
+| POST | /scheduling/focus-protection | `{enabled: bool}`; explicit opt-in creates fixed focus blocks from the user's recorded PLE session hour and working hours, skipping existing events; disabling removes only ALIBI-generated focus blocks |
 
 ### 4.10 Analytics (FR-DASH)
 | GET | /analytics/summary | `period=daily|weekly|monthly|custom`, `from`, `to` → `{period, total_time_min, tasks_completed, tasks_pending, tasks_overdue, completion_rate, on_time_rate, efficiency, estimate_accuracy}` |
@@ -155,6 +159,9 @@ Hosted mode (ADR-020): these endpoints return 503 `ai_unavailable` unless extern
 | POST | /assistant/threads/{id}/messages | `{content}` → `{answer, sources[{type,id,title,date,snippet}], used_tools[], grounded: bool}`; SSE streaming variant `Accept: text/event-stream` |
 | GET | /knowledge | `q`, `mode=keyword|semantic|hybrid`, `source_type`, `category_id`, `project_id`, `from`, `to` |
 | POST | /knowledge/notes · PATCH/DELETE /knowledge/notes/{id} | manual notes |
+| GET | /vault/notes/{id} | private note detail used by task-to-note navigation |
+| POST | /vault/notes/{id}/convert-task | `{task_text, task_id?}` → creates a task and an account-scoped note link |
+| GET | /tasks, /tasks/{id} | task responses include `linked_notes[{id,title,source_type,occurred_on}]`; completing a linked task appends a timestamped completion record to its note |
 | POST | /knowledge/upload | document → extracted text note |
 | GET | /knowledge/{id} | |
 
@@ -167,6 +174,8 @@ Hosted mode (ADR-020): these endpoints return 503 `ai_unavailable` unless extern
 | GET | /shares · POST /shares/{id}/revoke · GET /shares/{id}/access-log |
 | GET | /s/{token} | public HTML viewer (server-rendered, no JS required, `noindex`, `Referrer-Policy: no-referrer`) |
 | GET | /s/{token}/download?format= | if allowed |
+
+The Android weekly retrospective uses the SQL-backed `/analytics/summary?period=weekly` response and creates a personal Vault note only after the user saves their reflection.
 
 ### 4.15 Sync (FR-SYNC) — details in doc 11
 | POST | /sync/push | `{device_id, ops:[{op_id, entity_type, entity_id, op_type, base_version, fields, client_ts}]}` (≤ 200 ops) → `{results:[{op_id, result, new_version?, server_entity?, conflict?}]}` |

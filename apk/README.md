@@ -7,17 +7,29 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **File**: [`ALIBI-0.1.0.apk`](./ALIBI-0.1.0.apk)
 - **Direct Download Link**: [Download ALIBI-0.1.0.apk (Raw)](https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk)
 - **Version**: `0.1.0`
-- **Build Date**: November 19, 2026
-- **Variant**: Android release APK, JavaScriptCore + Babel
+- **Build Date**: November 20, 2026
+- **Variant**: Android release APK, Hermes Bytecode Engine (React Native 0.76 New Architecture)
 - **Signing**: Signed with the repository's current Android debug keystore. This is installable for direct distribution/testing, but it is not a Play Store production signature.
-- **SHA-256**: `7914992B57F6238814269CA719D192C553D6719B2AFD6FBF19D2F0EFFCF20A15`
-- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified; includes Morning Kickoff Top 3 priorities, Evening Sunset Sweep, batch task multi-select, bi-directional vault note-to-task conversion, tactile haptic feedback, sticky focus timer notifications, and PLE Peak Energy Shield.
+- **SHA-256**: `05D83177FC06F2A74CB04C38A4200D9041A554510E59056CE7789CFF1777EC40`
+- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified; includes Hermes Bytecode Engine restoration (resolves New Architecture blank screen on boot), 125+ Short & Crunchy Zomato-style Bollywood / Pop-Culture Notifications across 5 scenarios (Hera Pheri, Mirzapur, Wasseypur, Stree, Sholay, Shark Tank), Daily Morning (9:00 AM) and Evening (8:00 PM) check-ins, AAPT widget linking resolution, and Morning Kickoff Top 3 priorities.
 
 ---
 
 ## What's New in This Build
 
-1. **Morning Kickoff & Big Rocks**:
+1. **Hermes Engine Restored (Fixes White Screen)**:
+   - React Native 0.76 with New Architecture (Fabric + TurboModules) strictly requires Hermes bytecode. Restoring `hermesEnabled=true` resolves the blank white screen crash on boot.
+2. **125+ Short & Crunchy Zomato-Style Notifications**:
+   - 25 unique, short & punchy lines for each of the 5 scenarios:
+     - **Timer Runaway (> 2 hrs)**: *"25 din mein paisa double? 💸"*, *"70 minute khatam Kabir Khan ⏱️"*, *"Control Uday, Control! 🧘"*, *"Pushpa jhukega nahi... 🌺"*, *"Chilla chilla ke scheme bata de 📢"*.
+     - **Upcoming Deadline (15 min crunch)**: *"Sirf 15 minute bache hain! ⏳"*, *"Picture abhi baaki hai dost 🎞️"*, *"Darr ke aage jeet hai 🧗"*, *"Khatam, tata, bye-bye, goodbye! 👋"*.
+     - **Morning Kickoff (9:00 AM)**: *"Subah ho gayi Mamu! ☀️"*, *"Wake Up Sid! 🏙️"*, *"Ashneer: 'Bhai kya kar raha hai?' 🦈"*, *"Utho Anarkali, meeting bohot hain 💃"*.
+     - **Sunset Sweep (8:00 PM)**: *"O Stree kal aana! 👻"*, *"Biryani thandi ho rahi hai 🍗"*, *"Sholay: 'Yeh haath mujhe de de' 🖐️"*, *"Mirzapur: 'Rest kar lijiye' 🛏️"*.
+     - **Ghosting Inactivity (36-48 hrs)**: *"Hum aapke hain koun? 🥺"*, *"Seen pe chhod diya? 💔"*, *"CID ACP: 'Kuch toh gadbad hai' 🔍"*, *"Zomato: 'We miss cravings' / ALIBI: 'We miss task checkmarks' ✅"*.
+   - Switchable in **Settings -> Notifications -> Pop-culture & Zomato-style humor** (defaults to ON).
+3. **Daily Automatic Kickoff & Sunset Reminders**:
+   - Automatically registers 9:00 AM Morning Kickoff and 8:00 PM Evening Sweep check-ins via local on-device Android notifications.
+4. **Morning Kickoff & Big Rocks**:
    - Interactive morning modal to curate your Top 3 daily priorities.
    - Pinned at the top of the dashboard with a golden `★ TOP PRIORITY` pill and live completion tracking.
 2. **Evening Sunset Sweep**:

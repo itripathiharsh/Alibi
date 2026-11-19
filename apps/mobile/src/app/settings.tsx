@@ -8,6 +8,7 @@ import { ensureAuthenticated, getUserProfile, logoutMobile, saveUserProfile, typ
 import { getServerUrl } from "../lib/config";
 import { areTaskTimerRemindersEnabled, setTaskTimerRemindersEnabled } from "../lib/timer-reminders";
 import { areTaskDeadlineRemindersEnabled, DEFAULT_DEADLINE_REMINDER_LEAD_MIN, setTaskDeadlineRemindersEnabled, syncTaskDeadlineReminders } from "../lib/task-deadline-reminders";
+import { getNotificationStyle, setNotificationStyle } from "../lib/notification-witty-engine";
 import theme from "../lib/theme";
 
 type WorkingDay = { enabled: boolean; start: string; end: string };
@@ -28,6 +29,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const [remindersEnabled, setRemindersEnabled] = useState(true);
   const [deadlineRemindersEnabled, setDeadlineRemindersEnabled] = useState(false);
+  const [wittyTone, setWittyTone] = useState(true);
   const [reminderLeadMin, setReminderLeadMin] = useState(DEFAULT_DEADLINE_REMINDER_LEAD_MIN);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,9 +44,15 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     void (async () => {
-      const [enabled, deadlineEnabled, cachedUser] = await Promise.all([areTaskTimerRemindersEnabled(), areTaskDeadlineRemindersEnabled(), getUserProfile()]);
+      const [enabled, deadlineEnabled, style, cachedUser] = await Promise.all([
+        areTaskTimerRemindersEnabled(),
+        areTaskDeadlineRemindersEnabled(),
+        getNotificationStyle(),
+        getUserProfile(),
+      ]);
       setRemindersEnabled(enabled);
       setDeadlineRemindersEnabled(deadlineEnabled);
+      setWittyTone(style === "witty");
       setProfile(cachedUser);
       try {
         const token = await ensureAuthenticated();
@@ -129,6 +137,11 @@ export default function SettingsScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateNotificationStyle = async (enabled: boolean) => {
+    setWittyTone(enabled);
+    await setNotificationStyle(enabled ? "witty" : "calm");
   };
 
   const saveWorkingHours = async () => {
@@ -245,6 +258,14 @@ export default function SettingsScreen() {
           <View style={styles.iconBox}><CalendarDays size={20} color={theme.colors.accent.amber} /></View>
           <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>Deadline reminders</Text><Text style={styles.preferenceDescription}>A private on-device alert comes before a due time. It never shows your task name on the lock screen.</Text></View>
           {loading || saving ? <ActivityIndicator size="small" color={theme.colors.accent.amber} /> : <Switch value={deadlineRemindersEnabled} onValueChange={updateDeadlineReminders} trackColor={{ false: "#D3D9DF", true: "#F5B27E" }} thumbColor={deadlineRemindersEnabled ? theme.colors.accent.amber : theme.colors.surface.card} accessibilityLabel="Deadline reminders" />}
+        </View>
+        <View style={[styles.preferenceRow, styles.preferenceRowBorder]}>
+          <View style={styles.iconBox}><Sparkles size={20} color="#F47B25" /></View>
+          <View style={styles.preferenceCopy}>
+            <Text style={styles.preferenceTitle}>Pop-culture & Zomato-style humor</Text>
+            <Text style={styles.preferenceDescription}>Punchy, short Bollywood & meme notifications (Hera Pheri, Mirzapur, Wasseypur). Turn off for quiet direct reminders.</Text>
+          </View>
+          <Switch value={wittyTone} onValueChange={updateNotificationStyle} trackColor={{ false: "#D3D9DF", true: "#F5B27E" }} thumbColor={wittyTone ? "#F47B25" : "#FFFFFF"} accessibilityLabel="Pop-culture notifications" />
         </View>
       </View>
 

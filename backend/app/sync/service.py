@@ -19,6 +19,7 @@ from app.models.tag import Tag
 from app.models.task import Task
 from app.models.time_entry import TimeEntry
 from app.models.workspace import Workspace
+from app.vault.links import append_task_completion
 
 # Static server epoch for current instance run (regenerated on DB restore)
 SERVER_EPOCH = uuid.UUID("01933000-0000-7000-8000-000000000001")
@@ -247,6 +248,7 @@ class ServerSyncService:
         elif op_type == "update":
             if task is None:
                 return ("rejected", {"error": "Task not found on server"}, 0)
+            prior_status = task.status
 
             # Check for conflict: if server has progressed past client base_version
             # and title has changed on both sides (doc 11 §6)
@@ -324,6 +326,15 @@ class ServerSyncService:
                 task.completed_at = self._parse_datetime(payload.get("completed_at")) or utc_now()
             elif task.status != "completed":
                 task.completed_at = None
+
+            if prior_status != "completed" and task.status == "completed":
+                await append_task_completion(
+                    session=self.session,
+                    user_id=user_id,
+                    task_id=task.id,
+                    task_title=task.title,
+                    completed_at=task.completed_at or utc_now(),
+                )
 
             task.version += 1
             await self.session.flush()

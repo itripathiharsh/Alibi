@@ -1,7 +1,7 @@
 """Vault/task association and completion-log services (FR-PROD-006)."""
 
-import uuid
 import hashlib
+import uuid
 from datetime import datetime
 from typing import Any
 

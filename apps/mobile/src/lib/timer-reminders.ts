@@ -1,6 +1,7 @@
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+import { getNotificationCopy } from "./notification-witty-engine";
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const REMINDER_KIND = "active_task_check_in";
@@ -55,10 +56,12 @@ export async function scheduleTaskTimerReminder(input: {
     const at = new Date(Date.parse(input.startedAt) + TWO_HOURS_MS);
     if (Number.isNaN(at.getTime()) || at.getTime() <= Date.now()) return false;
 
+    const copy = await getNotificationCopy("TIMER_RUNAWAY");
+
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: "ALIBI focus check-in",
-        body: "A task timer has been running for two hours. Check your progress or take a short break.",
+        title: copy.title,
+        body: copy.body,
         data: { kind: REMINDER_KIND, timerId: input.timerId, taskId: input.taskId },
         sound: false,
       },

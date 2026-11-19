@@ -87,7 +87,9 @@ class TaskService:
         if category_hint and not await self.category_repo.get_by_id(self.user_id, category_hint):
             raise NotFoundError("Category not found.")
 
-        initial_status = status if status in ("pending", "in_progress", "completed", "cancelled") else "pending"
+        initial_status = (
+            status if status in ("pending", "in_progress", "completed", "cancelled") else "pending"
+        )
         initial_completed_at = now if initial_status == "completed" else None
 
         # Step 1: Persist initial task with raw_input (AC-M2-1 guarantee)
@@ -340,6 +342,7 @@ class TaskService:
         **updates: Any,
     ) -> Task:
         """Update arbitrary task fields with mutation diff recording (AC-M2-4)."""
+        requested_tags = updates.pop("tags", None)
         task = await self.task_repo.get_by_id(task_id)
         if not task:
             raise NotFoundError("Task not found.")
@@ -368,6 +371,8 @@ class TaskService:
                 actor="user",
             )
             await self.session.flush()
+        if requested_tags is not None:
+            await self.tag_repo.sync_task_tags(task_id, requested_tags)
         return task
 
     async def _assert_owned_references(

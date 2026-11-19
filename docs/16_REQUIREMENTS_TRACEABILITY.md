@@ -125,6 +125,15 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-NOTIF-001 | Task reminders, deadline approaching (configurable lead), work block start | M | M8 | 15 M8 | backend/tests/integration/notifications/ + e2e mobile | ☑ |
 | FR-NOTIF-002 | Daily plan prompt (configurable time) | S | M8 | 15 M8 | backend/tests/integration/notifications/ + e2e mobile | ☑ |
 | FR-NOTIF-003 | Quiet hours | S | M8 | 15 M8 | backend/tests/integration/notifications/ + e2e mobile | ☑ |
+| FR-PROD-001 | SQL-ranked 3-task kickoff; suggestions are saved only after user confirmation | M | M13 | 01§2.13, 04§4.4 | backend/tests/integration/test_tasks_api.py; Android morning flow | ◐ |
+| FR-PROD-002 | Optional end-of-day review with explicit and audited task actions | M | M13 | 01§2.13, 04§4.4 | backend/tests/integration/test_tasks_api.py; Android review flow | ◐ |
+| FR-PROD-003 | Private Android foreground focus timer with pause and mark-done actions | M | M13 | 01§2.13, ADR-027 | Android notification service; device QA | ◐ |
+| FR-PROD-004 | Android home widget and Quick Settings tile for typed/voice capture | M | M13 | 01§2.13, ADR-027 | Android widget/tile; device QA | ◐ |
+| FR-PROD-005 | Opt-in calendar blocks derived from actual learned focus hours without moving existing events | M | M13 | 01§2.13, 04§4.9, ADR-027 | backend/tests/integration/test_scheduling_api.py; Android settings | ◐ |
+| FR-PROD-006 | Account-scoped Vault/task links and task-completion notes | M | M13 | 01§2.13, 03§3.5, 04§4.13 | backend/tests/integration/test_vault_and_assistant_api.py; Android Vault/tasks | ◐ |
+| FR-PROD-007 | SQL-backed weekly reflection saved in private Vault | M | M13 | 01§2.13, 04§4.14 | Android Insights; Vault notes API | ◐ |
+| FR-PROD-008 | Haptics and multi-select task actions on Android | M | M13 | 01§2.13 | Android Tasks; device QA | ◐ |
+| FR-PROD-009 | Optional offline ambient audio generated on device | M | M13 | 01§2.13, ADR-027 | Android focus audio; device QA | ◐ |
 | NFR-PERF-001 | Task create (text, no AI) API p95 | M | M2–M12 | 14 | tests/perf/ | ☑ |
 | NFR-PERF-002 | Task appears in list after save (optimistic) | M | M2–M12 | 14 | tests/perf/ | ☑ |
 | NFR-PERF-003 | Extraction with local LLM p95 | M | M2–M12 | 14 | tests/perf/ | ☑ |

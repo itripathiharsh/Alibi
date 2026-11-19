@@ -92,6 +92,118 @@ async def test_ac_m2_1_capture_persists_raw_input_before_parsing(
     assert "security" in data["extraction"]["final_proposal"]["tags"]
 
 
+@pytest.mark.req("FR-PROD-001")
+@pytest.mark.asyncio
+async def test_daily_kickoff_returns_three_grounded_deadline_suggestions(
+    auth_client: httpx.AsyncClient,
+) -> None:
+    """FR-PROD-001: Kickoff ranking is based on the user's deadlines and saved priority."""
+    ist = zoneinfo.ZoneInfo("Asia/Kolkata")
+    today = utc_now().astimezone(ist).date()
+    payloads = [
+        {
+            "title": "Hard deadline today",
+            "deadline_at": datetime.combine(today, time(23, 55), tzinfo=ist).isoformat(),
+            "deadline_kind": "hard",
+            "priority": 3,
+        },
+        {
+            "title": "Hard deadline tomorrow",
+            "deadline_at": datetime.combine(
+                today + timedelta(days=1), time(9), tzinfo=ist
+            ).isoformat(),
+            "deadline_kind": "hard",
+            "priority": 2,
+        },
+        {
+            "title": "Soft deadline",
+            "deadline_at": datetime.combine(
+                today - timedelta(days=1), time(12), tzinfo=ist
+            ).isoformat(),
+            "deadline_kind": "soft",
+            "priority": 1,
+        },
+        {"title": "Backlog task", "priority": 1},
+    ]
+    created_ids: list[str] = []
+    for payload in payloads:
+        response = await auth_client.post("/api/v1/tasks", json=payload)
+        assert response.status_code == 201, response.text
+        created_ids.append(response.json()["id"])
+
+    response = await auth_client.get("/api/v1/tasks/daily-kickoff")
+    assert response.status_code == 200, response.text
+    suggestions = response.json()["suggestions"]
+    assert len(suggestions) == 3
+    assert suggestions[0]["id"] == created_ids[0], suggestions
+    assert "Due today" in suggestions[0]["reasons"]
+    assert suggestions[1]["id"] == created_ids[1]
+    assert "Hard deadline" in suggestions[1]["reasons"]
+    assert suggestions[2]["id"] == created_ids[2]
+    assert created_ids[3] not in {suggestion["id"] for suggestion in suggestions}
+
+
+@pytest.mark.req("FR-PROD-002")
+@pytest.mark.asyncio
+async def test_end_of_day_actions_are_explicit_and_audited(
+    auth_client: httpx.AsyncClient,
+) -> None:
+    """FR-PROD-002: EOD reports real counts and selected actions update task history."""
+    from app.scheduling.config import DEFAULT_WORKING_HOURS
+
+    ist = zoneinfo.ZoneInfo("Asia/Kolkata")
+    today = utc_now().astimezone(ist).date()
+    settings_response = await auth_client.patch(
+        "/api/v1/auth/me",
+        json={"settings": {"working_hours": DEFAULT_WORKING_HOURS}},
+    )
+    assert settings_response.status_code == 200, settings_response.text
+
+    due_response = await auth_client.post(
+        "/api/v1/tasks",
+        json={
+            "title": "Review today's due task",
+            "deadline_at": datetime.combine(today, time(23, 55), tzinfo=ist).isoformat(),
+            "deadline_kind": "hard",
+        },
+    )
+    assert due_response.status_code == 201, due_response.text
+    due_id = due_response.json()["id"]
+
+    active_response = await auth_client.post("/api/v1/tasks", json={"title": "Active work"})
+    active_id = active_response.json()["id"]
+    await auth_client.post(f"/api/v1/tasks/{active_id}/status", json={"status": "in_progress"})
+
+    completed_response = await auth_client.post("/api/v1/tasks", json={"title": "Finished today"})
+    completed_id = completed_response.json()["id"]
+    await auth_client.post(f"/api/v1/tasks/{completed_id}/status", json={"status": "completed"})
+
+    review = await auth_client.get("/api/v1/tasks/end-of-day")
+    assert review.status_code == 200, review.text
+    review_data = review.json()
+    assert review_data["completed_count"] == 1
+    assert {task["id"] for task in review_data["unfinished"]} == {due_id, active_id}
+
+    moved = await auth_client.post(
+        f"/api/v1/tasks/{due_id}/end-of-day-action",
+        json={"action": "tomorrow"},
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["reschedule_count"] == 1
+    moved_deadline = datetime.fromisoformat(moved.json()["deadline_at"].replace("Z", "+00:00"))
+    assert moved_deadline.astimezone(ist).date() > today
+    history = await auth_client.get(f"/api/v1/tasks/{due_id}/events")
+    assert any(event["event_type"] == "rescheduled" for event in history.json())
+
+    backlog = await auth_client.post(
+        f"/api/v1/tasks/{active_id}/end-of-day-action",
+        json={"action": "backlog"},
+    )
+    assert backlog.status_code == 200, backlog.text
+    assert backlog.json()["status"] == "in_progress"
+    assert backlog.json()["deadline_at"] is None
+
+
 # req: FR-TASK-003, FR-TASK-005
 @pytest.mark.asyncio
 async def test_extraction_fields_apply_only_after_user_decision(

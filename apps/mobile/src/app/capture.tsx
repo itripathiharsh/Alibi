@@ -110,7 +110,7 @@ export default function QuickCaptureScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background.base },
-  back: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF" },
+  back: { width: 48, height: 48, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF" },
   content: { paddingHorizontal: 22, paddingTop: 32, gap: 15 },
   eyebrow: { color: theme.colors.accent.amber, fontSize: 11, fontWeight: "800", letterSpacing: 1.4 },
   title: { color: theme.colors.text.primary, fontSize: 29, fontWeight: "800", letterSpacing: -0.7 },

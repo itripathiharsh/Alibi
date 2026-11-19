@@ -31,6 +31,7 @@ users ─┬─ devices ── refresh_tokens
        ├─ workspaces ─┬─ categories ── projects
        │              └─ tags
        ├─ tasks ─┬─ subtasks / task_tags / task_dependencies / time_entries / evidence
+       │         └─ task_note_links ── notes
        │         ├─ task_events ✎ / task_predictions / ai_extractions
        │         └─ recurrence_rules (template)
        ├─ calendar_events      ├─ work_logs      ├─ notes ── embeddings
@@ -129,6 +130,8 @@ Exclusion constraint optional for non-recurring work blocks: `EXCLUDE USING gist
 `privacy_class` (copied from category sharing_class; manual override allowed), `storage_key NULL`, `content_hash`, `embed_status CHECK in ('pending','done','failed','skipped')`.
 UNIQUE `(source_type, source_id)` for auto-ingested items (idempotent ingestion).
 
+**task_note_links**: `id uuid`, `user_id`, `task_id`, `note_id`, `created_at timestamptz`. Unique `(user_id, task_id, note_id)`; indexes `(user_id, task_id)` and `(user_id, note_id)`. Both references cascade on delete. The link service verifies that the task and note belong to the same authenticated account. On task completion, the service appends a timestamped entry to the linked note and rebuilds its local search chunks.
+
 **embeddings**: `id`, `user_id`, `note_id`, `chunk_index`, `content text`, `embedding vector(384)`, `model text`, `content_hash`,
 `meta jsonb` (occurred_on, category_id, project_id, privacy_class, source_type), `created_at`.
 Index: HNSW `embedding vector_cosine_ops` (m=16, ef_construction=64); btree `(user_id, (meta->>'occurred_on'))`.
@@ -203,6 +206,9 @@ Retention 90 days. Duplicate `op_id` → return stored result (idempotency).
 | 0009 | M8 | notifications (+ any calendar columns found missing in M6, via additive migration only) |
 | 0010 | M9 | reports, report_shares, report_share_access_log |
 | 0011 | M10 | sync_operations, sync_conflicts, devices.last_pull_seq |
+| 0012 | M13 | organizations, memberships, invitations, consent and ownership |
+| 0013 | M13 | allow one running timer per user/task pair |
+| 0014 | M13 | account-scoped task_note_links |
 
 Note: scheduling (M6) needs fixed events and work blocks, so `calendar_events` ships with M6 (full definition above). M8 adds the calendar UI, recurrence editing UI and reminders. `work_logs` ships in M2 because RAG (M7) and reports (M9) read it.
 

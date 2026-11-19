@@ -45,4 +45,3 @@ class EndOfDayActionResponse(BaseModel):
     status: str
     deadline_at: datetime | None
     reschedule_count: int
-

@@ -1,10 +1,10 @@
 """Integration tests for Knowledge Vault and Grounded Assistant (doc 08, AC-RAG-1..6)."""
 
+import uuid
 from datetime import date
 
 import httpx
 import pytest
-import uuid
 
 
 @pytest.mark.asyncio

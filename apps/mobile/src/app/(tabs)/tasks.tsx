@@ -31,6 +31,8 @@ import {
   History,
   Pause,
   Repeat2,
+  FileText,
+  ChevronRight,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, SunriseArt } from "../../components/brand-ui";
@@ -72,6 +74,7 @@ interface TaskItem {
   reschedule_count: number;
   tags: string[];
   subtasks: { id: string; title: string; completed: boolean }[];
+  linked_notes?: { id: string; title: string; source_type: string; occurred_on: string }[];
 }
 
 interface RunningTimer {
@@ -205,6 +208,9 @@ export default function TasksScreen() {
   // Batch selection mode
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [tagModalVisible, setTagModalVisible] = useState(false);
+  const [batchTagText, setBatchTagText] = useState("");
 
   const toggleTaskSelection = (id: string) => {
     triggerHaptic("tap");
@@ -216,82 +222,67 @@ export default function TasksScreen() {
     });
   };
 
-  const handleBatchComplete = async () => {
-    triggerHaptic("complete");
-    const ids = Array.from(selectedIds);
-    setTasks((prev) => prev.map((t) => ids.includes(t.id) ? { ...t, status: "completed" } : t));
-    setSelectionMode(false);
-    setSelectedIds(new Set());
+  const runBatch = async (operation: (task: TaskItem, token: string) => Promise<Response>) => {
+    const selectedTasks = tasks.filter((task) => selectedIds.has(task.id));
+    if (!selectedTasks.length || batchBusy) return;
+    setBatchBusy(true);
     try {
       const token = await ensureAuthenticated();
-      const baseUrl = getServerUrl();
-      if (token) {
-        await Promise.all(
-          ids.map((id) =>
-            fetch(`${baseUrl}/api/v1/tasks/${id}/status`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ status: "completed" }),
-            }).catch(() => undefined)
-          )
-        );
+      if (!token) throw new Error("Sign in to update selected tasks.");
+      const responses = await Promise.all(selectedTasks.map((task) => operation(task, token)));
+      const failures = responses.filter((response) => !response.ok);
+      if (failures.length) {
+        const firstError = await failures[0].json().catch(() => ({})) as { detail?: string };
+        throw new Error(`${failures.length} task${failures.length === 1 ? "" : "s"} could not be updated. ${firstError.detail ?? "Refresh and try again."}`);
       }
+      triggerHaptic("complete");
+      setSelectionMode(false);
+      setSelectedIds(new Set());
+      setTagModalVisible(false);
+      setBatchTagText("");
+      await fetchTasks();
+    } catch (error) {
+      Alert.alert("Some changes were not saved", error instanceof Error ? error.message : "Refresh the task list and try again.");
+      await fetchTasks();
     } finally {
-      fetchTasks();
+      setBatchBusy(false);
     }
   };
 
-  const handleBatchRescheduleTomorrow = async () => {
-    triggerHaptic("tap");
-    const ids = Array.from(selectedIds);
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(23, 59, 0, 0);
-    const deadlineIso = tomorrow.toISOString();
-    setTasks((prev) => prev.map((t) => ids.includes(t.id) ? { ...t, deadline_at: deadlineIso } : t));
-    setSelectionMode(false);
-    setSelectedIds(new Set());
-    try {
-      const token = await ensureAuthenticated();
-      const baseUrl = getServerUrl();
-      if (token) {
-        await Promise.all(
-          ids.map((id) =>
-            fetch(`${baseUrl}/api/v1/tasks/${id}/reschedule`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ new_deadline_at: deadlineIso, reason: "Batch postpone to tomorrow" }),
-            }).catch(() => undefined)
-          )
-        );
-      }
-    } finally {
-      fetchTasks();
-    }
-  };
+  const handleBatchComplete = () => runBatch((task, token) => fetch(`${getServerUrl()}/api/v1/tasks/${task.id}/status`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ status: "completed" }),
+  }));
 
-  const handleBatchDelete = async () => {
-    triggerHaptic("alert");
-    const ids = Array.from(selectedIds);
-    setTasks((prev) => prev.filter((t) => !ids.includes(t.id)));
-    setSelectionMode(false);
-    setSelectedIds(new Set());
-    try {
-      const token = await ensureAuthenticated();
-      const baseUrl = getServerUrl();
-      if (token) {
-        await Promise.all(
-          ids.map((id) =>
-            fetch(`${baseUrl}/api/v1/tasks/${id}`, {
-              method: "DELETE",
-              headers: { Authorization: `Bearer ${token}` },
-            }).catch(() => undefined)
-          )
-        );
-      }
-    } finally {
-      fetchTasks();
-    }
+  const handleBatchRescheduleTomorrow = () => runBatch((task, token) => fetch(`${getServerUrl()}/api/v1/tasks/${task.id}/end-of-day-action`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ action: "tomorrow" }),
+  }));
+
+  const handleBatchDelete = () => Alert.alert(
+    `Move ${selectedIds.size} tasks to Trash?`,
+    "You can restore them from Trash later.",
+    [
+      { text: "Keep tasks", style: "cancel" },
+      { text: "Move to Trash", style: "destructive", onPress: () => {
+        void runBatch((task, token) => fetch(`${getServerUrl()}/api/v1/tasks/${task.id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        }));
+      } },
+    ],
+  );
+
+  const handleBatchTag = () => {
+    const tag = batchTagText.trim().replace(/^#/, "").toLowerCase();
+    if (!tag) return Alert.alert("Add a tag", "Type a tag name first.");
+    void runBatch((task, token) => fetch(`${getServerUrl()}/api/v1/tasks/${task.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ tags: Array.from(new Set([...task.tags, tag])) }),
+    }));
   };
 
   const resetModal = () => {
@@ -624,9 +615,7 @@ export default function TasksScreen() {
     triggerHaptic("tap");
     const profile = await getUserProfile();
     const activeTimer = runningTimers.find((timer) => timer.task_id === task.id);
-    if (!activeTimer) {
-      void startFocusNotification(task.title, task.estimate_user_min || 25);
-    } else {
+    if (activeTimer) {
       void stopFocusNotification();
     }
     const useOfflineTimer = async () => {
@@ -638,6 +627,7 @@ export default function TasksScreen() {
       } else {
         const timer = await startTaskTimerOffline(profile.id, task.id);
         setRunningTimers((previous) => [...previous.filter((item) => item.task_id !== task.id), timer]);
+        void startFocusNotification(task.id, task.title, timer.started_at, task.estimate_user_min, profile.settings?.focus_show_task_name === true);
         void scheduleTaskTimerReminder({ timerId: timer.id, taskId: timer.task_id, startedAt: timer.started_at });
       }
       void fetchTasks();
@@ -706,6 +696,7 @@ export default function TasksScreen() {
         if (res.ok) {
           const entry = await res.json();
           setRunningTimers((previous) => [...previous.filter((timer) => timer.task_id !== task.id), entry]);
+          void startFocusNotification(task.id, task.title, entry.started_at, task.estimate_user_min, profile?.settings?.focus_show_task_name === true);
           if (profile) await cacheRunningTimers(profile.id, [...runningTimers.filter((timer) => timer.task_id !== task.id), entry]);
           void scheduleTaskTimerReminder({ timerId: entry.id, taskId: entry.task_id, startedAt: entry.started_at });
           fetchTasks();
@@ -1038,6 +1029,12 @@ export default function TasksScreen() {
                       <Text style={styles.metaText}>#{t}</Text>
                     </View>
                   ))}
+                  {task.linked_notes?.[0] && <Pressable
+                    style={styles.linkedNoteChip}
+                    onPress={() => router.push({ pathname: "/(tabs)/vault", params: { noteId: task.linked_notes?.[0].id } })}
+                    accessibilityRole="link"
+                    accessibilityLabel={`Open note ${task.linked_notes[0].title}`}
+                  ><FileText size={13} color={theme.colors.accent.amber} /><Text style={styles.linkedNoteChipText}>Note</Text></Pressable>}
                 </View>
               </View>
             );
@@ -1047,17 +1044,21 @@ export default function TasksScreen() {
       {/* Batch Action Bar */}
       {selectionMode && selectedIds.size > 0 && (
         <View style={styles.batchActionBar}>
-          <Text style={styles.batchCountText}>{selectedIds.size} selected</Text>
+          <Text style={styles.batchCountText}>{batchBusy ? "Saving changes…" : `${selectedIds.size} selected`}</Text>
           <View style={styles.batchBtnsRow}>
-            <Pressable onPress={handleBatchComplete} style={[styles.batchBtn, { backgroundColor: "#10B981" }]}>
+            <Pressable disabled={batchBusy} onPress={() => { void handleBatchComplete(); }} style={[styles.batchBtn, { backgroundColor: "#10B981" }, batchBusy && { opacity: 0.5 }]}>
               <CheckCircle2 size={14} color="#fff" />
               <Text style={styles.batchBtnText}>Done</Text>
             </Pressable>
-            <Pressable onPress={handleBatchRescheduleTomorrow} style={[styles.batchBtn, { backgroundColor: "#0284C7" }]}>
+            <Pressable disabled={batchBusy} onPress={() => { void handleBatchRescheduleTomorrow(); }} style={[styles.batchBtn, { backgroundColor: "#0284C7" }, batchBusy && { opacity: 0.5 }]}>
               <Calendar size={14} color="#fff" />
-              <Text style={styles.batchBtnText}>Tomorrow</Text>
+              <Text style={styles.batchBtnText}>Next workday</Text>
             </Pressable>
-            <Pressable onPress={handleBatchDelete} style={[styles.batchBtn, { backgroundColor: "#EF4444" }]}>
+            <Pressable disabled={batchBusy} onPress={() => setTagModalVisible(true)} style={[styles.batchBtn, { backgroundColor: "#475569" }, batchBusy && { opacity: 0.5 }]}>
+              <TagIcon size={14} color="#fff" />
+              <Text style={styles.batchBtnText}>Tag</Text>
+            </Pressable>
+            <Pressable disabled={batchBusy} onPress={handleBatchDelete} style={[styles.batchBtn, { backgroundColor: "#EF4444" }, batchBusy && { opacity: 0.5 }]}>
               <X size={14} color="#fff" />
               <Text style={styles.batchBtnText}>Delete</Text>
             </Pressable>
@@ -1384,6 +1385,17 @@ export default function TasksScreen() {
                 <Text style={styles.repeatScheduleLabel}>Repeat this task</Text>
                 <Text style={styles.repeatScheduleHint}>{isLoadingRepeat ? "Loading…" : repeatRule ? `Every ${repeatRule.interval > 1 ? `${repeatRule.interval} ` : ""}${repeatRule.frequency}` : "Set a schedule"}</Text>
               </Pressable>
+              {!!selectedTask.linked_notes?.length && <View style={styles.linkedNotesSection}>
+                <Text style={styles.historyTitle}>Related Vault notes</Text>
+                {selectedTask.linked_notes.map((note) => <Pressable key={note.id} style={styles.linkedNoteRow} onPress={() => {
+                  setSelectedTask(null);
+                  router.push({ pathname: "/(tabs)/vault", params: { noteId: note.id } });
+                }} accessibilityRole="link">
+                  <FileText size={15} color={theme.colors.accent.amber} />
+                  <View style={{ flex: 1 }}><Text style={styles.linkedNoteTitle} numberOfLines={1}>{note.title}</Text><Text style={styles.linkedNoteMeta}>{note.source_type.replaceAll("_", " ")} · {note.occurred_on}</Text></View>
+                  <ChevronRight size={16} color={theme.colors.text.secondary} />
+                </Pressable>)}
+              </View>}
               <Text style={styles.historyTitle}>Sessions</Text>
               {isLoadingHistory ? <ActivityIndicator size="small" color={theme.colors.accent.amber} /> : historyError ? (
                 <View style={styles.historyEmpty}>
@@ -1424,6 +1436,32 @@ export default function TasksScreen() {
         onCreate={(frequency, interval) => { void createRepeatSchedule(frequency, interval); }}
         onStop={stopRepeatSchedule}
       />
+
+      <Modal visible={tagModalVisible} transparent animationType="fade" onRequestClose={() => setTagModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add a tag to selected tasks</Text>
+              <Pressable onPress={() => setTagModalVisible(false)} accessibilityLabel="Close tag dialog"><X size={20} color={theme.colors.text.secondary} /></Pressable>
+            </View>
+            <TextInput
+              value={batchTagText}
+              onChangeText={setBatchTagText}
+              placeholder="Tag name"
+              placeholderTextColor={theme.colors.text.muted}
+              autoCapitalize="none"
+              style={styles.batchTagInput}
+              editable={!batchBusy}
+            />
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelBtn} onPress={() => setTagModalVisible(false)} disabled={batchBusy}><Text style={styles.cancelBtnText}>Cancel</Text></Pressable>
+              <Pressable style={[styles.confirmBtn, batchBusy && { opacity: 0.55 }]} onPress={handleBatchTag} disabled={batchBusy || !batchTagText.trim()}>
+                <Text style={styles.confirmBtnText}>{batchBusy ? "Saving…" : "Add tag"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1507,16 +1545,16 @@ const styles = StyleSheet.create({
   },
   batchActionBar: {
     position: "absolute",
-    bottom: 24,
+    bottom: 88,
     left: 16,
-    right: 88,
+    right: 16,
     backgroundColor: "#0D1929",
     borderRadius: 16,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 8,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
     elevation: 9,
@@ -1533,9 +1571,12 @@ const styles = StyleSheet.create({
   batchBtnsRow: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
     gap: 8,
   },
   batchBtn: {
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -1547,6 +1588,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: "#FFFFFF",
+  },
+  batchTagInput: {
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+    backgroundColor: theme.colors.background.base,
+    paddingHorizontal: 14,
+    color: theme.colors.text.primary,
+    fontSize: 15,
   },
   taskHeader: {
     flexDirection: "row",
@@ -1688,6 +1739,12 @@ const styles = StyleSheet.create({
   repeatScheduleButton: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: theme.colors.border.subtle, borderRadius: 14, backgroundColor: theme.colors.surface.card },
   repeatScheduleLabel: { color: theme.colors.text.primary, fontSize: 12, fontWeight: "800", flex: 1 },
   repeatScheduleHint: { color: theme.colors.text.secondary, fontSize: 10, fontWeight: "700", textTransform: "capitalize" },
+  linkedNotesSection: { gap: 8 },
+  linkedNoteRow: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 11, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: theme.colors.background.base },
+  linkedNoteTitle: { color: theme.colors.text.primary, fontSize: 12, fontWeight: "700" },
+  linkedNoteMeta: { color: theme.colors.text.secondary, fontSize: 10, marginTop: 2, textTransform: "capitalize" },
+  linkedNoteChip: { minHeight: 36, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, borderRadius: 10, backgroundColor: "#FFF7ED" },
+  linkedNoteChipText: { color: "#B45309", fontSize: 10, fontWeight: "700" },
   historyTitle: { fontSize: 15, fontWeight: "700", color: theme.colors.text.primary, marginTop: 2 },
   historyList: { maxHeight: 300 },
   historyEmpty: { padding: 16, borderRadius: 12, backgroundColor: theme.colors.background.base, color: theme.colors.text.secondary, lineHeight: 20, fontSize: 13 },

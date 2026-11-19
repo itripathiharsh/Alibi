@@ -380,10 +380,10 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M2b Early hosted deploy �
 
 ---
 
-## M13 — Personal Android refresh, public signup, and organization web portal
+## M13 — Personal Android refresh, productivity workflows, public signup, and organization web portal
 **Goal:** deliver the reference-led personal Android app and transition authenticated web into a professional-only organization portal with explicit member consent.
-**Read first:** `AGENTS.md`; 00, 01, 02, 03, 04, 05, 10, 12, 14, 16; `IMPLEMENTATION_STATUS.md`; `KNOWN_ISSUES.md`; `DECISIONS.md` ADR-020, ADR-022, ADR-023, ADR-024; the M13 plan; existing app, API, analytics and sharing code.
-**Entry criteria:** M12/v1.0 release complete; owner approved six mobile tabs, public individual-account signup, and the organization/consent product model (ADR-022/023/024). Schema and API changes are in scope; sync protocol changes remain out of scope.
+**Read first:** `AGENTS.md`; 00, 01, 02, 03, 04, 05, 10, 12, 14, 16; `IMPLEMENTATION_STATUS.md`; `KNOWN_ISSUES.md`; `DECISIONS.md` ADR-020, ADR-022, ADR-023, ADR-024, ADR-027; the M13 plan; existing app, API, analytics and sharing code.
+**Entry criteria:** M12/v1.0 release complete; owner approved six mobile tabs, public individual-account signup, the organization/consent product model, and the productivity workflow scope (ADR-022/023/024/027). Additive task-note schema and API changes are in scope; sync protocol changes remain out of scope.
 **Tasks**
 1. Establish shared mobile tokens, branded header/backdrop, typography, and card treatments.
 2. Refresh Home, Tasks, Calendar, Insights, Assistant, and Settings; add API-backed Vault and Profile screens.
@@ -395,6 +395,11 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M2b Early hosted deploy �
 8. Add public web invite review with explicit member consent and a self-service sharing/leave page; ensure owners and team leads never see non-professional data or unconsented history.
 9. Update generated API client, UI guidance, ADRs, status and known issues; do not copy screenshot example data.
 10. Add independent task timers, private two-hour on-device timer check-ins, task-level activity scoring and a year-long consistency heatmap (ADR-025).
+11. Add account-scoped daily kickoff suggestions and an optional explicit end-of-day review; never apply suggestions before the user accepts them.
+12. Add Android foreground focus controls, home-widget/Quick Settings capture launchers, haptics, and locally generated ambient focus audio.
+13. Add optional PLE focus blocks that skip existing calendar events and can be removed by disabling the setting; no silent displacement or task reschedule.
+14. Add account-scoped Vault/task links, checklist-item conversion, completion notes, and a SQL-backed private weekly retrospective.
+15. Add Android task multi-select for complete, next-workday, tag and trash actions.
 
 **AC**
 - AC-M13-1 Six requested destinations render in the requested order with clear selected state and accessible labels.
@@ -403,7 +408,7 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M2b Early hosted deploy �
 - AC-M13-4 Profile uses `/api/v1/auth/me`, analytics summary, and learning profile; no sample metrics or personal records are hard-coded.
 - AC-M13-5 Capture and event flows retain their existing API contracts and user confirmation behavior.
 - AC-M13-6 Android surfaces match supplied visual references, maintain accessible touch targets, and respect reduced motion settings.
-- AC-M13-7 Settings, logout, login, and signup remain navigable and consistent; no schema, sync, provider, or dependency changes.
+- AC-M13-7 Settings, logout, login, and signup remain navigable and consistent; no new dependency, sync-envelope/conflict-rule, or provider changes. The additive task-note link schema/API has a reversible migration and ownership coverage.
 - AC-M13-8 Public signup provisions an isolated account on web and Android; duplicate emails and signup rate limits are handled; all protected reads/writes use the authenticated user's ID.
 - AC-M13-9 Owner can create an organization and role-scoped invitations; invitation tokens are hashed, expiring and revocable.
 - AC-M13-10 Member must accept a clear professional-data consent statement before membership activates; consent can be revoked and is audit-logged.
@@ -414,8 +419,14 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M2b Early hosted deploy �
 - AC-M13-15 Each timer has a private local two-hour check-in that is cancelled when that timer stops; denying notification permission does not block time tracking.
 - AC-M13-16 Insights uses SQL-backed per-task minutes and a separate documented score, plus a 365-day activity heatmap; empty history remains empty.
 - AC-M13-17 Signup form and authenticated shell render without a server-discovery/setup-status request; explicit server discovery remains a user action.
+- AC-M13-18 Morning kickoff suggestions are ranked from the authenticated user's tasks and are stored as priorities only after confirmation; the 06:00–10:00 local prompt is shown at most once per day.
+- AC-M13-19 Optional end-of-day review uses SQL-backed counts; next-workday reschedule increments the count and appends a task event, while backlog/drop/done affect only the selected task.
+- AC-M13-20 Android's foreground timer is private by default and exposes pause/mark-done actions; widget and Quick Settings voice/typed capture use the real capture flow.
+- AC-M13-21 PLE focus blocks require explicit opt-in, use recorded session history and configured work hours, and skip calendar conflicts without moving existing events.
+- AC-M13-22 Vault/task linking is account-scoped, visible from both screens, and task completion adds its actual title/time to the linked note.
+- AC-M13-23 Weekly reflection numbers come from SQL and the user's reflection is saved as a personal Vault note; batch actions, haptics and ambient sound add no sample task/history data or external audio dependency.
 
-**QA:** mobile/web/API typechecks, migration upgrade/downgrade, API and two-account consent/IDOR tests, Android build, and manual review of mobile consent plus web role routes. Mark complete only with evidence recorded in `IMPLEMENTATION_STATUS.md` and an M13 report.
+**QA:** mobile/web/API typechecks, migration upgrade/downgrade, workflow API tests, two-account consent/IDOR tests, Android build, and manual review of timer controls, capture widget/tile, ambient sound, mobile consent and web role routes. Mark complete only with evidence recorded in `IMPLEMENTATION_STATUS.md` and an M13 report.
 
 ---
 

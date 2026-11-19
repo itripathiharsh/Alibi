@@ -1,7 +1,7 @@
 """SQL-backed daily guidance and explicit end-of-day actions (FR-PROD-001/002)."""
 
 import uuid
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import case, func, or_, select
@@ -50,7 +50,7 @@ class ProductivityWorkflowService:
                 )
                 .order_by(
                     case((Task.status == "in_progress", 0), else_=1),
-                    (Task.deadline_kind == "hard").desc(),
+                    (Task.deadline_kind == "hard").desc().nulls_last(),
                     Task.deadline_at.asc().nulls_last(),
                     Task.priority.asc().nulls_last(),
                     Task.created_at.asc(),
@@ -89,7 +89,9 @@ class ProductivityWorkflowService:
         tz = self._timezone(user)
         local_day = utc_now().astimezone(tz).date()
         start_at = datetime.combine(local_day, time.min, tzinfo=tz).astimezone(UTC)
-        end_at = (datetime.combine(local_day, time.min, tzinfo=tz) + timedelta(days=1)).astimezone(UTC)
+        end_at = (datetime.combine(local_day, time.min, tzinfo=tz) + timedelta(days=1)).astimezone(
+            UTC
+        )
 
         scheduled_task_ids = select(CalendarEvent.task_id).where(
             CalendarEvent.user_id == user.id,
@@ -157,7 +159,9 @@ class ProductivityWorkflowService:
             except (KeyError, ValueError, TypeError):
                 continue
             return datetime.combine(work_date, start_time, tzinfo=tz).astimezone(UTC)
-        raise ConflictError("Set at least one working day in Settings before moving a task to tomorrow.")
+        raise ConflictError(
+            "Set at least one working day in Settings before moving a task to tomorrow."
+        )
 
     async def apply_end_of_day_action(
         self,
@@ -174,9 +178,13 @@ class ProductivityWorkflowService:
 
         if body.action == "tomorrow":
             deadline = self._next_work_start(user, utc_now())
-            task = await service.reschedule_task(task.id, deadline, "End-of-day review: next workday")
+            task = await service.reschedule_task(
+                task.id, deadline, "End-of-day review: next workday"
+            )
         elif body.action == "backlog":
-            task = await service.update_task(task.id, deadline_at=None, deadline_kind=None, deadline_source=None)
+            task = await service.update_task(
+                task.id, deadline_at=None, deadline_kind=None, deadline_source=None
+            )
         else:
             task = await service.update_status(task.id, "cancelled")
 
