@@ -1,0 +1,15 @@
+appId: com.alibi.app
+---
+# req: FR-MOBILE-001
+- launchApp:
+    clearState: true
+- assertVisible: "A QUICK INTRODUCTION"
+- assertVisible: "Make space for meaningful work."
+- tapOn:
+    text: "Skip ALIBI introduction"
+- assertVisible: "Sign in to ALIBI"
+- stopApp
+- launchApp:
+    clearState: false
+- assertNotVisible: "A QUICK INTRODUCTION"
+- assertVisible: "Sign in to ALIBI"

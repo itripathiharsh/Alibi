@@ -400,6 +400,7 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M2b Early hosted deploy �
 13. Add optional PLE focus blocks that skip existing calendar events and can be removed by disabling the setting; no silent displacement or task reschedule.
 14. Add account-scoped Vault/task links, checklist-item conversion, completion notes, and a SQL-backed private weekly retrospective.
 15. Add Android task multi-select for complete, next-workday, tag and trash actions.
+16. Add the first-install ALIBI introduction before auth routing, using existing native animation and storage APIs without a new dependency.
 
 **AC**
 - AC-M13-1 Six requested destinations render in the requested order with clear selected state and accessible labels.
@@ -425,6 +426,7 @@ M0 Env ─ M1 DB/Auth ─ M2 Tasks(+mobile shell) ─ M2b Early hosted deploy �
 - AC-M13-21 PLE focus blocks require explicit opt-in, use recorded session history and configured work hours, and skip calendar conflicts without moving existing events.
 - AC-M13-22 Vault/task linking is account-scoped, visible from both screens, and task completion adds its actual title/time to the linked note.
 - AC-M13-23 Weekly reflection numbers come from SQL and the user's reflection is saved as a personal Vault note; batch actions, haptics and ambient sound add no sample task/history data or external audio dependency.
+- AC-M13-24 Fresh Android installs show a one-time, skippable ALIBI introduction before login; returning installations go straight to their normal route, app colors are preserved, and reduced motion is respected.
 
 **QA:** mobile/web/API typechecks, migration upgrade/downgrade, workflow API tests, two-account consent/IDOR tests, Android build, and manual review of timer controls, capture widget/tile, ambient sound, mobile consent and web role routes. Mark complete only with evidence recorded in `IMPLEMENTATION_STATUS.md` and an M13 report.
 

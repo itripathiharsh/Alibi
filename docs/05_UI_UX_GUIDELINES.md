@@ -67,6 +67,11 @@ Every data screen implements: **loading** (skeleton), **empty** (one-line guidan
 - **Weekly retrospective:** the weekly Insights view shows database counts, asks what worked/blocked/comes next, and writes a personal Vault note only when the user saves.
 - **Batch actions and audio:** long-press enters multi-select; show the selection count and clearly name each action. Trash and multi-task EOD moves ask for confirmation; haptics and locally generated ambient sound are optional and never transmit task data.
 
+### 3b. First launch (FR-MOBILE-001)
+- On a fresh Android installation, introduce ALIBI before login with the existing wordmark and app palette: warm off-white surfaces, deep navy text, and amber accent.
+- Tell the user what ALIBI helps with through a short sequence: capture thoughts, choose today's focus, use private focus tools, and reflect on actual activity. Show no personal records, sample tasks, or invented metrics.
+- Keep the sequence under ten seconds, provide a visible Skip action, honor reduced-motion settings, and persist completion locally so subsequent launches go straight to the normal app route.
+
 ## 4. Design system
 - **Typography:** Inter (web via self-hosted font files, mobile via expo-font) — scale 12/14/16/20/24/32; tabular numerals for metrics.
 - **Spacing:** 4-pt grid. **Radius:** 8 (controls), 12 (cards), 20 (sheets).

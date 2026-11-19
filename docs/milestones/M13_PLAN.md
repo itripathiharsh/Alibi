@@ -1,10 +1,11 @@
 # M13 Plan — Personal Android refresh and organization web portal
 
 - Scope: Refresh personal Android and replace authenticated web dashboard with an organization portal for owners/team leads. Public marketing/landing routes remain unchanged.
-- Requirement IDs: FR-AUTH-001..007, FR-ORG-001..006, FR-TASK-001..021, FR-CAL-001..009, FR-DASH-001..007, FR-LEARN-005..009, FR-KNOW-001..004, FR-REP-001..005, FR-PROD-001..009.
+- Requirement IDs: FR-AUTH-001..007, FR-MOBILE-001, FR-ORG-001..006, FR-TASK-001..021, FR-CAL-001..009, FR-DASH-001..007, FR-LEARN-005..009, FR-KNOW-001..004, FR-REP-001..005, FR-PROD-001..009.
 - Entry: M12/v1.0 release is complete; owner approved six tabs, public self-signup, and organization reporting with professional-only consent (ADR-022/023/024). Schema changes are in scope. No new dependency or sync-envelope/conflict-rule change is planned; the owner's audit-fix instruction authorized connecting the already-approved Android SQLite/Drizzle/sync-core stack (ADR-026).
 - Read first: docs 01–05, 10, 12, 14, 16; ADR-020/022/023/024; existing mobile and web routes, analytics, reports, auth and API contracts.
 - Tasks: retain mobile visual refresh and isolated signup; add reversible org/membership/invitation/consent schema; add real role-protected APIs and professional-only SQL analytics; redesign authenticated web nav/pages for Overview, People, Insights and Settings; add public web invite acceptance with consent and self-service revoke/leave; retain public landing design; update docs and API client. Add SQL-ranked daily kickoff and explicit end-of-day choices; add a private Android focus foreground service, widget and Quick Settings capture launch; add opt-in PLE focus blocks without displacing existing events; connect Vault notes and tasks with completion entries; add a private weekly reflection, haptics, multi-select task actions and offline ambient audio.
+- Add first-install intro before auth routing, using existing native animation and storage APIs with no new dependency.
 - Acceptance criteria:
   - AC-M13-1 Six requested destinations render in the requested order with a clear selected state and accessible labels.
   - AC-M13-2 Home, task lists, calendar, and insights continue using existing authenticated API data and existing actions.
@@ -25,6 +26,7 @@
   - AC-M13-21 Focus protection requires opt-in, uses the user's observed focus hour and working hours, skips existing calendar conflicts, and never moves existing events.
   - AC-M13-22 Vault/task links are owner-scoped, visible from either screen, and append a factual completion log to the linked note.
   - AC-M13-23 Weekly retrospective counts come from SQL, reflection is saved as a personal Vault note, and batch actions/haptics/offline ambient audio introduce no sample content or external media dependency.
+  - AC-M13-24 Fresh Android installs show a one-time, skippable ALIBI introduction before login; returning installations go straight to their normal route, app colors are preserved, and reduced motion is respected.
 - Risks: screenshots contain example numbers/records; never copy them as production data. Signup still has no email verification and uses process-local rate limiting. Organization reporting adds cross-account access and consent risks; keep M13 in progress until automated isolation tests and manual review pass.
 - Test plan: mobile/web typechecks, backend lint/types, migration upgrade/downgrade, workflow API regression tests, organization API and two-account consent/IDOR tests, Android build, and manual web/mobile review including focus notification controls, widget/tile voice capture, and ambient playback.
 - Exit gate: acceptance criteria reviewed; all routes and existing data/actions retained; status and known issues updated; report written after evidence is available. Do not mark complete without test evidence.

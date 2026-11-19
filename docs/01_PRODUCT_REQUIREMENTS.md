@@ -211,6 +211,11 @@ email/Slack integrations; payments; push notifications via a paid service; psych
 | FR-PROD-008 | Android task list supports haptic feedback and multi-select completion, reschedule, tag, and delete actions | M |
 | FR-PROD-009 | Android offers optional locally generated ambient focus audio that requires no network or audio dependency | M |
 
+### 2.14 First launch (MOBILE)
+| ID | Req | P |
+|----|-----|---|
+| FR-MOBILE-001 | A fresh Android installation shows a short, branded introduction to capture, focus, and reflection before login or the app shell; it can be skipped, respects reduced-motion settings, and is shown only once per installation | M |
+
 ## 3. Non-functional requirements
 | ID | Requirement | Target |
 |----|-------------|--------|

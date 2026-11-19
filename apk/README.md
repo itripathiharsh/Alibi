@@ -10,8 +10,8 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **Build Date**: November 20, 2026
 - **Variant**: Android release APK, Hermes Bytecode Engine (React Native 0.76 New Architecture)
 - **Signing**: Signed with the repository's current Android debug keystore. This is installable for direct distribution/testing, but it is not a Play Store production signature.
-- **SHA-256**: `78ADF6E532D20A68BD644C411CB33B8741E47CB91510F1F37B26A9AF96E89844`
-- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified; includes Android 13+ POST_NOTIFICATIONS runtime prompt on boot, high-importance heads-up notification channels (v2) with audible sound and vibration, RECEIVE_BOOT_COMPLETED & SCHEDULE_EXACT_ALARM permissions, 125+ Short & Crunchy Zomato-style pop-culture notifications across 5 scenarios, in-settings instant 2-second test notification trigger, and Hermes engine fix.
+- **SHA-256**: `B078B87851340E6833146442F85A727B9B98744C3E6D597F966BFBF7CD4AF6DC`
+- **Build verification**: `assembleRelease` succeeded; verified Hermes Bytecode (`0x1F1903C103BC1FC6` header, 69.1 MB); APK v2 signature verified; includes First-Launch Intro & Feature Tour modal, Android 13+ POST_NOTIFICATIONS runtime prompt on boot, high-importance heads-up notification channels (v2) with audible sound and vibration, RECEIVE_BOOT_COMPLETED & SCHEDULE_EXACT_ALARM permissions, 125+ Short & Crunchy Zomato-style pop-culture notifications across 5 scenarios, in-settings instant 2-second test notification trigger, and Hermes engine fix.
 
 ---
 
