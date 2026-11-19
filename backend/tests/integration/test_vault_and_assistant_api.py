@@ -4,6 +4,7 @@ from datetime import date
 
 import httpx
 import pytest
+import uuid
 
 
 @pytest.mark.asyncio
@@ -50,6 +51,47 @@ async def test_vault_notes_crud_and_search_api(auth_client: httpx.AsyncClient) -
     hybrid_results = hybrid_res.json()
     assert len(hybrid_results) > 0
     assert hybrid_results[0]["note_id"] == note_id
+
+
+@pytest.mark.req("FR-PROD-006")
+@pytest.mark.asyncio
+async def test_vault_note_task_bridge_and_completion_log(
+    auth_client: httpx.AsyncClient,
+) -> None:
+    """A vault checklist item becomes a linked task and completion is logged back to the note."""
+    note_response = await auth_client.post(
+        "/api/v1/vault/notes",
+        json={
+            "title": "Release checklist",
+            "body": "- [ ] Prepare the rollback plan\n- [x] Review the deployment window",
+            "occurred_on": date.today().isoformat(),
+        },
+    )
+    assert note_response.status_code == 201, note_response.text
+    note_id = note_response.json()["id"]
+    task_id = str(uuid.uuid4())
+
+    conversion = await auth_client.post(
+        f"/api/v1/vault/notes/{note_id}/convert-task",
+        json={"task_id": task_id, "task_text": "Prepare the rollback plan"},
+    )
+    assert conversion.status_code == 201, conversion.text
+    assert conversion.json()["task_id"] == task_id
+
+    task_response = await auth_client.get(f"/api/v1/tasks/{task_id}")
+    assert task_response.status_code == 200, task_response.text
+    assert task_response.json()["linked_notes"][0]["id"] == note_id
+
+    completed = await auth_client.post(
+        f"/api/v1/tasks/{task_id}/status", json={"status": "completed"}
+    )
+    assert completed.status_code == 200, completed.text
+
+    note_detail = await auth_client.get(f"/api/v1/vault/notes/{note_id}")
+    assert note_detail.status_code == 200, note_detail.text
+    note_body = note_detail.json()["body"]
+    assert "Prepare the rollback plan" in note_body
+    assert "Completed" in note_body
 
 
 @pytest.mark.asyncio

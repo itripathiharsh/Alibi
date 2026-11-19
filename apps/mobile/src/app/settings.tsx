@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
-import { ArrowLeft, BellRing, CalendarDays, Clock3, LogOut, ShieldCheck } from "lucide-react-native";
+import { ArrowLeft, BellRing, CalendarDays, Clock3, LogOut, ShieldCheck, Sparkles } from "lucide-react-native";
 import { BrandHeader, SunriseArt } from "../components/brand-ui";
 import { ensureAuthenticated, getUserProfile, logoutMobile, saveUserProfile, type MobileUserProfile } from "../lib/auth";
 import { getServerUrl } from "../lib/config";
@@ -32,6 +32,11 @@ export default function SettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [focusSaving, setFocusSaving] = useState(false);
+  const [focusProtectionEnabled, setFocusProtectionEnabled] = useState(false);
+  const [eveningReviewEnabled, setEveningReviewEnabled] = useState(false);
+  const [showFocusTaskName, setShowFocusTaskName] = useState(false);
+  const [workflowSaving, setWorkflowSaving] = useState(false);
   const [profile, setProfile] = useState<MobileUserProfile | null>(null);
   const [workingHours, setWorkingHours] = useState<WorkingHours>(DEFAULT_WORKING_HOURS);
 
@@ -48,6 +53,9 @@ export default function SettingsScreen() {
           if (response.ok) {
             const user = await response.json() as MobileUserProfile;
             setProfile(user);
+            setFocusProtectionEnabled(user.settings?.focus_protection_enabled === true);
+            setEveningReviewEnabled(user.settings?.eod_sweep_enabled === true);
+            setShowFocusTaskName(user.settings?.focus_show_task_name === true);
             const savedLead = user.settings?.reminder_lead_min;
             if (typeof savedLead === "number") setReminderLeadMin(savedLead);
             const savedHours = user.settings?.working_hours;
@@ -158,6 +166,63 @@ export default function SettingsScreen() {
     }
   };
 
+  const saveWorkflowPreferences = async (nextEvening: boolean, nextShowName: boolean) => {
+    if (workflowSaving) return;
+    setWorkflowSaving(true);
+    try {
+      const token = await ensureAuthenticated();
+      if (!token) throw new Error("Sign in to save preferences.");
+      const response = await fetch(`${getServerUrl()}/api/v1/auth/me`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: { eod_sweep_enabled: nextEvening, focus_show_task_name: nextShowName } }),
+      });
+      const result = await response.json().catch(() => ({})) as MobileUserProfile & { detail?: string };
+      if (!response.ok) throw new Error(result.detail ?? "Preferences could not be saved.");
+      setProfile(result);
+      await saveUserProfile(result);
+      setEveningReviewEnabled(nextEvening);
+      setShowFocusTaskName(nextShowName);
+    } catch (error) {
+      Alert.alert("Could not save preference", error instanceof Error ? error.message : "Try again.");
+    } finally {
+      setWorkflowSaving(false);
+    }
+  };
+
+  const updateFocusProtection = async (enabled: boolean) => {
+    if (focusSaving) return;
+    setFocusSaving(true);
+    try {
+      const token = await ensureAuthenticated();
+      if (!token) throw new Error("Sign in to protect a learned focus window.");
+      const response = await fetch(`${getServerUrl()}/api/v1/scheduling/focus-protection`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      const result = await response.json() as { message?: string; detail?: string; focus_start?: string; blocks_created?: number; conflicts_skipped?: number };
+      if (!response.ok) throw new Error(result.detail ?? "Focus protection could not be changed.");
+      setFocusProtectionEnabled(enabled);
+      const current = await getUserProfile();
+      if (current) {
+        const updated = { ...current, settings: { ...(current.settings ?? {}), focus_protection_enabled: enabled } };
+        setProfile(updated);
+        await saveUserProfile(updated);
+      }
+      Alert.alert(
+        enabled ? "Focus time protected" : "Focus protection removed",
+        enabled
+          ? `${result.message ?? "Learned focus blocks were added."}${result.focus_start ? `\n\n${result.focus_start} · ${result.blocks_created ?? 0} blocks added${result.conflicts_skipped ? `, ${result.conflicts_skipped} existing calendar conflicts skipped` : ""}.` : ""}`
+          : result.message ?? "Your ALIBI focus blocks were removed.",
+      );
+    } catch (error) {
+      Alert.alert("Focus protection unchanged", error instanceof Error ? error.message : "Try again.");
+    } finally {
+      setFocusSaving(false);
+    }
+  };
+
   const signOut = () => Alert.alert("Log out of ALIBI?", "Your account will be signed out on this device.", [
     { text: "Cancel", style: "cancel" },
     { text: "Log Out", style: "destructive", onPress: async () => { await logoutMobile(); router.replace("/login"); } },
@@ -180,6 +245,31 @@ export default function SettingsScreen() {
           <View style={styles.iconBox}><CalendarDays size={20} color={theme.colors.accent.amber} /></View>
           <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>Deadline reminders</Text><Text style={styles.preferenceDescription}>A private on-device alert comes before a due time. It never shows your task name on the lock screen.</Text></View>
           {loading || saving ? <ActivityIndicator size="small" color={theme.colors.accent.amber} /> : <Switch value={deadlineRemindersEnabled} onValueChange={updateDeadlineReminders} trackColor={{ false: "#D3D9DF", true: "#F5B27E" }} thumbColor={deadlineRemindersEnabled ? theme.colors.accent.amber : theme.colors.surface.card} accessibilityLabel="Deadline reminders" />}
+        </View>
+      </View>
+
+      <View style={styles.sectionHeader}><Sparkles size={18} color="#8759E8" /><Text style={styles.sectionTitle}>Personal productivity</Text></View>
+      <View style={styles.preferenceCard}>
+        <View style={styles.preferenceRow}>
+          <View style={styles.iconBox}><CalendarDays size={20} color="#8759E8" /></View>
+          <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>Evening task review</Text><Text style={styles.preferenceDescription}>After your configured workday, review today’s completed and unfinished tasks. ALIBI will never reschedule or cancel them without your choice.</Text></View>
+          {loading || workflowSaving ? <ActivityIndicator size="small" color="#8759E8" /> : <Switch value={eveningReviewEnabled} onValueChange={(value) => { void saveWorkflowPreferences(value, showFocusTaskName); }} trackColor={{ false: "#D3D9DF", true: "#D6C4FA" }} thumbColor={eveningReviewEnabled ? "#8759E8" : "#FFFFFF"} accessibilityLabel="Evening task review" />}
+        </View>
+        <View style={[styles.preferenceRow, styles.preferenceRowBorder]}>
+          <View style={styles.iconBox}><ShieldCheck size={20} color={theme.colors.accent.blue} /></View>
+          <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>Show task name on focus notification</Text><Text style={styles.preferenceDescription}>Off by default so the lock screen only says “Focus session”.</Text></View>
+          {loading || workflowSaving ? <ActivityIndicator size="small" color={theme.colors.accent.blue} /> : <Switch value={showFocusTaskName} onValueChange={(value) => { void saveWorkflowPreferences(eveningReviewEnabled, value); }} trackColor={{ false: "#D3D9DF", true: "#9AC8E8" }} thumbColor={showFocusTaskName ? theme.colors.accent.blue : "#FFFFFF"} accessibilityLabel="Show task name in focus notification" />}
+        </View>
+        <View style={[styles.preferenceRow, styles.preferenceRowBorder]}>
+          <View style={styles.iconBox}><Clock3 size={20} color="#18A76A" /></View>
+          <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>Protect learned focus hours</Text><Text style={styles.preferenceDescription}>Uses your real timer history and work schedule. ALIBI adds blocks only to open calendar slots and skips existing events.</Text></View>
+          {loading || focusSaving ? <ActivityIndicator size="small" color="#18A76A" /> : <Switch value={focusProtectionEnabled} onValueChange={(value) => {
+            if (value) Alert.alert("Protect learned focus time?", "ALIBI will add fixed focus blocks to free slots for the next year. Existing events and tasks are left unchanged.", [
+              { text: "Cancel", style: "cancel" },
+              { text: "Protect time", onPress: () => { void updateFocusProtection(true); } },
+            ]);
+            else void updateFocusProtection(false);
+          }} trackColor={{ false: "#D3D9DF", true: "#9AD9B8" }} thumbColor={focusProtectionEnabled ? "#18A76A" : "#FFFFFF"} accessibilityLabel="Protect learned focus hours" />}
         </View>
       </View>
 

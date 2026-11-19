@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import {
   CheckSquare,
+  Square,
   Clock,
   Calendar,
   Plus,
@@ -38,6 +39,7 @@ import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder, scheduleTaskTimerReminder, syncTaskTimerReminders } from "../../lib/timer-reminders";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
+import { triggerHaptic, startFocusNotification, stopFocusNotification } from "../../lib/focus-session-notification";
 import { loadLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
 import { CaptureReviewSheet } from "../../components/capture-review-sheet";
 import { decideTaskExtraction, type TaskExtractionProposal } from "../../lib/task-extraction";
@@ -199,6 +201,98 @@ export default function TasksScreen() {
   const [customTimeStr, setCustomTimeStr] = useState("");
   const [learnedRoutines, setLearnedRoutines] = useState<LearnedTaskRoutine[]>([]);
   const [isLoadingRoutines, setIsLoadingRoutines] = useState(false);
+
+  // Batch selection mode
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleTaskSelection = (id: string) => {
+    triggerHaptic("tap");
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBatchComplete = async () => {
+    triggerHaptic("complete");
+    const ids = Array.from(selectedIds);
+    setTasks((prev) => prev.map((t) => ids.includes(t.id) ? { ...t, status: "completed" } : t));
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+    try {
+      const token = await ensureAuthenticated();
+      const baseUrl = getServerUrl();
+      if (token) {
+        await Promise.all(
+          ids.map((id) =>
+            fetch(`${baseUrl}/api/v1/tasks/${id}/status`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ status: "completed" }),
+            }).catch(() => undefined)
+          )
+        );
+      }
+    } finally {
+      fetchTasks();
+    }
+  };
+
+  const handleBatchRescheduleTomorrow = async () => {
+    triggerHaptic("tap");
+    const ids = Array.from(selectedIds);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(23, 59, 0, 0);
+    const deadlineIso = tomorrow.toISOString();
+    setTasks((prev) => prev.map((t) => ids.includes(t.id) ? { ...t, deadline_at: deadlineIso } : t));
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+    try {
+      const token = await ensureAuthenticated();
+      const baseUrl = getServerUrl();
+      if (token) {
+        await Promise.all(
+          ids.map((id) =>
+            fetch(`${baseUrl}/api/v1/tasks/${id}/reschedule`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ new_deadline_at: deadlineIso, reason: "Batch postpone to tomorrow" }),
+            }).catch(() => undefined)
+          )
+        );
+      }
+    } finally {
+      fetchTasks();
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    triggerHaptic("alert");
+    const ids = Array.from(selectedIds);
+    setTasks((prev) => prev.filter((t) => !ids.includes(t.id)));
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+    try {
+      const token = await ensureAuthenticated();
+      const baseUrl = getServerUrl();
+      if (token) {
+        await Promise.all(
+          ids.map((id) =>
+            fetch(`${baseUrl}/api/v1/tasks/${id}`, {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => undefined)
+          )
+        );
+      }
+    } finally {
+      fetchTasks();
+    }
+  };
 
   const resetModal = () => {
     setCaptureText("");
@@ -453,6 +547,11 @@ export default function TasksScreen() {
 
   const handleStatusToggle = async (task: TaskItem) => {
     const nextStatus = task.status === "completed" ? "pending" : "completed";
+    if (nextStatus === "completed") {
+      triggerHaptic("complete");
+    } else {
+      triggerHaptic("tap");
+    }
     const profile = await getUserProfile();
     const activeTimer = runningTimers.find((item) => item.task_id === task.id);
     try {
@@ -468,6 +567,7 @@ export default function TasksScreen() {
             await stopTaskTimerOffline(profile.id, timer.id);
             setRunningTimers((previous) => previous.filter((item) => item.id !== timer.id));
             await cancelTaskTimerReminder(timer.id);
+            void stopFocusNotification();
           }
         }
         return;
@@ -506,6 +606,7 @@ export default function TasksScreen() {
               body: JSON.stringify({}),
             });
             await cancelTaskTimerReminder(timer.id);
+            void stopFocusNotification();
             if (profile) await removeLocalTimer(profile.id, timer.id);
           }
         }
@@ -520,8 +621,14 @@ export default function TasksScreen() {
   };
 
   const handleTimerAction = async (task: TaskItem) => {
+    triggerHaptic("tap");
     const profile = await getUserProfile();
     const activeTimer = runningTimers.find((timer) => timer.task_id === task.id);
+    if (!activeTimer) {
+      void startFocusNotification(task.title, task.estimate_user_min || 25);
+    } else {
+      void stopFocusNotification();
+    }
     const useOfflineTimer = async () => {
       if (!profile) return false;
       if (activeTimer) {
@@ -765,7 +872,28 @@ export default function TasksScreen() {
     <View style={styles.container}>
       <SunriseArt height={176} />
       <BrandHeader right={<><Pressable style={styles.headerAction} onPress={() => router.push("/calendar")} accessibilityLabel="Open calendar"><CalendarDays size={21} color={theme.colors.text.primary} /></Pressable><Pressable style={styles.headerAction} onPress={() => router.push("/(tabs)/profile")} accessibilityLabel="Open profile"><UserRound size={21} color={theme.colors.text.primary} /></Pressable></>} />
-      <View style={styles.screenHeading}><Text style={styles.screenTitle}>Tasks</Text><Text style={styles.screenSubtitle}>Capture, organize and get things done.</Text></View>
+      <View style={styles.screenHeading}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <View>
+            <Text style={styles.screenTitle}>Tasks</Text>
+            <Text style={styles.screenSubtitle}>Capture, organize and get things done.</Text>
+          </View>
+          {tasks.length > 0 && (
+            <Pressable
+              style={[styles.selectToggleBtn, selectionMode && styles.selectToggleBtnActive]}
+              onPress={() => {
+                triggerHaptic("tap");
+                setSelectionMode(!selectionMode);
+                setSelectedIds(new Set());
+              }}
+            >
+              <Text style={[styles.selectToggleText, selectionMode && styles.selectToggleTextActive]}>
+                {selectionMode ? "Cancel" : "Select"}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
       {/* View Selector Tabs */}
       <View style={styles.viewTabs}>
         {VIEWS.map((view) => (
@@ -813,18 +941,35 @@ export default function TasksScreen() {
             const elapsedLabel = `${Math.floor(elapsedSeconds / 3600)}h ${Math.floor((elapsedSeconds % 3600) / 60).toString().padStart(2, "0")}m`;
 
             return (
-              <View key={task.id} style={styles.taskCard}>
+              <View key={task.id} style={[styles.taskCard, selectedIds.has(task.id) && styles.taskCardSelected]}>
                 <View style={styles.taskHeader}>
-                  <Pressable
-                    onPress={() => handleStatusToggle(task)}
-                    style={({ pressed }) => [styles.checkboxBtn, pressed && { transform: [{ scale: 0.9 }] }]}
-                  >
-                    {isDone ? (
-                      <CheckCircle2 size={22} color={theme.colors.accent.emerald} />
-                    ) : (
-                      <Circle size={22} color={theme.colors.text.secondary} />
-                    )}
-                  </Pressable>
+                  {selectionMode ? (
+                    <Pressable
+                      onPress={() => toggleTaskSelection(task.id)}
+                      style={styles.checkboxBtn}
+                    >
+                      {selectedIds.has(task.id) ? (
+                        <CheckSquare size={22} color="#F97316" />
+                      ) : (
+                        <Square size={22} color={theme.colors.text.secondary} />
+                      )}
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      onPress={() => handleStatusToggle(task)}
+                      onLongPress={() => {
+                        setSelectionMode(true);
+                        toggleTaskSelection(task.id);
+                      }}
+                      style={({ pressed }) => [styles.checkboxBtn, pressed && { transform: [{ scale: 0.9 }] }]}
+                    >
+                      {isDone ? (
+                        <CheckCircle2 size={22} color={theme.colors.accent.emerald} />
+                      ) : (
+                        <Circle size={22} color={theme.colors.text.secondary} />
+                      )}
+                    </Pressable>
+                  )}
 
                   <Pressable
                     style={styles.taskTitleCol}
@@ -898,6 +1043,27 @@ export default function TasksScreen() {
             );
           })}
       </ScrollView>
+
+      {/* Batch Action Bar */}
+      {selectionMode && selectedIds.size > 0 && (
+        <View style={styles.batchActionBar}>
+          <Text style={styles.batchCountText}>{selectedIds.size} selected</Text>
+          <View style={styles.batchBtnsRow}>
+            <Pressable onPress={handleBatchComplete} style={[styles.batchBtn, { backgroundColor: "#10B981" }]}>
+              <CheckCircle2 size={14} color="#fff" />
+              <Text style={styles.batchBtnText}>Done</Text>
+            </Pressable>
+            <Pressable onPress={handleBatchRescheduleTomorrow} style={[styles.batchBtn, { backgroundColor: "#0284C7" }]}>
+              <Calendar size={14} color="#fff" />
+              <Text style={styles.batchBtnText}>Tomorrow</Text>
+            </Pressable>
+            <Pressable onPress={handleBatchDelete} style={[styles.batchBtn, { backgroundColor: "#EF4444" }]}>
+              <X size={14} color="#fff" />
+              <Text style={styles.batchBtnText}>Delete</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
 
       {/* Floating Action Button for Quick Capture */}
       <Pressable
@@ -1302,6 +1468,26 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
+  selectToggleBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+  },
+  selectToggleBtnActive: {
+    backgroundColor: "#F97316",
+    borderColor: "#EA580C",
+  },
+  selectToggleText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.colors.text.secondary,
+  },
+  selectToggleTextActive: {
+    color: "#FFFFFF",
+  },
   taskCard: {
     backgroundColor: theme.colors.surface.card,
     borderRadius: 19,
@@ -1314,6 +1500,53 @@ const styles = StyleSheet.create({
     shadowRadius: 11,
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
+  },
+  taskCardSelected: {
+    borderColor: "#F97316",
+    backgroundColor: "rgba(249, 115, 22, 0.08)",
+  },
+  batchActionBar: {
+    position: "absolute",
+    bottom: 24,
+    left: 16,
+    right: 88,
+    backgroundColor: "#0D1929",
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    elevation: 9,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+  },
+  batchCountText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#F1F5F9",
+  },
+  batchBtnsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  batchBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  batchBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   taskHeader: {
     flexDirection: "row",

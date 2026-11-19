@@ -198,6 +198,13 @@ class TaskExtractionDecisionRequest(BaseModel):
     rejected_fields: list[str] = Field(default_factory=list)
 
 
+class TaskNoteSummary(BaseModel):
+    id: uuid.UUID
+    title: str
+    source_type: str
+    occurred_on: date
+
+
 class TaskResponse(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
@@ -228,6 +235,7 @@ class TaskResponse(BaseModel):
     completion_note: str | None = None
     tags: list[str] = Field(default_factory=list)
     subtasks: list[SubtaskResponse] = Field(default_factory=list)
+    linked_notes: list[TaskNoteSummary] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

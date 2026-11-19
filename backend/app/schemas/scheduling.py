@@ -12,6 +12,20 @@ class ProposalGenerateRequest(BaseModel):
     horizon_days: int = Field(default=1, ge=1, le=14)
 
 
+class FocusProtectionRequest(BaseModel):
+    enabled: bool
+
+
+class FocusProtectionResponse(BaseModel):
+    enabled: bool
+    focus_start: str | None = None
+    session_min: int | None = None
+    session_count: int = 0
+    blocks_created: int = 0
+    conflicts_skipped: int = 0
+    message: str
+
+
 class ProposalDecisionRequest(BaseModel):
     action: str = Field(pattern="^(accept|partially_accept|reject)$")
     accepted_indices: list[int] | None = None

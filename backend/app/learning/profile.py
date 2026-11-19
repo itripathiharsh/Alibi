@@ -20,6 +20,7 @@ from app.models.learning import (
     MLModel,
     TaskPrediction,
 )
+from app.models.user import User
 
 
 class PLEProfileCompiler:
@@ -37,7 +38,10 @@ class PLEProfileCompiler:
         dur_mat = await self.maturity_evaluator.get_duration_maturity(user_id)
         class_mat = await self.maturity_evaluator.get_classification_maturity(user_id)
         routines = await self.routine_detector.detect_user_routines(user_id)
-        preferences = await self.preference_learner.learn_preferences(user_id)
+        timezone_name = await self.db.scalar(select(User.timezone).where(User.id == user_id))
+        preferences = await self.preference_learner.learn_preferences(
+            user_id, timezone_name or "Asia/Kolkata"
+        )
 
         # Get latest version
         ver_stmt = select(func.max(MemoryProfile.version)).where(MemoryProfile.user_id == user_id)
@@ -77,6 +81,8 @@ class PLEProfileCompiler:
                     "category": p.category,
                     "preferred_session_min": p.preferred_session_min,
                     "preferred_hours": p.preferred_hours,
+                    "session_count": p.session_count,
+                    "confidence": p.confidence,
                     "postponement_rate": p.postponement_rate,
                     "confidence": p.confidence,
                 }

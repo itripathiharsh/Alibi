@@ -23,6 +23,7 @@ from app.repositories.task_repo import TaskRepository
 from app.repositories.workspace_repo import WorkspaceRepository
 from app.services.grounding_validator import GroundingValidator
 from app.services.rules_parser import RulesParser
+from app.vault.links import append_task_completion
 
 # 16-pair transition table (doc 01 §4, AC-M2-3)
 VALID_STATUS_TRANSITIONS: dict[tuple[str, str], bool] = {
@@ -290,6 +291,14 @@ class TaskService:
             actor="user",
             occurred_at=event_time,
         )
+        if new_status == "completed":
+            await append_task_completion(
+                session=self.session,
+                user_id=self.user_id,
+                task_id=task.id,
+                task_title=task.title,
+                completed_at=event_time,
+            )
         await self.session.flush()
         return task
 

@@ -82,7 +82,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response?.status === 502 || response?.status === 503 || response?.status === 504) {
         throw new Error("The server is waking up. Please wait 10-15 seconds and try again.");
       }
-      throw new Error((error as { detail?: string })?.detail || "Login failed");
+      const errObj = error as { detail?: string | { msg?: string }[]; title?: string; invalid_params?: { name: string; reason: string }[] };
+      let errorMsg = typeof errObj?.detail === "string" ? errObj.detail : undefined;
+      if (!errorMsg && Array.isArray(errObj?.detail) && errObj.detail[0]?.msg) {
+        errorMsg = errObj.detail[0].msg;
+      }
+      if (!errorMsg && errObj?.invalid_params?.[0]?.reason) {
+        errorMsg = errObj.invalid_params[0].reason;
+      }
+      throw new Error(errorMsg || errObj?.title || "Login failed. Please check your credentials.");
     }
 
     setAccessToken(data.access_token);
@@ -105,7 +113,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response?.status === 502 || response?.status === 503 || response?.status === 504) {
         throw new Error("The server is waking up. Please wait 10-15 seconds and try again.");
       }
-      throw new Error((error as { detail?: string })?.detail || "Setup failed");
+      const errObj = error as { detail?: string | { msg?: string }[]; title?: string; invalid_params?: { name: string; reason: string }[] };
+      let errorMsg = typeof errObj?.detail === "string" ? errObj.detail : undefined;
+      if (!errorMsg && Array.isArray(errObj?.detail) && errObj.detail[0]?.msg) {
+        errorMsg = errObj.detail[0].msg;
+      }
+      if (!errorMsg && errObj?.invalid_params?.[0]?.reason) {
+        errorMsg = errObj.invalid_params[0].reason;
+      }
+      throw new Error(errorMsg || errObj?.title || "Setup failed");
     }
 
     setNeedsSetup(false);
@@ -125,7 +141,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response?.status === 502 || response?.status === 503 || response?.status === 504) {
         throw new Error("The server is waking up. Please wait 10-15 seconds and try again.");
       }
-      throw new Error((error as { detail?: string })?.detail || "Could not create your account.");
+      const errObj = error as { detail?: string | { msg?: string }[]; title?: string; invalid_params?: { name: string; reason: string }[] };
+      let errorMsg = typeof errObj?.detail === "string" ? errObj.detail : undefined;
+      if (!errorMsg && Array.isArray(errObj?.detail) && errObj.detail[0]?.msg) {
+        errorMsg = errObj.detail[0].msg;
+      }
+      if (!errorMsg && errObj?.invalid_params?.[0]?.reason) {
+        errorMsg = errObj.invalid_params[0].reason;
+      }
+      if (!errorMsg && response?.status === 429) {
+        errorMsg = "Too many account creation attempts. Please try again in a few minutes.";
+      }
+      throw new Error(errorMsg || errObj?.title || "Could not create your account.");
     }
     await login(email, password, redirectTo);
   };

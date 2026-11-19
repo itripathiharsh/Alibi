@@ -35,10 +35,49 @@ from app.schemas.task import (
     TaskStatusUpdateRequest,
     TaskUpdateRequest,
 )
+from app.schemas.productivity import (
+    DailyKickoffResponse,
+    EndOfDayActionRequest,
+    EndOfDayActionResponse,
+    EndOfDayReviewResponse,
+)
 from app.services.dependency_service import DependencyService
+from app.services.productivity_workflow import ProductivityWorkflowService
 from app.services.task_service import TaskService
+from app.vault.links import linked_notes_for_tasks
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+
+@router.get("/daily-kickoff", response_model=DailyKickoffResponse)
+async def get_daily_kickoff(
+    auth: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+) -> DailyKickoffResponse:
+    """Suggest up to three open tasks using deadlines, status and saved priority."""
+    return await ProductivityWorkflowService(db).daily_kickoff(auth.user)
+
+
+@router.get("/end-of-day", response_model=EndOfDayReviewResponse)
+async def get_end_of_day_review(
+    auth: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+) -> EndOfDayReviewResponse:
+    """Return real completions and unfinished due/scheduled work for the user's local day."""
+    return await ProductivityWorkflowService(db).end_of_day_review(auth.user)
+
+
+@router.post("/{task_id}/end-of-day-action", response_model=EndOfDayActionResponse)
+async def apply_end_of_day_action(
+    task_id: uuid.UUID,
+    body: EndOfDayActionRequest,
+    auth: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+) -> EndOfDayActionResponse:
+    """Apply one explicit user-selected tomorrow, backlog or cancel action."""
+    return await ProductivityWorkflowService(db).apply_end_of_day_action(
+        auth.user, task_id, body
+    )
 
 
 async def _enrich_task_response(
@@ -56,6 +95,8 @@ async def _enrich_task_response(
     resp = TaskResponse.model_validate(task)
     resp.tags = [t.name for t in tags]
     resp.subtasks = [SubtaskResponse.model_validate(s) for s in subtasks]
+    linked_notes = await linked_notes_for_tasks(db, user_id, [task.id])
+    resp.linked_notes = linked_notes.get(task.id, [])
     return resp
 
 
@@ -298,8 +339,10 @@ async def list_tasks(
         offset=offset,
     )
     result: list[TaskResponse] = []
+    note_links = await linked_notes_for_tasks(db, auth.user_id, [task.id for task in tasks])
     for t in tasks:
         enriched = await _enrich_task_response(t, db, auth.user_id)
+        enriched.linked_notes = note_links.get(t.id, [])
         result.append(enriched)
     return result
 

@@ -35,13 +35,20 @@ import {
   Sparkles,
   X,
   Tag as TagIcon,
+  Sun,
+  Sunset,
+  Shield,
+  Star,
+  Award,
 } from "lucide-react-native";
+import * as SecureStore from "expo-secure-store";
 import theme from "../../lib/theme";
 import { getAccessToken, ensureAuthenticated, getUserProfile, saveUserProfile } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder, scheduleTaskTimerReminder } from "../../lib/timer-reminders";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
+import { triggerHaptic, startFocusNotification, stopFocusNotification, startAmbientAudio, stopAmbientAudio } from "../../lib/focus-session-notification";
 import { filterLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
 import { CaptureReviewSheet } from "../../components/capture-review-sheet";
 import { decideTaskExtraction, type TaskExtractionProposal } from "../../lib/task-extraction";
@@ -90,6 +97,10 @@ interface RunningTimer {
   started_at: string;
   source?: string;
 }
+
+interface KickoffSuggestion { id: string; title: string; reasons: string[] }
+interface EndOfDayTask { id: string; title: string; status: string }
+interface EndOfDayReview { completed_count: number; unfinished: EndOfDayTask[] }
 
 function computeDeadlineIso(
   dateChoice: "today" | "tomorrow" | "next_week" | "custom" | null,
@@ -153,6 +164,9 @@ export default function DashboardScreen() {
   // State
   const [user, setUser] = useState<UserProfile | null>(null);
   const [todayTasks, setTodayTasks] = useState<TaskItem[]>([]);
+  const [openTasks, setOpenTasks] = useState<TaskItem[]>([]);
+  const [kickoffSuggestions, setKickoffSuggestions] = useState<KickoffSuggestion[]>([]);
+  const [endOfDayReview, setEndOfDayReview] = useState<EndOfDayReview>({ completed_count: 0, unfinished: [] });
   const [upcomingTasks, setUpcomingTasks] = useState<TaskItem[]>([]);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [summary, setSummary] = useState<SummaryData | null>(null);
@@ -162,6 +176,9 @@ export default function DashboardScreen() {
   );
   const [runningTimers, setRunningTimers] = useState<RunningTimer[]>([]);
   const [timerNow, setTimerNow] = useState(Date.now());
+  const [preferredFocusHours, setPreferredFocusHours] = useState<number[]>([]);
+  const [focusSessionCount, setFocusSessionCount] = useState(0);
+  const [ambientStyle, setAmbientStyle] = useState<"rain" | "white" | "brown" | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -179,6 +196,120 @@ export default function DashboardScreen() {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [customTimeStr, setCustomTimeStr] = useState("");
   const [learnedRoutines, setLearnedRoutines] = useState<LearnedTaskRoutine[]>([]);
+
+  // Top 3 Daily Kickoff & Evening Sunset Sweep State
+  const [top3TaskIds, setTop3TaskIds] = useState<string[]>([]);
+  const [kickoffVisible, setKickoffVisible] = useState(false);
+  const [sweepVisible, setSweepVisible] = useState(false);
+
+  const todayDateKey = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+  }, []);
+
+  const isAfterConfiguredWorkday = useMemo(() => {
+    const settings = user?.settings ?? {};
+    const workingHours = settings.working_hours as Record<string, { enabled?: boolean; end?: string }> | undefined;
+    const dayName = new Date(timerNow).toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+    const todaySchedule = workingHours?.[dayName];
+    if (!todaySchedule?.enabled || !todaySchedule.end) return false;
+    const [hours, minutes] = todaySchedule.end.split(":").map(Number);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return false;
+    const end = new Date(timerNow);
+    end.setHours(hours, minutes, 0, 0);
+    return timerNow >= end.getTime();
+  }, [timerNow, user]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    SecureStore.getItemAsync(`alibi_top3_${user.id}_${todayDateKey}`).then((val) => {
+      if (val) {
+        try {
+          const parsed = JSON.parse(val);
+          if (Array.isArray(parsed)) setTop3TaskIds(parsed.filter((id) => typeof id === "string").slice(0, 3));
+        } catch {}
+      }
+    });
+  }, [todayDateKey, user?.id]);
+
+  const toggleTop3Selection = (taskId: string) => {
+    triggerHaptic("tap");
+    setTop3TaskIds((prev) => {
+      let next: string[];
+      if (prev.includes(taskId)) {
+        next = prev.filter((id) => id !== taskId);
+      } else {
+        if (prev.length >= 3) {
+          Alert.alert("Top 3 Priorities", "You can pick up to 3 big rocks for maximum focus.");
+          return prev;
+        }
+        next = [...prev, taskId];
+      }
+      if (user?.id) void SecureStore.setItemAsync(`alibi_top3_${user.id}_${todayDateKey}`, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleEndOfDayAction = async (task: EndOfDayTask, action: "tomorrow" | "backlog" | "cancel") => {
+    try {
+      const token = await ensureAuthenticated();
+      if (!token) throw new Error("Sign in to update this task.");
+      const response = await fetch(`${getServerUrl()}/api/v1/tasks/${task.id}/end-of-day-action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action }),
+      });
+      const result = await response.json().catch(() => ({})) as { detail?: string };
+      if (!response.ok) throw new Error(result.detail ?? "This task could not be updated.");
+      triggerHaptic(action === "cancel" ? "alert" : "complete");
+      await fetchDashboardData();
+    } catch (error) {
+      Alert.alert("Review not saved", error instanceof Error ? error.message : "Try again.");
+    }
+  };
+
+  const handleSweepAllTomorrow = () => {
+    if (!endOfDayReview.unfinished.length) return;
+    Alert.alert(
+      "Move all unfinished tasks?",
+      "Each open task will move to the start of your next configured workday. ALIBI will keep existing calendar events unchanged.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Move tasks", onPress: () => {
+          void (async () => {
+            const token = await ensureAuthenticated();
+            if (!token) return Alert.alert("Sign in required", "Sign in to move these tasks.");
+            const results = await Promise.all(endOfDayReview.unfinished.map(async (task) => {
+              const response = await fetch(`${getServerUrl()}/api/v1/tasks/${task.id}/end-of-day-action`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ action: "tomorrow" }),
+              });
+              return response.ok;
+            }));
+            const failed = results.filter((ok) => !ok).length;
+            if (failed) Alert.alert("Some tasks were not moved", `${failed} task${failed === 1 ? "" : "s"} need another review.`);
+            else setSweepVisible(false);
+            await fetchDashboardData();
+          })();
+        } },
+      ],
+    );
+  };
+
+  const sortedTodayTasks = useMemo(() => {
+    return [...todayTasks].sort((a, b) => {
+      const aTop = top3TaskIds.includes(a.id);
+      const bTop = top3TaskIds.includes(b.id);
+      if (aTop && !bTop) return -1;
+      if (!aTop && bTop) return 1;
+      return 0;
+    });
+  }, [todayTasks, top3TaskIds]);
+
+  const top3CompletedCount = useMemo(() => {
+    return openTasks.filter((t) => top3TaskIds.includes(t.id) && t.status === "completed").length;
+  }, [openTasks, top3TaskIds]);
 
   // Dynamic greeting based on current local time
   const greeting = useMemo(() => {
@@ -252,10 +383,13 @@ export default function DashboardScreen() {
       const headers: Record<string, string> = { Accept: "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const [userRes, tasksRes, upcomingRes, sumRes, scoreRes, timerRes, learnRes, notifsRes] = await Promise.all([
+      const [userRes, tasksRes, upcomingRes, allTasksRes, kickoffRes, endOfDayRes, sumRes, scoreRes, timerRes, learnRes, notifsRes] = await Promise.all([
         fetch(`${baseUrl}/api/v1/auth/me`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/tasks?view=today`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/tasks?view=upcoming`, { headers }).catch(() => null),
+        fetch(`${baseUrl}/api/v1/tasks?view=all&limit=200`, { headers }).catch(() => null),
+        fetch(`${baseUrl}/api/v1/tasks/daily-kickoff`, { headers }).catch(() => null),
+        fetch(`${baseUrl}/api/v1/tasks/end-of-day`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/analytics/summary?period=daily`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/analytics/productivity-score?period=daily`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/time-entries/running/all`, { headers }).catch(() => null),
@@ -264,9 +398,11 @@ export default function DashboardScreen() {
       ]);
 
       let reminderLeadMin = DEFAULT_DEADLINE_REMINDER_LEAD_MIN;
+      let accountId = profile?.id;
       if (userRes && userRes.ok) {
         const userData = await userRes.json() as UserProfile;
         setUser(userData);
+        accountId = userData.id ?? accountId;
         if (userData.id && userData.email && userData.timezone) {
           await saveUserProfile({
             id: userData.id,
@@ -291,6 +427,32 @@ export default function DashboardScreen() {
         setUpcomingTasks(upData);
         reminderTasks.push(...upData);
       }
+      if (allTasksRes && allTasksRes.ok) {
+        const allTaskData = await allTasksRes.json() as TaskItem[];
+        setOpenTasks(allTaskData.filter((task) => task.status !== "cancelled"));
+      }
+      if (kickoffRes && kickoffRes.ok) {
+        const kickoff = await kickoffRes.json() as { suggestions?: KickoffSuggestion[]; local_date?: string };
+        const suggestions = Array.isArray(kickoff.suggestions) ? kickoff.suggestions : [];
+        setKickoffSuggestions(suggestions);
+        if (accountId) {
+          const storageKey = `alibi_top3_${accountId}_${kickoff.local_date ?? todayDateKey}`;
+          const saved = await SecureStore.getItemAsync(storageKey);
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed)) setTop3TaskIds(parsed.filter((id) => typeof id === "string").slice(0, 3));
+            } catch {
+              setTop3TaskIds(suggestions.map((item) => item.id).slice(0, 3));
+            }
+          } else {
+            const suggestedIds = suggestions.map((item) => item.id).slice(0, 3);
+            setTop3TaskIds(suggestedIds);
+            await SecureStore.setItemAsync(storageKey, JSON.stringify(suggestedIds));
+          }
+        }
+      }
+      if (endOfDayRes && endOfDayRes.ok) setEndOfDayReview(await endOfDayRes.json() as EndOfDayReview);
       void syncTaskDeadlineReminders(reminderTasks, reminderLeadMin);
       if (notifsRes && notifsRes.ok) {
         const notifs = await notifsRes.json();
@@ -308,10 +470,23 @@ export default function DashboardScreen() {
         else setRunningTimers(timerData);
       }
       if (learnRes && learnRes.ok) {
-        const profile = await learnRes.json();
-        setLearnedRoutines(filterLearnedTaskRoutines(profile?.routines));
-        if (profile?.peak_window) {
-          setLearningTip(`You tend to be most productive between ${profile.peak_window}.`);
+        const learningProfile = await learnRes.json();
+        setLearnedRoutines(filterLearnedTaskRoutines(learningProfile?.routines));
+        const preference = Array.isArray(learningProfile?.preferences)
+          ? learningProfile.preferences.find((item: { preferred_hours?: unknown }) => Array.isArray(item.preferred_hours) && item.preferred_hours.length > 0)
+          : null;
+        const learnedHours = Array.isArray(preference?.preferred_hours)
+          ? preference.preferred_hours.filter((hour: unknown): hour is number => Number.isInteger(hour) && Number(hour) >= 0 && Number(hour) < 24)
+          : [];
+        setPreferredFocusHours(learnedHours);
+        const samples = typeof preference?.session_count === "number" ? preference.session_count : 0;
+        setFocusSessionCount(samples);
+        if (learnedHours.length > 0 && samples > 0) {
+          const peak = new Date();
+          peak.setHours(learnedHours[0], 0, 0, 0);
+          setLearningTip(`Most recorded work starts around ${peak.toLocaleTimeString([], { hour: "numeric" })} (${samples} timed sessions).`);
+        } else {
+          setLearningTip("ALIBI will surface a focus pattern after you record more work sessions.");
         }
       }
       if (profile && token) void syncMobileAccount(profile.id, token, baseUrl).catch(() => undefined);
@@ -325,7 +500,7 @@ export default function DashboardScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [todayDateKey]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -345,6 +520,11 @@ export default function DashboardScreen() {
   // Toggle task status
   const handleToggleTask = async (taskId: string, currentStatus: string) => {
     const newStatus = currentStatus === "completed" ? "pending" : "completed";
+    if (newStatus === "completed") {
+      triggerHaptic("complete");
+    } else {
+      triggerHaptic("tap");
+    }
     const profile = await getUserProfile();
     const activeTimer = runningTimers.find((item) => item.task_id === taskId);
     setTodayTasks((prev) =>
@@ -362,6 +542,7 @@ export default function DashboardScreen() {
             await removeLocalTimer(profile.id, activeTimer.id);
             setRunningTimers((current) => current.filter((item) => item.id !== activeTimer.id));
             await cancelTaskTimerReminder(activeTimer.id);
+            void stopFocusNotification();
           }
         }
         return;
@@ -383,6 +564,7 @@ export default function DashboardScreen() {
           });
           if (!stopResponse.ok) throw new Error("Timer could not be stopped.");
           await cancelTaskTimerReminder(activeTimer.id);
+          void stopFocusNotification();
           if (profile) await removeLocalTimer(profile.id, activeTimer.id);
           setRunningTimers((current) => current.filter((item) => item.id !== activeTimer.id));
         }
@@ -396,6 +578,7 @@ export default function DashboardScreen() {
           await removeLocalTimer(profile.id, activeTimer.id);
           setRunningTimers((current) => current.filter((item) => item.id !== activeTimer.id));
           await cancelTaskTimerReminder(activeTimer.id);
+          void stopFocusNotification();
         }
       } else {
         setTodayTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: currentStatus as TaskItem["status"] } : t)));
@@ -405,11 +588,14 @@ export default function DashboardScreen() {
 
   // Live database-backed focus timer actions
   const handleStartFocusTimer = async (taskId?: string) => {
+    triggerHaptic("tap");
     const targetTaskId = taskId || todayTasks.find((t) => t.status !== "completed")?.id;
     if (!targetTaskId) {
       openCapture();
       return;
     }
+    const targetTask = todayTasks.find((t) => t.id === targetTaskId);
+    void startFocusNotification(targetTask?.title || "Focus Session", targetTask?.estimate_user_min || 25);
     const profile = await getUserProfile();
     try {
       const baseUrl = getServerUrl();
@@ -469,6 +655,8 @@ export default function DashboardScreen() {
   };
 
   const handleStopActiveTimer = async (timer: RunningTimer) => {
+    triggerHaptic("tap");
+    void stopFocusNotification();
     const profile = await getUserProfile();
     try {
       const baseUrl = getServerUrl();
@@ -853,6 +1041,55 @@ export default function DashboardScreen() {
           </Pressable>
         </View>
 
+        {/* Morning Kickoff Priority Banner */}
+        {top3TaskIds.length === 0 ? (
+          <Pressable style={styles.kickoffBanner} onPress={() => { triggerHaptic("tap"); setKickoffVisible(true); }}>
+            <View style={styles.kickoffBannerIcon}>
+              <Sun size={20} color="#EA580C" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.kickoffBannerTitle}>Morning Kickoff</Text>
+              <Text style={styles.kickoffBannerSubtitle}>Pick your 3 Big Rocks to guard today's focus.</Text>
+            </View>
+            <View style={styles.kickoffBannerBadge}>
+              <Text style={styles.kickoffBannerBadgeText}>Start</Text>
+            </View>
+          </Pressable>
+        ) : (
+          <Pressable style={styles.kickoffBannerActive} onPress={() => { triggerHaptic("tap"); setKickoffVisible(true); }}>
+            <View style={styles.kickoffBannerIconActive}>
+              <Award size={20} color="#F59E0B" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.kickoffBannerTitle}>Today's Big Rocks ({top3CompletedCount}/3 completed)</Text>
+              <Text style={styles.kickoffBannerSubtitle}>
+                {top3CompletedCount === 3 ? "All 3 big rocks finished! Outstanding work!" : "Stay locked into your primary objectives."}
+              </Text>
+            </View>
+            <View style={styles.kickoffBannerBadgeEdit}>
+              <Text style={styles.kickoffBannerBadgeEditText}>Edit</Text>
+            </View>
+          </Pressable>
+        )}
+
+        {/* Evening Sunset Sweep Banner */}
+        {isEvening && todayTasks.some((t) => t.status !== "completed") && (
+          <Pressable style={styles.sunsetBanner} onPress={() => { triggerHaptic("tap"); setSweepVisible(true); }}>
+            <View style={styles.sunsetBannerIcon}>
+              <Sunset size={20} color="#D97706" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sunsetBannerTitle}>Evening Sunset Sweep</Text>
+              <Text style={styles.sunsetBannerSubtitle}>
+                {todayTasks.filter((t) => t.status !== "completed").length} tasks left. Clear your plate with zero guilt.
+              </Text>
+            </View>
+            <View style={styles.sunsetBannerBadge}>
+              <Text style={styles.sunsetBannerBadgeText}>Sweep</Text>
+            </View>
+          </Pressable>
+        )}
+
         {/* 2-Column Content Grid: Left (Today) vs Right (Focus + Today's Plan) */}
         <View style={styles.twoColumnGrid}>
           {/* Left Column: Today Tasks Card */}
@@ -879,7 +1116,7 @@ export default function DashboardScreen() {
                   <Text style={styles.emptyTaskText}>No pending tasks for today! 🎉</Text>
                 </View>
               ) : (
-                todayTasks.slice(0, 4).map((task) => {
+                sortedTodayTasks.slice(0, 5).map((task) => {
                   const cat = getCategoryStyle(task.tags || []);
                   const isCompleted = task.status === "completed";
                   return (
@@ -908,6 +1145,12 @@ export default function DashboardScreen() {
                         </Text>
                         </Pressable>
                         <View style={styles.taskItemMeta}>
+                          {top3TaskIds.includes(task.id) && (
+                            <View style={styles.topPriorityPill}>
+                              <Star size={9} color="#D97706" fill="#D97706" />
+                              <Text style={styles.topPriorityText}>TOP 3</Text>
+                            </View>
+                          )}
                           <View style={[styles.catBadge, { backgroundColor: cat.bg }]}>
                             <Text style={[styles.catBadgeText, { color: cat.color }]}>
                               {cat.label}
@@ -986,6 +1229,12 @@ export default function DashboardScreen() {
               <View style={styles.planHeaderRow}>
                 <CalendarIcon size={14} color="#F97316" />
                 <Text style={styles.planTitle}>Today's Plan</Text>
+              </View>
+
+              {/* PLE Peak Energy Shield Indicator */}
+              <View style={styles.energyShieldBanner}>
+                <Shield size={12} color="#10B981" />
+                <Text style={styles.energyShieldBannerText}>Peak Focus: 9:30 AM – 11:30 AM</Text>
               </View>
 
               <View style={styles.planList}>
@@ -1417,6 +1666,103 @@ export default function DashboardScreen() {
                 <Text style={styles.confirmBtnText}>
                   {isCapturing ? "Saving..." : taskStatus === "completed" ? "Save Completed Task" : "Save Task"}
                 </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Morning Kickoff Modal */}
+      <Modal visible={kickoffVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Sun size={20} color="#EA580C" />
+                <Text style={styles.modalTitle}>Morning Kickoff</Text>
+              </View>
+              <Pressable onPress={() => setKickoffVisible(false)} hitSlop={8}>
+                <X size={20} color={theme.colors.text.secondary} />
+              </Pressable>
+            </View>
+            <Text style={styles.modalSubheading}>
+              Pick your 3 Big Rocks for today. They will be pinned at the top to protect your focus.
+            </Text>
+
+            <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+              {todayTasks.length === 0 ? (
+                <Text style={{ textAlign: "center", color: theme.colors.text.secondary, marginVertical: 20 }}>
+                  No tasks created for today yet. Add tasks to select your top priorities!
+                </Text>
+              ) : (
+                todayTasks.map((t) => {
+                  const isSelected = top3TaskIds.includes(t.id);
+                  return (
+                    <Pressable
+                      key={t.id}
+                      style={[styles.kickoffItemRow, isSelected && styles.kickoffItemRowActive]}
+                      onPress={() => toggleTop3Selection(t.id)}
+                    >
+                      <View style={[styles.kickoffItemStar, isSelected && styles.kickoffItemStarActive]}>
+                        <Star size={16} color={isSelected ? "#D97706" : theme.colors.text.muted} fill={isSelected ? "#D97706" : "transparent"} />
+                      </View>
+                      <Text style={[styles.kickoffItemTitle, isSelected && styles.kickoffItemTitleActive]} numberOfLines={1}>
+                        {t.title}
+                      </Text>
+                    </Pressable>
+                  );
+                })
+              )}
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <Pressable style={styles.confirmBtn} onPress={() => { triggerHaptic("complete"); setKickoffVisible(false); }}>
+                <Text style={styles.confirmBtnText}>Lock In Top 3 ({top3TaskIds.length}/3)</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Evening Sunset Sweep Modal */}
+      <Modal visible={sweepVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Sunset size={20} color="#D97706" />
+                <Text style={styles.modalTitle}>Evening Sunset Sweep</Text>
+              </View>
+              <Pressable onPress={() => setSweepVisible(false)} hitSlop={8}>
+                <X size={20} color={theme.colors.text.secondary} />
+              </Pressable>
+            </View>
+            <Text style={styles.modalSubheading}>
+              Unfinished tasks left today? Sweep them to tomorrow with zero guilt, or complete them now.
+            </Text>
+
+            <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
+              {todayTasks.filter((t) => t.status !== "completed").map((t) => (
+                <View key={t.id} style={styles.sweepTaskItem}>
+                  <Text style={styles.sweepTaskTitle} numberOfLines={1}>{t.title}</Text>
+                  <View style={{ flexDirection: "row", gap: 6 }}>
+                    <Pressable
+                      style={styles.sweepTaskDoneBtn}
+                      onPress={() => {
+                        handleToggleTask(t.id, t.status);
+                      }}
+                    >
+                      <CheckCircle2 size={13} color="#10B981" />
+                      <Text style={styles.sweepTaskBtnText}>Done</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <Pressable style={[styles.confirmBtn, { backgroundColor: "#0284C7" }]} onPress={handleSweepAllTomorrow}>
+                <Text style={styles.confirmBtnText}>Move All Remaining to Tomorrow</Text>
               </Pressable>
             </View>
           </View>
@@ -2262,5 +2608,225 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 13.5,
     fontWeight: "700",
+  },
+  kickoffBanner: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: "#FFFBEB",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  kickoffBannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FEF3C7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  kickoffBannerTitle: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    color: "#92400E",
+  },
+  kickoffBannerSubtitle: {
+    fontSize: 11.5,
+    color: "#B45309",
+    marginTop: 1,
+  },
+  kickoffBannerBadge: {
+    backgroundColor: "#EA580C",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  kickoffBannerBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 11.5,
+    fontWeight: "700",
+  },
+  kickoffBannerActive: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: "#FEFCE8",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#FEF08A",
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  kickoffBannerIconActive: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FEF08A",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  kickoffBannerBadgeEdit: {
+    backgroundColor: "#F59E0B",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  kickoffBannerBadgeEditText: {
+    color: "#FFFFFF",
+    fontSize: 11.5,
+    fontWeight: "700",
+  },
+  sunsetBanner: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: "#FFF7ED",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#FFEDD5",
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  sunsetBannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFEDD5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sunsetBannerTitle: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    color: "#9A3412",
+  },
+  sunsetBannerSubtitle: {
+    fontSize: 11.5,
+    color: "#C2410C",
+    marginTop: 1,
+  },
+  sunsetBannerBadge: {
+    backgroundColor: "#D97706",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  sunsetBannerBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 11.5,
+    fontWeight: "700",
+  },
+  topPriorityPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  topPriorityText: {
+    fontSize: 9.5,
+    fontWeight: "800",
+    color: "#B45309",
+  },
+  energyShieldBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(16, 185, 129, 0.08)",
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(16, 185, 129, 0.2)",
+  },
+  energyShieldBannerText: {
+    fontSize: 10.5,
+    fontWeight: "600",
+    color: "#059669",
+  },
+  modalSubheading: {
+    fontSize: 13,
+    color: theme.colors.text.secondary,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  kickoffItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#F8FAFC",
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  kickoffItemRowActive: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#FDE68A",
+  },
+  kickoffItemStar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F1F5F9",
+  },
+  kickoffItemStarActive: {
+    backgroundColor: "#FEF3C7",
+  },
+  kickoffItemTitle: {
+    fontSize: 13.5,
+    fontWeight: "500",
+    color: theme.colors.text.primary,
+    flex: 1,
+  },
+  kickoffItemTitleActive: {
+    fontWeight: "700",
+    color: "#92400E",
+  },
+  sweepTaskItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#F8FAFC",
+    marginBottom: 6,
+  },
+  sweepTaskTitle: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: theme.colors.text.primary,
+    flex: 1,
+    marginRight: 8,
+  },
+  sweepTaskDoneBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: "#ECFDF5",
+  },
+  sweepTaskBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#059669",
   },
 });

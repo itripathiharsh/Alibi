@@ -28,6 +28,7 @@ from app.models.tag import Tag
 from app.models.task import Task
 from app.models.task_dependency import TaskDependency
 from app.models.task_event import TaskEvent
+from app.models.task_note_link import TaskNoteLink
 from app.models.task_tag import TaskTag
 from app.models.time_entry import TimeEntry
 from app.models.user import User
@@ -55,6 +56,7 @@ __all__ = [
     "TaskDependency",
     "RecurrenceRule",
     "TaskEvent",
+    "TaskNoteLink",
     "TimeEntry",
     "Evidence",
     "AIExtraction",

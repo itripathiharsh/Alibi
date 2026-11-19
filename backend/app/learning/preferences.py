@@ -8,6 +8,7 @@ import math
 import statistics
 import uuid
 from dataclasses import dataclass
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +36,9 @@ class PLEPreferenceLearner:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    async def learn_preferences(self, user_id: uuid.UUID) -> list[CategoryPreference]:
+    async def learn_preferences(
+        self, user_id: uuid.UUID, timezone_name: str = "Asia/Kolkata"
+    ) -> list[CategoryPreference]:
         """Learn behavioral preferences per category."""
         # Query completed time entries
         stmt = select(
@@ -54,7 +57,11 @@ class PLEPreferenceLearner:
             return []
 
         durations = [e[0] for e in entries if e[0]]
-        hours = [e[1].hour for e in entries if e[1]]
+        try:
+            user_timezone = ZoneInfo(timezone_name)
+        except (ZoneInfoNotFoundError, ValueError):
+            user_timezone = ZoneInfo("UTC")
+        hours = [e[1].astimezone(user_timezone).hour for e in entries if e[1]]
 
         session_median = int(statistics.median(durations)) if durations else 45
         if len(durations) >= 4:
@@ -72,7 +79,11 @@ class PLEPreferenceLearner:
 
         total_mass = sum(hour_counts)
         uniform = 1.0 / 24.0
-        preferred_hours = [h for h in range(24) if (hour_counts[h] / total_mass) >= 1.5 * uniform]
+        preferred_hours = sorted(
+            (h for h in range(24) if (hour_counts[h] / total_mass) >= 1.5 * uniform),
+            key=lambda hour: hour_counts[hour],
+            reverse=True,
+        )
 
         # Postponement rate from tasks
         task_stmt = select(func.count(Task.id), func.sum(Task.reschedule_count)).where(

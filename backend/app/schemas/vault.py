@@ -17,6 +17,17 @@ class NoteCreateRequest(BaseModel):
     privacy_class: str = Field(default="personal")
 
 
+class NoteTaskConversionRequest(BaseModel):
+    task_id: uuid.UUID | None = None
+    task_text: str = Field(..., min_length=1, max_length=300)
+
+
+class NoteTaskConversionResponse(BaseModel):
+    note_id: uuid.UUID
+    task_id: uuid.UUID
+    task_title: str
+
+
 class NoteResponse(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID

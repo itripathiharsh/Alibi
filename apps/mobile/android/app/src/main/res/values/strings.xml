@@ -2,4 +2,5 @@
   <string name="app_name">ALIBI</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
+  <string name="quick_capture_widget_description">Capture a task quickly by typing or voice.</string>
 </resources>

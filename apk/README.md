@@ -8,16 +8,31 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **Direct Download Link**: [Download ALIBI-0.1.0.apk (Raw)](https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk)
 - **Version**: `0.1.0`
 - **Build Date**: November 19, 2026
-- **Variant**: Android release APK, Hermes
+- **Variant**: Android release APK, JavaScriptCore + Babel
 - **Signing**: Signed with the repository's current Android debug keystore. This is installable for direct distribution/testing, but it is not a Play Store production signature.
-- **SHA-256**: `FC3E8E815A1D141B456C272B661484C50AD7C31D5FCFF8793B670B449F31A7B6`
-- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified; dynamic focus timer, calendar activity indicators, recurring tasks, deadline reminders, and task extraction review sheets included.
+- **SHA-256**: `7914992B57F6238814269CA719D192C553D6719B2AFD6FBF19D2F0EFFCF20A15`
+- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified; includes Morning Kickoff Top 3 priorities, Evening Sunset Sweep, batch task multi-select, bi-directional vault note-to-task conversion, tactile haptic feedback, sticky focus timer notifications, and PLE Peak Energy Shield.
 
 ---
 
 ## What's New in This Build
 
-1. **Executive Light Theme Dashboard**:
+1. **Morning Kickoff & Big Rocks**:
+   - Interactive morning modal to curate your Top 3 daily priorities.
+   - Pinned at the top of the dashboard with a golden `★ TOP PRIORITY` pill and live completion tracking.
+2. **Evening Sunset Sweep**:
+   - Clean-slate evening banner (after 5 PM) to easily postpone all uncompleted tasks to tomorrow or backlog with zero guilt.
+3. **Batch Multi-Select Mode in Tasks**:
+   - "Select" button or long-press on task cards to activate batch mode.
+   - Floating action bar to batch mark **Done**, reschedule to **Tomorrow**, or **Delete** with one tap.
+4. **Bi-directional Vault Note to Task**:
+   - Convert any note or raw idea directly into an actionable task from the Knowledge Vault in one tap.
+5. **Tactile Haptic Feedback & Live Focus Notifications**:
+   - Native tactile vibration patterns on task completion, selection, and batch operations.
+   - Sticky ongoing focus notification showing active task name and elapsed/countdown time.
+6. **PLE Peak Energy Shield**:
+   - Visual shield banner in *Today's Plan* safeguarding the personal 9:30 AM – 11:30 AM deep work window.
+7. **Executive Light Theme Dashboard**:
    - Modern warm light UI matching executive dashboard design.
    - Dynamic greeting (`Good Morning/Afternoon/Evening, Harsh 👋`) with subtle peach dune art.
    - Floating Quick Capture pill with instant voice dictation.
