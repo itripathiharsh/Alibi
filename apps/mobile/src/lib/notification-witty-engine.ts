@@ -250,25 +250,107 @@ export function getRandomWittyCopy(scenario: NotificationScenario, context?: { t
   return item;
 }
 
+export const DAILY_CHANNEL_ID = "alibi-daily-digests-v2";
+export const CHECKIN_CHANNEL_ID = "task-check-ins-v2";
+export const DEADLINE_CHANNEL_ID = "task-deadlines-v2";
+
 export const DAILY_MORNING_KIND = "daily_morning_kickoff";
 export const DAILY_EVENING_KIND = "daily_evening_sweep";
 export const INACTIVITY_NUDGE_KIND = "inactivity_nudge";
+
+/**
+ * Configure top-level Expo notification behavior (alerts, sound, badges).
+ */
+export function registerNotificationHandler(): void {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+}
+
+/**
+ * Request notification permissions from Android / iOS.
+ * Prompts user with OS system dialog on Android 13+ (POST_NOTIFICATIONS).
+ */
+export async function requestNotificationPermissions(): Promise<boolean> {
+  try {
+    let settings = await Notifications.getPermissionsAsync();
+    if (settings.status !== "granted") {
+      settings = await Notifications.requestPermissionsAsync({
+        ios: {
+          allowAlert: true,
+          allowBadge: true,
+          allowSound: true,
+        },
+      });
+    }
+    return settings.status === "granted";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ensures high-importance notification channels are registered on Android.
+ * High/Max importance guarantees heads-up popup banner and audible chime.
+ */
+export async function ensureNotificationChannels(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  try {
+    // Delete legacy low-importance/silent channels
+    await Notifications.deleteNotificationChannelAsync("alibi-daily-digests").catch(() => undefined);
+    await Notifications.deleteNotificationChannelAsync("task-check-ins").catch(() => undefined);
+    await Notifications.deleteNotificationChannelAsync("task-deadlines").catch(() => undefined);
+
+    await Notifications.setNotificationChannelAsync(DAILY_CHANNEL_ID, {
+      name: "Daily Motivation & Check-ins",
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: "default",
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#F47B25",
+      enableLights: true,
+      enableVibrate: true,
+      showBadge: true,
+    });
+
+    await Notifications.setNotificationChannelAsync(CHECKIN_CHANNEL_ID, {
+      name: "Task Check-ins",
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: "default",
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#F47B25",
+      enableLights: true,
+      enableVibrate: true,
+      showBadge: true,
+    });
+
+    await Notifications.setNotificationChannelAsync(DEADLINE_CHANNEL_ID, {
+      name: "Task Deadlines",
+      importance: Notifications.AndroidImportance.MAX,
+      sound: "default",
+      vibrationPattern: [0, 300, 200, 300],
+      lightColor: "#EF4444",
+      enableLights: true,
+      enableVibrate: true,
+      showBadge: true,
+    });
+  } catch {
+    // Non-fatal if channel creation fails
+  }
+}
 
 /**
  * Schedule daily morning kickoff (9:00 AM) and evening sweep (8:00 PM).
  */
 export async function scheduleDailyWittyReminders(): Promise<void> {
   try {
-    const perm = await Notifications.getPermissionsAsync();
-    if (perm.status !== "granted") return;
+    const granted = await requestNotificationPermissions();
+    if (!granted) return;
 
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("alibi-daily-digests", {
-        name: "Daily Motivation & Check-ins",
-        importance: Notifications.AndroidImportance.DEFAULT,
-        lightColor: "#F47B25",
-      });
-    }
+    await ensureNotificationChannels();
 
     const scheduled = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
     const existingMorning = scheduled.find((s) => s.content.data?.kind === DAILY_MORNING_KIND);
@@ -282,13 +364,14 @@ export async function scheduleDailyWittyReminders(): Promise<void> {
           title: copy.title,
           body: copy.body,
           data: { kind: DAILY_MORNING_KIND },
-          sound: false,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DAILY,
           hour: 9,
           minute: 0,
-          ...(Platform.OS === "android" ? { channelId: "alibi-daily-digests" } : {}),
+          ...(Platform.OS === "android" ? { channelId: DAILY_CHANNEL_ID } : {}),
         },
       });
     }
@@ -301,13 +384,14 @@ export async function scheduleDailyWittyReminders(): Promise<void> {
           title: copy.title,
           body: copy.body,
           data: { kind: DAILY_EVENING_KIND },
-          sound: false,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DAILY,
           hour: 20,
           minute: 0,
-          ...(Platform.OS === "android" ? { channelId: "alibi-daily-digests" } : {}),
+          ...(Platform.OS === "android" ? { channelId: DAILY_CHANNEL_ID } : {}),
         },
       });
     }
@@ -319,6 +403,11 @@ export async function scheduleDailyWittyReminders(): Promise<void> {
 /** Resets a 36-hour inactivity notification so if the user ghosts the app, they receive a funny nudge */
 export async function scheduleInactivityNudge(): Promise<void> {
   try {
+    const granted = await requestNotificationPermissions();
+    if (!granted) return;
+
+    await ensureNotificationChannels();
+
     const scheduled = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
     const ghostNotifs = scheduled.filter((s) => s.content.data?.kind === INACTIVITY_NUDGE_KIND);
     await Promise.all(ghostNotifs.map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => undefined)));
@@ -331,15 +420,49 @@ export async function scheduleInactivityNudge(): Promise<void> {
         title: copy.title,
         body: copy.body,
         data: { kind: INACTIVITY_NUDGE_KIND },
-        sound: false,
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: fireDate,
-        ...(Platform.OS === "android" ? { channelId: "alibi-daily-digests" } : {}),
+        ...(Platform.OS === "android" ? { channelId: DAILY_CHANNEL_ID } : {}),
       },
     });
   } catch {
     // Non-fatal
+  }
+}
+
+/**
+ * Immediately schedules a test witty notification to fire in 2 seconds.
+ * Allows user to verify audible sound, heads-up banner, and vibration on device.
+ */
+export async function triggerTestNotification(): Promise<boolean> {
+  try {
+    const granted = await requestNotificationPermissions();
+    if (!granted) return false;
+
+    await ensureNotificationChannels();
+    const copy = await getNotificationCopy("TIMER_RUNAWAY");
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: copy.title,
+        body: copy.body,
+        data: { kind: "test_notification" },
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.MAX,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 2,
+        ...(Platform.OS === "android" ? { channelId: DAILY_CHANNEL_ID } : {}),
+      },
+    });
+    return true;
+  } catch (e) {
+    console.warn("Failed to trigger test notification:", e);
+    return false;
   }
 }

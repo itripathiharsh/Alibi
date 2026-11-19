@@ -6,8 +6,11 @@ import { Pressable, StyleSheet, Text, View, Image } from "react-native";
 import { User } from "lucide-react-native";
 import theme from "../lib/theme";
 import { getAccessToken, getRefreshToken } from "../lib/auth";
-import { scheduleDailyWittyReminders, scheduleInactivityNudge } from "../lib/notification-witty-engine";
+import { registerNotificationHandler, scheduleDailyWittyReminders, scheduleInactivityNudge } from "../lib/notification-witty-engine";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+
+// Ensure Expo notifications can play sounds and show heads-up banners across the entire app
+registerNotificationHandler();
 
 export default function RootLayout() {
   const router = useRouter();

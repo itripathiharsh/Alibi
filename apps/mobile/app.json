@@ -27,7 +27,11 @@
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM",
+        "VIBRATE"
       ]
     },
     "plugins": [

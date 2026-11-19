@@ -8,7 +8,7 @@ import { ensureAuthenticated, getUserProfile, logoutMobile, saveUserProfile, typ
 import { getServerUrl } from "../lib/config";
 import { areTaskTimerRemindersEnabled, setTaskTimerRemindersEnabled } from "../lib/timer-reminders";
 import { areTaskDeadlineRemindersEnabled, DEFAULT_DEADLINE_REMINDER_LEAD_MIN, setTaskDeadlineRemindersEnabled, syncTaskDeadlineReminders } from "../lib/task-deadline-reminders";
-import { getNotificationStyle, setNotificationStyle } from "../lib/notification-witty-engine";
+import { getNotificationStyle, setNotificationStyle, triggerTestNotification } from "../lib/notification-witty-engine";
 import theme from "../lib/theme";
 
 type WorkingDay = { enabled: boolean; start: string; end: string };
@@ -30,6 +30,7 @@ export default function SettingsScreen() {
   const [remindersEnabled, setRemindersEnabled] = useState(true);
   const [deadlineRemindersEnabled, setDeadlineRemindersEnabled] = useState(false);
   const [wittyTone, setWittyTone] = useState(true);
+  const [testingNotif, setTestingNotif] = useState(false);
   const [reminderLeadMin, setReminderLeadMin] = useState(DEFAULT_DEADLINE_REMINDER_LEAD_MIN);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -142,6 +143,25 @@ export default function SettingsScreen() {
   const updateNotificationStyle = async (enabled: boolean) => {
     setWittyTone(enabled);
     await setNotificationStyle(enabled ? "witty" : "calm");
+  };
+
+  const handleTestNotification = async () => {
+    setTestingNotif(true);
+    try {
+      const ok = await triggerTestNotification();
+      if (ok) {
+        Alert.alert("Notification scheduled! 🚀", "Look at the top of your screen in 2 seconds. A heads-up pop-culture alert should appear.");
+      } else {
+        Alert.alert("Notifications not allowed", "Please enable notifications for ALIBI in Android App Settings.", [
+          { text: "Cancel", style: "cancel" },
+          { text: "Open Settings", onPress: () => void Linking.openSettings() },
+        ]);
+      }
+    } catch {
+      Alert.alert("Could not send test notification", "Please try again.");
+    } finally {
+      setTestingNotif(false);
+    }
   };
 
   const saveWorkingHours = async () => {
@@ -267,6 +287,26 @@ export default function SettingsScreen() {
           </View>
           <Switch value={wittyTone} onValueChange={updateNotificationStyle} trackColor={{ false: "#D3D9DF", true: "#F5B27E" }} thumbColor={wittyTone ? "#F47B25" : "#FFFFFF"} accessibilityLabel="Pop-culture notifications" />
         </View>
+        <View style={[styles.preferenceRow, styles.preferenceRowBorder]}>
+          <View style={styles.iconBox}><BellRing size={20} color="#F47B25" /></View>
+          <View style={styles.preferenceCopy}>
+            <Text style={styles.preferenceTitle}>Test notification now</Text>
+            <Text style={styles.preferenceDescription}>Fires a heads-up pop-culture alert with sound in 2 seconds so you can verify on your phone.</Text>
+          </View>
+          <Pressable
+            style={({ pressed }) => [styles.testButton, pressed && { opacity: 0.7 }]}
+            onPress={handleTestNotification}
+            disabled={testingNotif}
+            accessibilityRole="button"
+            accessibilityLabel="Test notification now"
+          >
+            {testingNotif ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.testButtonText}>Test (2s)</Text>
+            )}
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.sectionHeader}><Sparkles size={18} color="#8759E8" /><Text style={styles.sectionTitle}>Personal productivity</Text></View>
@@ -361,4 +401,6 @@ const styles = StyleSheet.create({
   privacyCard: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 15, borderRadius: 18, backgroundColor: "#F0FAF5", borderWidth: 1, borderColor: "#D7EFE1" },
   logoutButton: { minHeight: 52, borderRadius: 16, borderWidth: 1, borderColor: "#F2A5A5", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, backgroundColor: "#FFFFFF", marginTop: 8 },
   logoutText: { color: "#D92D35", fontSize: 14, fontWeight: "800" },
+  testButton: { minHeight: 38, paddingHorizontal: 14, backgroundColor: "#F47B25", borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  testButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
 });

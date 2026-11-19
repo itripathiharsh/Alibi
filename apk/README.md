@@ -10,8 +10,8 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **Build Date**: November 20, 2026
 - **Variant**: Android release APK, Hermes Bytecode Engine (React Native 0.76 New Architecture)
 - **Signing**: Signed with the repository's current Android debug keystore. This is installable for direct distribution/testing, but it is not a Play Store production signature.
-- **SHA-256**: `05D83177FC06F2A74CB04C38A4200D9041A554510E59056CE7789CFF1777EC40`
-- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified; includes Hermes Bytecode Engine restoration (resolves New Architecture blank screen on boot), 125+ Short & Crunchy Zomato-style Bollywood / Pop-Culture Notifications across 5 scenarios (Hera Pheri, Mirzapur, Wasseypur, Stree, Sholay, Shark Tank), Daily Morning (9:00 AM) and Evening (8:00 PM) check-ins, AAPT widget linking resolution, and Morning Kickoff Top 3 priorities.
+- **SHA-256**: `78ADF6E532D20A68BD644C411CB33B8741E47CB91510F1F37B26A9AF96E89844`
+- **Build verification**: `assembleRelease` succeeded; APK v2 signature verified; includes Android 13+ POST_NOTIFICATIONS runtime prompt on boot, high-importance heads-up notification channels (v2) with audible sound and vibration, RECEIVE_BOOT_COMPLETED & SCHEDULE_EXACT_ALARM permissions, 125+ Short & Crunchy Zomato-style pop-culture notifications across 5 scenarios, in-settings instant 2-second test notification trigger, and Hermes engine fix.
 
 ---
 

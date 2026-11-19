@@ -1,11 +1,11 @@
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import { getNotificationCopy } from "./notification-witty-engine";
+import { CHECKIN_CHANNEL_ID, ensureNotificationChannels, getNotificationCopy } from "./notification-witty-engine";
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const REMINDER_KIND = "active_task_check_in";
-const ANDROID_CHANNEL_ID = "task-check-ins";
+const ANDROID_CHANNEL_ID = CHECKIN_CHANNEL_ID;
 const REMINDERS_ENABLED_KEY = "alibi_task_checkins_enabled";
 
 export async function areTaskTimerRemindersEnabled(): Promise<boolean> {
@@ -41,14 +41,8 @@ export async function scheduleTaskTimerReminder(input: {
 }): Promise<boolean> {
   try {
     if (!(await areTaskTimerRemindersEnabled())) return false;
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-        name: "Task check-ins",
-        importance: Notifications.AndroidImportance.DEFAULT,
-        vibrationPattern: [0],
-        lightColor: "#F47B25",
-      });
-    }
+    await ensureNotificationChannels();
+
     let permission = await Notifications.getPermissionsAsync();
     if (permission.status !== "granted") permission = await Notifications.requestPermissionsAsync();
     if (permission.status !== "granted") return false;
@@ -63,7 +57,8 @@ export async function scheduleTaskTimerReminder(input: {
         title: copy.title,
         body: copy.body,
         data: { kind: REMINDER_KIND, timerId: input.timerId, taskId: input.taskId },
-        sound: false,
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,

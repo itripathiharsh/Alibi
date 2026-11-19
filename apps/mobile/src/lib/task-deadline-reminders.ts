@@ -1,11 +1,11 @@
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import { getNotificationCopy } from "./notification-witty-engine";
+import { DEADLINE_CHANNEL_ID, ensureNotificationChannels, getNotificationCopy } from "./notification-witty-engine";
 
 const ENABLED_KEY = "alibi_deadline_reminders_enabled";
 const REMINDER_KIND = "task_deadline";
-const ANDROID_CHANNEL_ID = "task-deadlines";
+const ANDROID_CHANNEL_ID = DEADLINE_CHANNEL_ID;
 export const DEFAULT_DEADLINE_REMINDER_LEAD_MIN = 15;
 
 export async function areTaskDeadlineRemindersEnabled(): Promise<boolean> {
@@ -31,13 +31,7 @@ export async function syncTaskDeadlineReminders(
   leadMinutes: number,
 ): Promise<void> {
   try {
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-        name: "Task deadlines",
-        importance: Notifications.AndroidImportance.DEFAULT,
-        vibrationPattern: [0],
-      });
-    }
+    await ensureNotificationChannels();
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     const deadlineNotices = scheduled.filter((request) => request.content.data?.kind === REMINDER_KIND);
     if (!(await areTaskDeadlineRemindersEnabled()) || (await Notifications.getPermissionsAsync()).status !== "granted") {
@@ -64,7 +58,8 @@ export async function syncTaskDeadlineReminders(
           title: copy.title,
           body: copy.body,
           data: { kind: REMINDER_KIND, taskId: task.id, fireAt },
-          sound: false,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.MAX,
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
