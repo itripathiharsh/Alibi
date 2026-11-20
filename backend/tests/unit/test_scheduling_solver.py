@@ -141,3 +141,76 @@ def test_learned_session_length_and_focus_window_shape_proposal() -> None:
     assert [item["duration_min"] for item in proposals] == [45, 45]
     assert proposals[0]["start_at"] == "2026-11-17T14:00:00+05:30"
     assert all("PREFERRED_WINDOW" in item["reasons"] for item in proposals)
+
+
+def test_cpsat_solver_executes_and_reports_cpsat_status() -> None:
+    """AC-SCH-7: When OR-Tools is installed, SchedulingSolver executes CP-SAT and reports status."""
+    solver = SchedulingSolver()
+    snapshot = {
+        "horizon_start": "2026-11-17T09:00:00Z",
+        "horizon_end": "2026-11-17T18:00:00Z",
+        "working_hours": {"start": "09:00", "end": "18:00"},
+        "tasks": [
+            {
+                "id": "task-cp-1",
+                "title": "Architectural Review",
+                "priority": 1,
+                "remaining_min": 60,
+                "deadline_at": "2026-11-17T12:00:00Z",
+                "deadline_kind": "hard",
+            },
+            {
+                "id": "task-cp-2",
+                "title": "Security audit",
+                "priority": 2,
+                "remaining_min": 60,
+                "deadline_at": "2026-11-17T17:00:00Z",
+            },
+        ],
+        "blocked_intervals": [
+            {
+                "id": "fixed-lunch",
+                "title": "Team lunch",
+                "kind": "fixed_event",
+                "start_at": "2026-11-17T12:00:00Z",
+                "end_at": "2026-11-17T13:00:00Z",
+            }
+        ],
+    }
+
+    result = solver.solve(snapshot)
+    assert result["solver_status"] in ("cpsat_optimal", "cpsat_feasible")
+    assert len(result["proposals"]) == 2
+    assert "solve_ms" in result
+
+    # Check non-overlapping with fixed event
+    lunch_s = datetime.fromisoformat("2026-11-17T12:00:00Z")
+    lunch_e = datetime.fromisoformat("2026-11-17T13:00:00Z")
+    for p in result["proposals"]:
+        start = datetime.fromisoformat(p["start_at"])
+        end = datetime.fromisoformat(p["end_at"])
+        assert not (start < lunch_e and end > lunch_s), f"CP-SAT block {p} overlaps with fixed event"
+        assert len(p["reasons"]) >= 1
+
+    # Hard deadline check for task-cp-1: must finish <= 12:00
+    p1 = [p for p in result["proposals"] if p["task_id"] == "task-cp-1"][0]
+    assert datetime.fromisoformat(p1["end_at"]) <= datetime.fromisoformat("2026-11-17T12:00:00Z")
+
+
+def test_cpsat_solver_respects_explicit_greedy_override() -> None:
+    """AC-SCH-7: Explicit request for greedy scheduler returns solver_status='greedy'."""
+    solver = SchedulingSolver()
+    snapshot = {
+        "horizon_start": "2026-11-17T09:00:00Z",
+        "horizon_end": "2026-11-17T18:00:00Z",
+        "solver": "greedy",
+        "tasks": [
+            {"id": "t1", "title": "A", "priority": 1, "remaining_min": 60, "deadline_at": None}
+        ],
+        "blocked_intervals": [],
+    }
+
+    result = solver.solve(snapshot)
+    assert result["solver_status"] == "greedy"
+    assert len(result["proposals"]) == 1
+

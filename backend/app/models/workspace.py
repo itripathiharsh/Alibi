@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.uuid import generate_uuid7
-from app.db.base import Base, SyncableMixin
+from app.database.base import Base, SyncableMixin
 
 if TYPE_CHECKING:
     from app.models.category import Category

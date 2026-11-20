@@ -1,6 +1,7 @@
 """Scheduling Solver Engine (doc 09 §3, §4, AC-SCH-7).
 
-Dispatches to CP-SAT solver when available or deterministic GreedyScheduler.
+Dispatches to Google OR-Tools CP-SAT solver when available, falling back to
+deterministic GreedyScheduler when OR-Tools is unavailable or snapshot is infeasible.
 """
 
 import time as pytime
@@ -21,12 +22,21 @@ class SchedulingSolver:
         """Solve scheduling instance respecting all hard constraints."""
         t0 = pytime.perf_counter()
 
+        # If greedy was explicitly requested, bypass CP-SAT
+        if snapshot.get("solver") == "greedy":
+            result = self.greedy.solve(snapshot)
+            result["solve_ms"] = int((pytime.perf_counter() - t0) * 1000)
+            return result
+
         # Try CP-SAT if installed
         try:
-            from ortools.sat.python import cp_model  # type: ignore[import-not-found]
+            from app.scheduling.cpsat_solver import CpSatScheduler
 
-            # Use CP-SAT if available
-            result = self._solve_cpsat(snapshot, cp_model)
+            cpsat = CpSatScheduler(time_limit_s=self.time_limit_s, seed=self.seed)
+            result = cpsat.solve(snapshot)
+            if result.get("solver_status") not in ("cpsat_optimal", "cpsat_feasible"):
+                # Fallback to greedy if CP-SAT could not find a feasible solution
+                result = self.greedy.solve(snapshot)
         except Exception:
             # Deterministic greedy fallback
             result = self.greedy.solve(snapshot)
@@ -34,8 +44,3 @@ class SchedulingSolver:
         t1 = pytime.perf_counter()
         result["solve_ms"] = int((t1 - t0) * 1000)
         return result
-
-    def _solve_cpsat(self, snapshot: dict[str, Any], _cp_model: Any) -> dict[str, Any]:
-        """CP-SAT formulation (falls back to greedy if infeasible)."""
-        # For small problems or complex constraints, greedy gives instant deterministic results
-        return self.greedy.solve(snapshot)

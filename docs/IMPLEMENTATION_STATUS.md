@@ -1,6 +1,6 @@
 # Implementation Status
 
-_Last updated: 2026-11-19 by agent (productivity workflow implementation and Android release build; v1.0.0 remains released)_
+_Last updated: 2026-11-20 by agent (Google OR-Tools CP-SAT scheduler implemented, organization security tests added, db/ consolidated, and offline SQLite tables extended; v1.0.0 baseline maintained)_
 
 ## Current milestone
 **M13 — Personal Android refresh, productivity workflows, public signup, organization web portal, and time-tracking UX** · state: **In progress** · entry criteria: ✅ M12/v1.0 release complete; six-tab navigation, public signup, organization/consent product model, concurrent task timers, separate task score, and productivity workflow scope approved by owner (ADR-022/023/024/025/027)
@@ -61,6 +61,7 @@ See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: **124 requiremen
 | 2026-11-19 | Productivity workflows | Mobile typecheck | Kickoff, Vault links, weekly retrospective, task batch actions and focus audio screens typechecked cleanly | `pnpm --filter @alibi/mobile typecheck` |
 | 2026-11-19 | Productivity workflow implementation | Android release APK | Build succeeded; 83,544,585-byte JSC APK, package `com.alibi.app` v0.1.0; v2 signature verified; SHA-256 `BCDF942067D0CE2F7CC3D5DF34E6B2854A15A1FB7E3BC400284C9494D9463D6F`; copied to `apk/ALIBI-0.1.0.apk`; signed with repository debug key | `apps/mobile/android/gradlew.bat -p apps/mobile/android assembleRelease --max-workers=1 -PhermesEnabled=false`; `apksigner verify --verbose --print-certs`; `aapt dump badging` |
 | 2026-11-20 | FR-MOBILE-001 first-launch intro | Mobile typecheck and Android release APK | Typecheck passed; release APK assembled (83,559,605 bytes), package `com.alibi.app` v0.1.0; v2 signature verified; SHA-256 `4C3AB43868A4DBEC9588E427C80EBD57DC81DF6FF6DDE0021A3E8C78C8435F6A`; copied to `apk/ALIBI-0.1.0.apk`; Maestro flow added but awaits device execution | `pnpm --filter @alibi/mobile typecheck`; `apps/mobile/android/gradlew.bat -p apps/mobile/android assembleRelease --max-workers=1 -PhermesEnabled=false`; `apksigner verify --verbose --print-certs`; `aapt dump badging`; `tests/e2e/mobile/first-launch.yaml` |
+| 2026-11-20 | CP-SAT & Org Security | CP-SAT Solver & Org Security Suites | 13 passed (7 CP-SAT solver tests + 6 Org security tests), mobile typecheck 0 errors | `pytest tests/unit/test_scheduling_solver.py tests/integration/test_organizations_api.py`; `pnpm --filter @alibi/mobile typecheck` |
 
 ## Current work
 - M0–M9 and M11–M12 remain complete; M10 has been reopened because its Android offline acceptance was not actually present in the app. The existing tag records historical state and does not satisfy the M10 exit gate. v1.0.0 remains the released baseline.

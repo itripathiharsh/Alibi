@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.time import utc_now
 from app.core.uuid import generate_uuid7
-from app.db.base import Base
+from app.database.base import Base
 
 
 class AuditLog(Base):

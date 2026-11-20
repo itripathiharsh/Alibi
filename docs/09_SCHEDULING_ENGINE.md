@@ -36,7 +36,7 @@ Time discretised in 15-min slots. For each task *t* split into up to `k_t = ceil
 ## 4. Greedy fallback (deterministic)
 Earliest-deadline-first, then priority, then creation date; place chunks in earliest free slot respecting all hard constraints; used when CP-SAT fails/times out or OR-Tools unavailable. Proposal labelled `solver_status=greedy`.
 
-**Implementation status:** the current solver dispatches to the deterministic greedy scheduler even when OR-Tools is installed. The CP-SAT formulation, dependency-aware optimization, and benchmark targets above remain an implementation gap; see the open issue in `KNOWN_ISSUES.md`.
+**Implementation status:** `SchedulingSolver` runs Google OR-Tools CP-SAT (`app.scheduling.cpsat_solver`) with `NoOverlap` optional interval formulation, deadline enforcement, working hours bounds, and daily focus cap, reporting `cpsat_optimal` or `cpsat_feasible`. When OR-Tools is unavailable, the problem is infeasible, or greedy mode is explicitly requested, it falls back to the deterministic greedy scheduler (`solver_status=greedy`).
 
 ## 5. Explanations (FR-SCHED-003)
 Each proposed block gets reason codes computed from the model (not the LLM):

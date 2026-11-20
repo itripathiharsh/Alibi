@@ -13,7 +13,7 @@ from app.api.deps import AuthContext, get_auth_context, get_auth_service, get_cu
 from app.core.config import settings
 from app.core.errors import UnauthorizedError
 from app.core.security import signup_rate_limiter
-from app.db.session import get_db
+from app.database.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
     ChangePasswordRequest,

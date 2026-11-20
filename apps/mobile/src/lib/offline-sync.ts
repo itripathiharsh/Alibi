@@ -89,6 +89,34 @@ async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
       source TEXT NOT NULL,
       PRIMARY KEY (user_id, id)
     );
+    CREATE TABLE IF NOT EXISTS local_calendar_events (
+      user_id TEXT NOT NULL,
+      id TEXT NOT NULL,
+      data_json TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      server_seq INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, id)
+    );
+    CREATE TABLE IF NOT EXISTS local_notes (
+      user_id TEXT NOT NULL,
+      id TEXT NOT NULL,
+      data_json TEXT NOT NULL,
+      version INTEGER NOT NULL DEFAULT 1,
+      server_seq INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, id)
+    );
+    CREATE TABLE IF NOT EXISTS sync_conflicts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      client_data TEXT NOT NULL,
+      server_data TEXT NOT NULL,
+      resolved INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS offline_meta (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -550,6 +578,53 @@ class ExpoSyncAdapter implements SyncStorageAdapter {
       for (const item of changes) {
         if (!item || typeof item !== "object") continue;
         const value = item as Record<string, unknown>;
+        const entityType = String(value.entity_type || (value.kind ? "calendar_event" : "task")).toLowerCase();
+
+        // 1. Calendar Events
+        if (entityType === "calendar_event" || entityType === "event") {
+          const id = String(value.id);
+          if (value.deleted === true) {
+            await db.runAsync("DELETE FROM local_calendar_events WHERE user_id=? AND id=?", this.userId, id);
+          } else {
+            await db.runAsync(
+              `INSERT INTO local_calendar_events(user_id, id, data_json, version, server_seq, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(user_id, id) DO UPDATE SET
+               data_json=excluded.data_json, version=excluded.version, server_seq=excluded.server_seq, updated_at=excluded.updated_at`,
+              this.userId,
+              id,
+              JSON.stringify(value),
+              Number(value.version || 1),
+              Number(value.server_seq || 0),
+              new Date().toISOString(),
+            );
+          }
+          continue;
+        }
+
+        // 2. Vault Notes
+        if (entityType === "note" || entityType === "vault_note") {
+          const id = String(value.id);
+          if (value.deleted === true) {
+            await db.runAsync("DELETE FROM local_notes WHERE user_id=? AND id=?", this.userId, id);
+          } else {
+            await db.runAsync(
+              `INSERT INTO local_notes(user_id, id, data_json, version, server_seq, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(user_id, id) DO UPDATE SET
+               data_json=excluded.data_json, version=excluded.version, server_seq=excluded.server_seq, updated_at=excluded.updated_at`,
+              this.userId,
+              id,
+              JSON.stringify(value),
+              Number(value.version || 1),
+              Number(value.server_seq || 0),
+              new Date().toISOString(),
+            );
+          }
+          continue;
+        }
+
+        // 3. Tasks
         if (value.entity_type && value.entity_type !== "task") continue;
         const task = normalizeTask(value);
         if (!task) continue;
@@ -607,4 +682,109 @@ export async function getPendingSyncCount(userId: string): Promise<number> {
     userId,
   );
   return row?.count ?? 0;
+}
+
+export async function getLocalCalendarEvents(userId: string): Promise<Record<string, unknown>[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ data_json: string }>(
+    "SELECT data_json FROM local_calendar_events WHERE user_id=? ORDER BY updated_at DESC",
+    userId,
+  );
+  return rows.map((r) => JSON.parse(r.data_json) as Record<string, unknown>);
+}
+
+export async function saveLocalCalendarEvent(userId: string, event: Record<string, unknown>): Promise<void> {
+  const db = await getDatabase();
+  const id = String(event.id || makeOfflineId());
+  const now = new Date().toISOString();
+  await db.runAsync(
+    `INSERT INTO local_calendar_events(user_id, id, data_json, version, server_seq, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, id) DO UPDATE SET
+     data_json=excluded.data_json, version=excluded.version, updated_at=excluded.updated_at`,
+    userId,
+    id,
+    JSON.stringify({ ...event, id }),
+    Number(event.version || 1),
+    Number(event.server_seq || 0),
+    now,
+  );
+  await enqueue(
+    db,
+    userId,
+    id,
+    event.deleted ? "delete" : "create",
+    event,
+    Number(event.version || 1),
+    "calendar_event",
+  );
+}
+
+export async function getLocalNotes(userId: string): Promise<Record<string, unknown>[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ data_json: string }>(
+    "SELECT data_json FROM local_notes WHERE user_id=? ORDER BY updated_at DESC",
+    userId,
+  );
+  return rows.map((r) => JSON.parse(r.data_json) as Record<string, unknown>);
+}
+
+export async function saveLocalNote(userId: string, note: Record<string, unknown>): Promise<void> {
+  const db = await getDatabase();
+  const id = String(note.id || makeOfflineId());
+  const now = new Date().toISOString();
+  await db.runAsync(
+    `INSERT INTO local_notes(user_id, id, data_json, version, server_seq, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, id) DO UPDATE SET
+     data_json=excluded.data_json, version=excluded.version, updated_at=excluded.updated_at`,
+    userId,
+    id,
+    JSON.stringify({ ...note, id }),
+    Number(note.version || 1),
+    Number(note.server_seq || 0),
+    now,
+  );
+  await enqueue(
+    db,
+    userId,
+    id,
+    note.deleted ? "delete" : "create",
+    note,
+    Number(note.version || 1),
+    "vault_note",
+  );
+}
+
+export async function getSyncConflicts(userId: string): Promise<{ id: string; entity_type: string; entity_id: string; resolved: boolean }[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ id: string; entity_type: string; entity_id: string; resolved: number }>(
+    "SELECT id, entity_type, entity_id, resolved FROM sync_conflicts WHERE user_id=? AND resolved=0",
+    userId,
+  );
+  return rows.map((r) => ({ ...r, resolved: Boolean(r.resolved) }));
+}
+
+export async function resolveSyncConflict(userId: string, conflictId: string, resolution: "client" | "server"): Promise<void> {
+  const db = await getDatabase();
+  const conflict = await db.getFirstAsync<{ entity_type: string; entity_id: string; client_data: string; server_data: string }>(
+    "SELECT entity_type, entity_id, client_data, server_data FROM sync_conflicts WHERE user_id=? AND id=?",
+    userId,
+    conflictId,
+  );
+  if (!conflict) return;
+
+  if (resolution === "client") {
+    // Re-queue client data with latest client_ts
+    await enqueue(
+      db,
+      userId,
+      conflict.entity_id,
+      "update",
+      JSON.parse(conflict.client_data) as Record<string, unknown>,
+      1,
+      conflict.entity_type,
+    );
+  }
+  await db.runAsync("UPDATE sync_conflicts SET resolved=1 WHERE user_id=? AND id=?", userId, conflictId);
 }

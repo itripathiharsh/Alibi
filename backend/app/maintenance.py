@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.logging import logger, setup_logging
-from app.db.session import get_engine, get_session_maker
+from app.database.session import get_engine, get_session_maker
 from app.learning.profile import PLEProfileCompiler
 from app.models.user import User
 from app.services.recurrence_service import RecurrenceService
