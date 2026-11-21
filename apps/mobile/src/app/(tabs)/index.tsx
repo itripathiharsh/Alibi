@@ -54,7 +54,27 @@ import { triggerHaptic, startFocusNotification, stopFocusNotification } from "..
 import { filterLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
 import { CaptureReviewSheet } from "../../components/capture-review-sheet";
 import { decideTaskExtraction, type TaskExtractionProposal } from "../../lib/task-extraction";
-import { cacheRunningTimers, cacheTaskView, createTaskOffline, getCachedTaskView, getLocalAnalyticsSummary, getLocalTimers, makeOfflineId, removeLocalTimer, startTaskTimerOffline, stopTaskTimerOffline, syncMobileAccount, updateTaskOffline } from "../../lib/offline-sync";
+import { ChiefOfStaffCard } from "../../components/chief-of-staff-card";
+import { OnboardingModal } from "../../components/onboarding-modal";
+import { ProjectManagerSheet } from "../../components/project-manager-sheet";
+import {
+  cacheRunningTimers,
+  cacheTaskView,
+  createTaskOffline,
+  getCachedTaskView,
+  getLocalAnalyticsSummary,
+  getLocalProjects,
+  getLocalTimers,
+  getLocalUserPreferences,
+  LocalProjectRecord,
+  LocalUserPreferences,
+  makeOfflineId,
+  removeLocalTimer,
+  startTaskTimerOffline,
+  stopTaskTimerOffline,
+  syncMobileAccount,
+  updateTaskOffline,
+} from "../../lib/offline-sync";
 
 interface TaskItem {
   id: string;
@@ -195,6 +215,19 @@ export default function DashboardScreen() {
   const [kickoffVisible, setKickoffVisible] = useState(false);
   const [sweepVisible, setSweepVisible] = useState(false);
 
+  // Chief of Staff & Onboarding Preferences & Projects State
+  const [preferences, setPreferences] = useState<LocalUserPreferences>({
+    work_start_time: "09:00",
+    work_end_time: "18:00",
+    planning_style: "priority",
+    learning_paused: false,
+    timezone: "Asia/Kolkata",
+    primary_goal: null,
+  });
+  const [onboardingVisible, setOnboardingVisible] = useState(false);
+  const [projects, setProjects] = useState<LocalProjectRecord[]>([]);
+  const [projectsVisible, setProjectsVisible] = useState(false);
+
   const todayDateKey = useMemo(() => {
     const d = new Date();
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
@@ -260,6 +293,31 @@ export default function DashboardScreen() {
     } finally {
       fetchDashboardData();
     }
+  };
+
+  const overdueTasks = useMemo(() => {
+    const now = Date.now();
+    return todayTasks.filter((t) => t.status !== "completed" && t.deadline_at && Date.parse(t.deadline_at) < now);
+  }, [todayTasks]);
+
+  const calendarBusyMinutes = useMemo(() => {
+    return runningTimers.reduce((acc, _) => acc + 30, 0);
+  }, [runningTimers]);
+
+  const handleRescheduleOverdue = async (taskIds: string[]) => {
+    triggerHaptic("tap");
+    const today = new Date();
+    today.setHours(18, 0, 0, 0);
+    const deadlineIso = today.toISOString();
+    setTodayTasks((prev) =>
+      prev.map((t) => (taskIds.includes(t.id) ? { ...t, deadline_at: deadlineIso } : t)),
+    );
+    const profile = await getUserProfile();
+    const userId = profile?.id ?? "local_user";
+    for (const id of taskIds) {
+      await updateTaskOffline(userId, id, { deadline_at: deadlineIso });
+    }
+    Alert.alert("Tasks Rescheduled", `${taskIds.length} ${taskIds.length === 1 ? "task" : "tasks"} scheduled for completion today by 6:00 PM.`);
   };
 
   const sortedTodayTasks = useMemo(() => {
@@ -420,6 +478,12 @@ export default function DashboardScreen() {
       offlineMode = true;
     } finally {
       setCachedIsOffline(offlineMode);
+      try {
+        const prefs = await getLocalUserPreferences(effectiveUserId);
+        setPreferences(prefs);
+        const projs = await getLocalProjects(effectiveUserId);
+        setProjects(projs);
+      } catch {}
       if (offlineMode) {
         try {
           const cachedTasks = await getCachedTaskView(effectiveUserId, "today");
@@ -920,11 +984,39 @@ export default function DashboardScreen() {
             <Text style={styles.heroSubtitleText}>
               Plan, focus and get more done today.
             </Text>
+            <Pressable
+              style={styles.heroHabitsChip}
+              onPress={() => setOnboardingVisible(true)}
+              accessibilityLabel="Work window and habits"
+            >
+              <Clock size={12} color="#C2410C" />
+              <Text style={styles.heroHabitsText}>
+                Work: {preferences.work_start_time || "09:00"}–{preferences.work_end_time || "18:00"} · {preferences.planning_style === "time_blocking" ? "Time-Blocked" : "Priorities"}
+              </Text>
+              <ChevronRight size={12} color="#C2410C" />
+            </Pressable>
           </View>
           {/* Subtle warm sunset art element */}
           <View style={styles.heroArtDune} />
           <View style={styles.heroArtSun} />
         </View>
+
+        {/* AI Chief of Staff Briefing */}
+        <ChiefOfStaffCard
+          todayTasks={todayTasks}
+          overdueTasks={overdueTasks}
+          preferences={preferences}
+          calendarBusyMinutes={calendarBusyMinutes}
+          onStartFocus={(taskId) => {
+            const active = runningTimers.find((t) => t.task_id === taskId);
+            if (!active) {
+              void handleStartFocusTimer(taskId);
+            }
+          }}
+          onRescheduleOverdue={(taskIds) => {
+            void handleRescheduleOverdue(taskIds);
+          }}
+        />
 
         {/* Elevated Quick Capture Pill */}
         <Pressable
@@ -971,12 +1063,12 @@ export default function DashboardScreen() {
 
           <Pressable
             style={styles.actionTile}
-            onPress={() => router.push("/vault")}
+            onPress={() => setProjectsVisible(true)}
           >
             <View style={[styles.actionIconBox, { backgroundColor: "#FAF5FF" }]}>
               <Layers size={20} color="#8B5CF6" />
             </View>
-            <Text style={styles.actionTileLabel}>Notes</Text>
+            <Text style={styles.actionTileLabel}>Projects</Text>
           </Pressable>
 
           <Pressable
@@ -1724,6 +1816,24 @@ export default function DashboardScreen() {
         onApply={(fields, rejectedFields) => { void submitExtractionDecision(fields, rejectedFields); }}
         onKeepOriginal={(rejectedFields) => { void submitExtractionDecision({}, rejectedFields); }}
       />
+      <OnboardingModal
+        visible={onboardingVisible}
+        userId={user?.id || "local_user"}
+        initialPreferences={preferences}
+        onClose={() => setOnboardingVisible(false)}
+        onSave={(newPrefs: LocalUserPreferences) => {
+          setPreferences(newPrefs);
+        }}
+      />
+      <ProjectManagerSheet
+        visible={projectsVisible}
+        userId={user?.id || "local_user"}
+        projects={projects}
+        onClose={() => setProjectsVisible(false)}
+        onRefreshProjects={() => {
+          void fetchDashboardData();
+        }}
+      />
     </View>
   );
 }
@@ -1813,6 +1923,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#64748B",
     fontWeight: "400",
+  },
+  heroHabitsChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "#FFEDD5",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 6,
+    marginTop: 8,
+  },
+  heroHabitsText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#C2410C",
   },
   heroArtDune: {
     position: "absolute",

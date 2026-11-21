@@ -1,17 +1,36 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { BookOpen, CheckSquare, FileText, Link as LinkIcon, Mic, Plus, Search, Send, Sparkles, Square, Trash2, X } from "lucide-react-native";
+import { BookOpen, CheckSquare, Edit3, FileText, Link as LinkIcon, Mic, Pin, Plus, Save, Search, Send, Sparkles, Square, Trash2, X } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { triggerHaptic } from "../../lib/focus-session-notification";
-import { deleteLocalNote, getLocalNotes, makeOfflineId, saveLocalNote } from "../../lib/offline-sync";
+import { deleteLocalNote, getLocalNotes, makeOfflineId, saveLocalNote, updateLocalNote } from "../../lib/offline-sync";
 
-type VaultNote = { id: string; title: string; body: string; source_type: string; occurred_on: string; privacy_class: string };
-type SearchResult = { note_id: string; title: string; snippet: string; source_type: string; occurred_on: string; privacy_class: string };
+type VaultNote = {
+  id: string;
+  title: string;
+  body: string;
+  source_type: string;
+  occurred_on: string;
+  privacy_class: string;
+  category?: "general" | "idea" | "meeting" | "decision" | "project";
+  is_pinned?: boolean;
+  project_id?: string | null;
+  tags?: string[];
+};
+type SearchResult = { note_id: string; title: string; snippet: string; source_type: string; occurred_on: string; privacy_class: string; is_pinned?: boolean; category?: string };
+
+const VAULT_COLLECTIONS = [
+  { key: "all", label: "All Items" },
+  { key: "idea", label: "Ideas 💡" },
+  { key: "meeting", label: "Meetings 📝" },
+  { key: "decision", label: "Decisions ⚖️" },
+  { key: "project", label: "Projects 📁" },
+];
 
 function localDateString() {
   const date = new Date();
@@ -41,6 +60,12 @@ export default function VaultScreen() {
   const [taskText, setTaskText] = useState("");
   const [convertingTask, setConvertingTask] = useState(false);
   const [createdTaskTitle, setCreatedTaskTitle] = useState<string | null>(null);
+  const [selectedCollection, setSelectedCollection] = useState<string>("all");
+  const [isEditingNote, setIsEditingNote] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [newNoteCategory, setNewNoteCategory] = useState<VaultNote["category"]>("general");
   const voiceBase = useRef("");
   const routeNoteLoaded = useRef<string | null>(null);
 
@@ -61,6 +86,9 @@ export default function VaultScreen() {
         source_type: String(n.source_type || "manual"),
         occurred_on: String(n.occurred_on || localDateString()),
         privacy_class: String(n.privacy_class || "personal"),
+        category: (n.category as VaultNote["category"]) || "general",
+        is_pinned: Boolean(n.is_pinned),
+        project_id: n.project_id ? String(n.project_id) : null,
       }));
       setNotes(mappedLocal);
 
@@ -94,10 +122,13 @@ export default function VaultScreen() {
   useEffect(() => () => { void stopSpeechRecognition(); }, []);
 
   const openNote = useCallback(async (id: string) => {
+    setIsEditingNote(false);
     // 1. Check if note is already loaded in local memory
     const existing = notes.find((item) => item.id === id);
     if (existing) {
       setSelectedNote(existing);
+      setEditTitle(existing.title);
+      setEditBody(existing.body);
       setTaskText(existing.title);
       setCreatedTaskTitle(null);
       return;
@@ -112,6 +143,8 @@ export default function VaultScreen() {
         if (response.ok) {
           const note: VaultNote = await response.json();
           setSelectedNote(note);
+          setEditTitle(note.title);
+          setEditBody(note.body);
           setTaskText(note.title);
           setCreatedTaskTitle(null);
           return;
@@ -203,6 +236,8 @@ export default function VaultScreen() {
         body: body.trim(),
         source_type: "manual",
         privacy_class: "personal",
+        category: newNoteCategory,
+        is_pinned: false,
         occurred_on: localDateString(),
       };
 
@@ -225,6 +260,7 @@ export default function VaultScreen() {
 
       setTitle("");
       setBody("");
+      setNewNoteCategory("general");
       setCreateVisible(false);
       setResults(null);
       await loadNotes();
@@ -232,6 +268,40 @@ export default function VaultScreen() {
       setError(err instanceof Error ? err.message : "Could not save this note.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveNoteEdit = async () => {
+    if (!selectedNote || !editTitle.trim() || !editBody.trim() || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const profile = await getUserProfile();
+      const userId = profile?.id ?? "local_user";
+      await updateLocalNote(userId, selectedNote.id, {
+        title: editTitle.trim(),
+        body: editBody.trim(),
+      });
+      const updated: VaultNote = { ...selectedNote, title: editTitle.trim(), body: editBody.trim() };
+      setSelectedNote(updated);
+      setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+      setIsEditingNote(false);
+      triggerHaptic("complete");
+    } catch {
+      Alert.alert("Error", "Could not save edits to this note.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const togglePin = async (note: VaultNote) => {
+    triggerHaptic("tap");
+    const profile = await getUserProfile();
+    const userId = profile?.id ?? "local_user";
+    const newPinned = !note.is_pinned;
+    await updateLocalNote(userId, note.id, { is_pinned: newPinned });
+    setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, is_pinned: newPinned } : n)));
+    if (selectedNote?.id === note.id) {
+      setSelectedNote((prev) => (prev ? { ...prev, is_pinned: newPinned } : null));
     }
   };
 
@@ -288,7 +358,25 @@ export default function VaultScreen() {
     .map((line) => line.match(/^\s*[-*+]\s+\[\s\]\s+(.+?)\s*$/)?.[1]?.trim())
     .filter((line): line is string => Boolean(line)) ?? [];
 
-  const shownItems = results ?? (privateOnly ? notes.filter((item) => item.privacy_class === "personal" || item.privacy_class === "private") : notes);
+  const sortedNotes = useMemo(() => {
+    return [...notes].sort((a, b) => {
+      if (a.is_pinned && !b.is_pinned) return -1;
+      if (!a.is_pinned && b.is_pinned) return 1;
+      return 0;
+    });
+  }, [notes]);
+
+  const shownItems = useMemo(() => {
+    if (results) return results;
+    let list: Array<VaultNote | SearchResult> = sortedNotes;
+    if (privateOnly) {
+      list = list.filter((item) => item.privacy_class === "personal" || item.privacy_class === "private");
+    }
+    if (selectedCollection !== "all") {
+      list = list.filter((item) => ("category" in item ? item.category === selectedCollection : false));
+    }
+    return list;
+  }, [results, sortedNotes, privateOnly, selectedCollection]);
   return (
     <View style={styles.container}>
       <SunriseArt height={175} />
@@ -313,18 +401,91 @@ export default function VaultScreen() {
           <Pressable style={[styles.shortcut, privateOnly && styles.shortcutActive]} onPress={() => { setPrivateOnly((active) => !active); setResults(null); setQuery(""); }} accessibilityRole="button" accessibilityLabel={privateOnly ? "Show all vault items" : "Open private notes"}><View style={[styles.shortcutIcon, { backgroundColor: "#EAF4FF" }]}><BookOpen size={22} color="#3986CE" /></View><Text style={styles.shortcutText}>{privateOnly ? "All items" : "Private notes"}</Text></Pressable>
         </View>
 
-        <View style={styles.sectionHead}><View><Text style={styles.sectionTitle}>{results ? "Search Results" : privateOnly ? "Private Notes" : "Recent Items"}</Text><Text style={styles.sectionCaption}>{results ? "From your saved records" : privateOnly ? "Personal notes saved in your private vault" : "Your saved notes and records"}</Text></View>{(results !== null || privateOnly) && <Pressable onPress={() => { setResults(null); setPrivateOnly(false); setQuery(""); }}><Text style={styles.clearText}>Show all</Text></Pressable>}</View>
+        {/* Collections filter */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.collectionScroll}>
+          {VAULT_COLLECTIONS.map((c) => (
+            <Pressable
+              key={c.key}
+              style={[styles.collectionChip, selectedCollection === c.key && styles.collectionChipActive]}
+              onPress={() => {
+                triggerHaptic("tap");
+                setSelectedCollection(c.key);
+                setResults(null);
+              }}
+            >
+              <Text style={[styles.collectionChipText, selectedCollection === c.key && styles.collectionChipTextActive]}>
+                {c.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        <View style={styles.sectionHead}><View><Text style={styles.sectionTitle}>{results ? "Search Results" : privateOnly ? "Private Notes" : "Recent Items"}</Text><Text style={styles.sectionCaption}>{results ? "From your saved records" : privateOnly ? "Personal notes saved in your private vault" : "Your saved notes and records"}</Text></View>{(results !== null || privateOnly || selectedCollection !== "all") && <Pressable onPress={() => { setResults(null); setPrivateOnly(false); setSelectedCollection("all"); setQuery(""); }}><Text style={styles.clearText}>Show all</Text></Pressable>}</View>
         {error && <View style={styles.errorCard}><Text style={styles.errorText}>{error}</Text><Pressable onPress={loadNotes}><Text style={styles.retryText}>Retry</Text></Pressable></View>}
-        {loading || searching ? <ActivityIndicator color={theme.colors.accent.amber} style={{ marginTop: 30 }} /> : shownItems.length === 0 ? <View style={styles.emptyCard}><BookOpen size={28} color="#E87935" /><Text style={styles.emptyTitle}>{results ? "No matching records" : "Your vault is ready"}</Text><Text style={styles.emptyText}>{results ? "Try another phrase or clear the search." : "Save a note to make it easy to find later."}</Text>{!results && <Pressable onPress={() => setCreateVisible(true)} style={styles.emptyButton}><Plus size={17} color="#fff" /><Text style={styles.emptyButtonText}>Create a note</Text></Pressable>}</View> : shownItems.map((item) => { const id = "note_id" in item ? item.note_id : item.id; return <Pressable key={id} onPress={() => openNote(id)} style={styles.noteCard} accessibilityRole="button" accessibilityLabel={`Open note ${item.title}`}><View style={styles.noteIcon}><FileText size={20} color="#F47B36" /></View><View style={styles.noteCopy}><Text style={styles.noteTitle} numberOfLines={2}>{item.title}</Text><Text style={styles.noteSummary} numberOfLines={2}>{"snippet" in item ? item.snippet : item.body}</Text><View style={styles.noteMeta}><Text style={styles.metaText}>{item.source_type.replaceAll("_", " ")}</Text><View style={styles.metaDot} /><Text style={styles.metaText}>{item.occurred_on}</Text><View style={styles.metaDot} /><Text style={styles.metaText}>{item.privacy_class}</Text></View></View><View style={styles.openNote}><LinkIcon size={17} color="#64748B" /></View></Pressable>; })}
+        {loading || searching ? <ActivityIndicator color={theme.colors.accent.amber} style={{ marginTop: 30 }} /> : shownItems.length === 0 ? <View style={styles.emptyCard}><BookOpen size={28} color="#E87935" /><Text style={styles.emptyTitle}>{results ? "No matching records" : "Your vault is ready"}</Text><Text style={styles.emptyText}>{results ? "Try another phrase or clear the search." : "Save a note to make it easy to find later."}</Text>{!results && <Pressable onPress={() => setCreateVisible(true)} style={styles.emptyButton}><Plus size={17} color="#fff" /><Text style={styles.emptyButtonText}>Create a note</Text></Pressable>}</View> : shownItems.map((item) => {
+          const id = "note_id" in item ? item.note_id : item.id;
+          const isPinned = "is_pinned" in item && Boolean(item.is_pinned);
+          const cat = "category" in item ? item.category : undefined;
+          return (
+            <Pressable key={id} onPress={() => openNote(id)} style={styles.noteCard} accessibilityRole="button" accessibilityLabel={`Open note ${item.title}`}>
+              <View style={styles.noteIcon}><FileText size={20} color="#F47B36" /></View>
+              <View style={styles.noteCopy}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  {isPinned && (
+                    <View style={styles.pinBadge}>
+                      <Pin size={10} color="#EA580C" />
+                      <Text style={styles.pinBadgeText}>Pinned</Text>
+                    </View>
+                  )}
+                  {cat && cat !== "general" && (
+                    <Text style={styles.categoryPill}>{cat.toUpperCase()}</Text>
+                  )}
+                </View>
+                <Text style={styles.noteTitle} numberOfLines={2}>{item.title}</Text>
+                <Text style={styles.noteSummary} numberOfLines={2}>{"snippet" in item ? item.snippet : item.body}</Text>
+                <View style={styles.noteMeta}>
+                  <Text style={styles.metaText}>{item.source_type.replaceAll("_", " ")}</Text>
+                  <View style={styles.metaDot} />
+                  <Text style={styles.metaText}>{item.occurred_on}</Text>
+                  <View style={styles.metaDot} />
+                  <Text style={styles.metaText}>{item.privacy_class}</Text>
+                </View>
+              </View>
+              <View style={styles.openNote}><LinkIcon size={17} color="#64748B" /></View>
+            </Pressable>
+          );
+        })}
         <Pressable style={styles.askCard} onPress={() => router.push("/ai")}><Sparkles size={22} color="#8759E8" /><View style={styles.askCopy}><Text style={styles.askTitle}>Ask ALIBI</Text><Text style={styles.askText}>Get grounded answers from your notes and work records.</Text></View><Send size={18} color="#53657A" /></Pressable>
       </ScrollView>
-      <Modal visible={selectedNote !== null} animationType="slide" transparent statusBarTranslucent onRequestClose={() => setSelectedNote(null)}>
+      <Modal visible={selectedNote !== null} animationType="slide" transparent statusBarTranslucent onRequestClose={() => { setSelectedNote(null); setIsEditingNote(false); }}>
         <View style={styles.modalShade}>
           <View style={styles.detailModal}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeading}>
-              <Text style={styles.modalTitle} numberOfLines={2}>{selectedNote?.title}</Text>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <Text style={styles.modalTitle} numberOfLines={2}>
+                {isEditingNote ? "Edit Note" : selectedNote?.title}
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                {selectedNote && !isEditingNote && (
+                  <Pressable
+                    onPress={() => void togglePin(selectedNote)}
+                    accessibilityRole="button"
+                    accessibilityLabel={selectedNote.is_pinned ? "Unpin note" : "Pin note"}
+                    hitSlop={10}
+                  >
+                    <Pin size={20} color={selectedNote.is_pinned ? "#EA580C" : "#64748B"} />
+                  </Pressable>
+                )}
+                {selectedNote && !isEditingNote && (
+                  <Pressable
+                    onPress={() => setIsEditingNote(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Edit note"
+                    hitSlop={10}
+                  >
+                    <Edit3 size={20} color={theme.colors.brand.navy} />
+                  </Pressable>
+                )}
                 <Pressable
                   onPress={() => selectedNote && void deleteNote(selectedNote.id)}
                   accessibilityRole="button"
@@ -333,18 +494,113 @@ export default function VaultScreen() {
                 >
                   <Trash2 size={20} color="#DC2626" />
                 </Pressable>
-                <Pressable onPress={() => setSelectedNote(null)} accessibilityRole="button" accessibilityLabel="Close note" hitSlop={10}>
+                <Pressable onPress={() => { setSelectedNote(null); setIsEditingNote(false); }} accessibilityRole="button" accessibilityLabel="Close note" hitSlop={10}>
                   <X size={22} color="#0B2030" />
                 </Pressable>
               </View>
             </View>
-            <Text style={styles.detailMeta}>{selectedNote?.occurred_on} · {selectedNote?.privacy_class}</Text>
-            <ScrollView style={styles.noteBodyScroll}><Text style={styles.noteBodyText}>{selectedNote?.body}</Text></ScrollView>
-            <View style={styles.taskFromNote}><Text style={styles.taskFromNoteTitle}>Turn a note item into a task</Text><Text style={styles.taskFromNoteHint}>Choose an unfinished checklist item, or edit the task text below.</Text>{uncheckedChecklistItems.length > 0 && <ScrollView style={styles.checklistChoices} nestedScrollEnabled>{uncheckedChecklistItems.map((line, index) => <Pressable key={`${index}-${line}`} onPress={() => { setTaskText(line); setCreatedTaskTitle(null); }} style={[styles.checklistChoice, taskText === line && styles.checklistChoiceActive]}><CheckSquare size={16} color={taskText === line ? "#F97316" : "#83909D"} /><Text style={styles.checklistChoiceText}>{line}</Text></Pressable>)}</ScrollView>}<TextInput value={taskText} onChangeText={(value) => { setTaskText(value); setCreatedTaskTitle(null); }} placeholder="Task title" placeholderTextColor="#929EAC" style={styles.titleInput} /><Pressable disabled={!taskText.trim() || convertingTask} onPress={() => selectedNote && void convertNoteToTask(selectedNote, taskText)} style={[styles.saveButton, (!taskText.trim() || convertingTask) && { opacity: .55 }]}><Text style={styles.saveButtonText}>{convertingTask ? "Creating task…" : "Create linked task"}</Text></Pressable>{createdTaskTitle && <Text style={styles.createdTaskText}>Linked task: {createdTaskTitle}</Text>}</View>
+
+            {isEditingNote ? (
+              <View style={{ gap: 12 }}>
+                <TextInput
+                  value={editTitle}
+                  onChangeText={setEditTitle}
+                  placeholder="Note title"
+                  style={styles.editTitleInput}
+                />
+                <TextInput
+                  value={editBody}
+                  onChangeText={setEditBody}
+                  placeholder="Note contents"
+                  multiline
+                  textAlignVertical="top"
+                  style={styles.editBodyInput}
+                />
+                <View style={styles.editButtonRow}>
+                  <Pressable
+                    style={[styles.saveButton, { flex: 1, marginTop: 0 }, savingEdit && { opacity: 0.6 }]}
+                    onPress={saveNoteEdit}
+                    disabled={savingEdit}
+                  >
+                    <Text style={styles.saveButtonText}>{savingEdit ? "Saving..." : "Save Changes"}</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.cancelEditButton, { flex: 1 }]}
+                    onPress={() => setIsEditingNote(false)}
+                  >
+                    <Text style={styles.cancelEditText}>Cancel</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.detailMeta}>{selectedNote?.occurred_on} · {selectedNote?.privacy_class} · {selectedNote?.category?.toUpperCase() || "GENERAL"}</Text>
+                <ScrollView style={styles.noteBodyScroll}><Text style={styles.noteBodyText}>{selectedNote?.body}</Text></ScrollView>
+                <View style={styles.taskFromNote}>
+                  <Text style={styles.taskFromNoteTitle}>Turn a note item into a task</Text>
+                  <Text style={styles.taskFromNoteHint}>Choose an unfinished checklist item, or edit the task text below.</Text>
+                  {uncheckedChecklistItems.length > 0 && (
+                    <ScrollView style={styles.checklistChoices} nestedScrollEnabled>
+                      {uncheckedChecklistItems.map((line, index) => (
+                        <Pressable key={`${index}-${line}`} onPress={() => { setTaskText(line); setCreatedTaskTitle(null); }} style={[styles.checklistChoice, taskText === line && styles.checklistChoiceActive]}>
+                          <CheckSquare size={16} color={taskText === line ? "#F97316" : "#83909D"} />
+                          <Text style={styles.checklistChoiceText}>{line}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  )}
+                  <TextInput value={taskText} onChangeText={(value) => { setTaskText(value); setCreatedTaskTitle(null); }} placeholder="Task title" placeholderTextColor="#929EAC" style={styles.titleInput} />
+                  <Pressable disabled={!taskText.trim() || convertingTask} onPress={() => selectedNote && void convertNoteToTask(selectedNote, taskText)} style={[styles.saveButton, (!taskText.trim() || convertingTask) && { opacity: 0.55 }]}>
+                    <Text style={styles.saveButtonText}>{convertingTask ? "Creating task…" : "Create linked task"}</Text>
+                  </Pressable>
+                  {createdTaskTitle && <Text style={styles.createdTaskText}>Linked task: {createdTaskTitle}</Text>}
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
-      <Modal visible={createVisible} animationType="slide" transparent statusBarTranslucent onRequestClose={() => { void stopSpeechRecognition(); setListening(false); setCreateVisible(false); }}><View style={styles.modalShade}><View style={styles.modal}><View style={styles.modalHandle} /><View style={styles.modalHeading}><Text style={styles.modalTitle}>New Note</Text><Pressable onPress={() => { void stopSpeechRecognition(); setListening(false); setCreateVisible(false); }} accessibilityLabel="Close"><X size={22} color="#0B2030" /></Pressable></View><TextInput value={title} onChangeText={setTitle} placeholder="Give your note a title" placeholderTextColor="#929EAC" style={styles.titleInput} /><TextInput value={body} onChangeText={setBody} placeholder="Write or dictate something worth remembering…" placeholderTextColor="#929EAC" multiline textAlignVertical="top" style={styles.bodyInput} /><Pressable onPress={toggleVoice} style={[styles.voiceButton, listening && styles.voiceButtonActive]} accessibilityRole="button" accessibilityLabel={listening ? "Stop voice note" : "Dictate note"}>{listening ? <Square size={17} color="#FFFFFF" fill="#FFFFFF" /> : <Mic size={18} color="#F97316" />}<Text style={[styles.voiceButtonText, listening && { color: "#FFFFFF" }]}>{listening ? "Listening · tap to finish" : "Dictate in real time"}</Text></Pressable>{voiceError && <Text style={styles.voiceError}>{voiceError}</Text>}<Text style={styles.privateHint}>This note is saved to your personal vault in SQLite. Review before saving.</Text><Pressable disabled={!title.trim() || !body.trim() || saving || listening} onPress={createNote} style={[styles.saveButton, (!title.trim() || !body.trim() || saving || listening) && { opacity: .55 }]}><Text style={styles.saveButtonText}>{saving ? "Saving…" : listening ? "Finish dictation to save" : "Save Note"}</Text></Pressable></View></View></Modal>
+      <Modal visible={createVisible} animationType="slide" transparent statusBarTranslucent onRequestClose={() => { void stopSpeechRecognition(); setListening(false); setCreateVisible(false); }}>
+        <View style={styles.modalShade}>
+          <View style={styles.modal}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeading}>
+              <Text style={styles.modalTitle}>New Note</Text>
+              <Pressable onPress={() => { void stopSpeechRecognition(); setListening(false); setCreateVisible(false); }} accessibilityLabel="Close"><X size={22} color="#0B2030" /></Pressable>
+            </View>
+
+            {/* Category selection */}
+            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", marginVertical: 4 }}>
+              {(["general", "idea", "meeting", "decision", "project"] as const).map((cat) => (
+                <Pressable
+                  key={cat}
+                  style={[
+                    styles.newNoteCategoryChip,
+                    newNoteCategory === cat && styles.newNoteCategoryChipActive,
+                  ]}
+                  onPress={() => setNewNoteCategory(cat)}
+                >
+                  <Text
+                    style={[
+                      styles.newNoteCategoryText,
+                      newNoteCategory === cat && styles.newNoteCategoryTextActive,
+                    ]}
+                  >
+                    {cat === "general" ? "General" : cat === "idea" ? "💡 Idea" : cat === "meeting" ? "📝 Meeting" : cat === "decision" ? "⚖️ Decision" : "📁 Project"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <TextInput value={title} onChangeText={setTitle} placeholder="Give your note a title" placeholderTextColor="#929EAC" style={styles.titleInput} />
+            <TextInput value={body} onChangeText={setBody} placeholder="Write or dictate something worth remembering…" placeholderTextColor="#929EAC" multiline textAlignVertical="top" style={styles.bodyInput} />
+            <Pressable onPress={toggleVoice} style={[styles.voiceButton, listening && styles.voiceButtonActive]} accessibilityRole="button" accessibilityLabel={listening ? "Stop voice note" : "Dictate note"}>{listening ? <Square size={17} color="#FFFFFF" fill="#FFFFFF" /> : <Mic size={18} color="#F97316" />}<Text style={[styles.voiceButtonText, listening && { color: "#FFFFFF" }]}>{listening ? "Listening · tap to finish" : "Dictate in real time"}</Text></Pressable>
+            {voiceError && <Text style={styles.voiceError}>{voiceError}</Text>}
+            <Text style={styles.privateHint}>This note is saved to your personal vault in SQLite. Review before saving.</Text>
+            <Pressable disabled={!title.trim() || !body.trim() || saving || listening} onPress={createNote} style={[styles.saveButton, (!title.trim() || !body.trim() || saving || listening) && { opacity: 0.55 }]}><Text style={styles.saveButtonText}>{saving ? "Saving…" : listening ? "Finish dictation to save" : "Save Note"}</Text></Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -354,6 +610,23 @@ const styles = StyleSheet.create({
   heading: { paddingTop: 4, paddingBottom: 8 }, title: { color: theme.colors.text.primary, fontSize: 32, fontWeight: "800", letterSpacing: -.8 }, subtitle: { color: theme.colors.text.secondary, fontSize: 14, lineHeight: 20, marginTop: 3 },
   searchBox: { minHeight: 52, borderRadius: theme.radius.cardSecondary, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 13, shadowColor: theme.colors.brand.navy, shadowOpacity: .05, shadowRadius: 13, shadowOffset: { width: 0, height: 5 }, elevation: 2 }, searchInput: { flex: 1, color: theme.colors.text.primary, fontSize: 14, paddingVertical: 10 }, searchButton: { width: 38, height: 38, borderRadius: theme.radius.control, backgroundColor: theme.colors.brand.navy, alignItems: "center", justifyContent: "center" },
   shortcuts: { flexDirection: "row", gap: 10 }, shortcut: { flex: 1, minHeight: 94, alignItems: "center", justifyContent: "center", gap: 8, borderRadius: theme.radius.cardSecondary, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: "#FFFFFF" }, shortcutActive: { borderColor: theme.colors.accent.primary, backgroundColor: "#FFF8F3" }, shortcutIcon: { width: 42, height: 42, borderRadius: 15, alignItems: "center", justifyContent: "center" }, shortcutText: { color: theme.colors.text.primary, fontSize: 11, fontWeight: "700" },
+  collectionScroll: { flexDirection: "row", gap: 8, paddingVertical: 4 },
+  collectionChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: theme.colors.border.subtle },
+  collectionChipActive: { backgroundColor: theme.colors.brand.navy, borderColor: theme.colors.brand.navy },
+  collectionChipText: { fontSize: 12, fontWeight: "700", color: theme.colors.text.secondary },
+  collectionChipTextActive: { color: "#FFFFFF" },
+  pinBadge: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#FFF7ED", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  pinBadgeText: { fontSize: 10, fontWeight: "700", color: "#EA580C" },
+  categoryPill: { fontSize: 10, fontWeight: "700", color: "#64748B", backgroundColor: "#F1F5F9", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  editTitleInput: { fontSize: 16, fontWeight: "700", color: theme.colors.text.primary, borderWidth: 1, borderColor: theme.colors.border.subtle, borderRadius: theme.radius.control, padding: 10, backgroundColor: "#FFFFFF" },
+  editBodyInput: { fontSize: 14, color: theme.colors.text.primary, borderWidth: 1, borderColor: theme.colors.border.subtle, borderRadius: theme.radius.control, padding: 10, minHeight: 140, backgroundColor: "#FFFFFF" },
+  editButtonRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+  cancelEditButton: { minHeight: 50, borderRadius: theme.radius.control, backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center" },
+  cancelEditText: { color: theme.colors.text.secondary, fontWeight: "700", fontSize: 15 },
+  newNoteCategoryChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "transparent" },
+  newNoteCategoryChipActive: { backgroundColor: "#FFF7ED", borderColor: "#FF741F" },
+  newNoteCategoryText: { fontSize: 11, fontWeight: "600", color: theme.colors.text.secondary },
+  newNoteCategoryTextActive: { color: "#FF741F", fontWeight: "700" },
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 7 }, sectionTitle: { color: theme.colors.text.primary, fontSize: 19, fontWeight: "800" }, sectionCaption: { color: theme.colors.text.secondary, fontSize: 12, marginTop: 3 }, clearText: { color: theme.colors.accent.primary, fontSize: 13, fontWeight: "700", padding: 8 },
   noteCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: theme.radius.cardSecondary, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: "#FFFFFF", shadowColor: theme.colors.brand.navy, shadowOpacity: .04, shadowRadius: 9, shadowOffset: { width: 0, height: 4 }, elevation: 1 }, noteIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: "#FFF1E8", alignItems: "center", justifyContent: "center" }, noteCopy: { flex: 1, gap: 4 }, noteTitle: { color: theme.colors.text.primary, fontSize: 14, fontWeight: "700" }, noteSummary: { color: theme.colors.text.secondary, fontSize: 12, lineHeight: 17 }, noteMeta: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }, metaText: { color: theme.colors.text.muted, fontSize: 10, textTransform: "capitalize" }, metaDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: "#A9B2BC" }, openNote: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderRadius: theme.radius.cardSecondary, backgroundColor: "#F3F6F8" },
   askCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, borderRadius: theme.radius.cardSecondary, backgroundColor: "#F5F1FF", borderWidth: 1, borderColor: "#EAE2FF", marginTop: 4 }, askCopy: { flex: 1 }, askTitle: { color: theme.colors.text.primary, fontSize: 15, fontWeight: "800" }, askText: { color: theme.colors.text.secondary, fontSize: 12, lineHeight: 17, marginTop: 3 },

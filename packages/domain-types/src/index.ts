@@ -84,3 +84,42 @@ export interface ProductivityScore {
   period_end: string;
 }
 
+export interface Project extends SyncableFields {
+  user_id: UUIDv7;
+  workspace_id?: UUIDv7;
+  category_id?: UUIDv7 | null;
+  name: string;
+  description?: string | null;
+  objective?: string | null;
+  status: "active" | "paused" | "done" | "archived";
+  color: string;
+  target_date?: string | null;
+}
+
+export type SubscriptionTier = "free" | "pro" | "ultra";
+
+export interface UserSubscription {
+  tier: SubscriptionTier;
+  status: "active" | "expired" | "grace_period";
+  valid_until?: string | null;
+  ai_queries_today: number;
+  last_query_date: string;
+}
+
+export interface UserPreferences {
+  work_start_time: string;
+  work_end_time: string;
+  planning_style: "priority" | "time_blocking";
+  learning_paused: boolean;
+  timezone: string;
+  primary_goal?: string;
+}
+
+export interface IntegrationStatus {
+  provider: "google_calendar" | "gmail" | "google_drive" | "github";
+  status: "connected" | "disconnected" | "needs_credentials" | "syncing" | "error";
+  account_email?: string;
+  scopes: string[];
+  last_synced_at?: string;
+}
+

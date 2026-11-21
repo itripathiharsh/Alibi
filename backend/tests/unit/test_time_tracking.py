@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
-from hypothesis import given
+from hypothesis import HealthCheck, given
 from hypothesis import settings as hyp_settings
 from hypothesis import strategies as st
 
@@ -126,7 +126,7 @@ async def test_stopping_timer_records_history_and_learning_session() -> None:
 
 
 # Hypothesis property-based state machine test for actual_min = sum(durations)
-@hyp_settings(max_examples=50)
+@hyp_settings(max_examples=50, suppress_health_check=[HealthCheck.too_slow])
 @given(
     actions=st.lists(
         st.tuples(

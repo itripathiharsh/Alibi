@@ -7,15 +7,57 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **File**: [`ALIBI-0.1.0.apk`](./ALIBI-0.1.0.apk)
 - **Direct Download Link**: [Download ALIBI-0.1.0.apk (Raw)](https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk)
 - **Version**: `0.1.0`
-- **Build Date**: November 21, 2026 (23:26 IST)
+- **Build Date**: November 22, 2026 (00:16 IST)
 - **Variant**: Android release APK, Hermes Bytecode Engine (React Native 0.76 New Architecture)
-- **File Size**: `69,150,585 bytes`
+- **File Size**: `69,185,513 bytes` (65.98 MB)
 - **Signing**: Signed with the repository's Android release/debug keystore. Installable directly for distribution/testing.
-- **SHA-256**: `BE9A423DCA9A511AEA26EBB0239F11DA3AD91B81545C17F4770B9DCFE871A452`
-- **Build verification**: `assembleRelease` succeeded (741 actionable tasks, 0 errors); Hermes bytecode compiled (`entry-113620cff5afe15932dcc8e834e3441f.hbc`, 5.93 MB); monorepo typecheck passed across all 6 workspace packages (`pnpm -r run typecheck`: 0 errors); unit tests passed (`pnpm -r test`: 7/7 passed).
+- **SHA-256**: `1A3CD18BE6DDFEEF95D605C9CE147BB77B83F744A8A32468AE650F4EC6E49F72`
+- **Build verification**: `assembleRelease` succeeded (741 actionable tasks, BUILD SUCCESSFUL in 2m 26s); Hermes bytecode compiled (`entry-1972e2638302a509809c0c7f86d96088.hbc`, 6.04 MB); monorepo typecheck passed across all 6 workspace packages (`pnpm -r run typecheck`: 0 errors); monorepo unit tests passed (`pnpm -r test`: 7/7 passed); backend unit tests passed (`45/45` pure unit & property-based tests passed).
 - **Previous Build Backups**:
+  - [`ALIBI-0.1.0-backup-precommercial.apk`](./ALIBI-0.1.0-backup-precommercial.apk) (`69,150,585 bytes`, SHA-256: `BE9A423DCA9A511AEA26EBB0239F11DA3AD91B81545C17F4770B9DCFE871A452`)
   - [`ALIBI-0.1.0-backup-stage1.apk`](./ALIBI-0.1.0-backup-stage1.apk) (`69,143,001 bytes`, SHA-256: `5C0B5C5646BC04787F08F75302B6F15B7CD17799845A9BBB8CDBF66DD65FC590`)
   - [`ALIBI-0.1.0-backup-step2.apk`](./ALIBI-0.1.0-backup-step2.apk) (`69,141,677 bytes`, preserved).
+
+---
+
+## What's New in This Build (Personal Operating System & Commercialization Master Mission)
+
+1. **Module A — AI Daily Chief of Staff Briefing**:
+   - Integrated `<ChiefOfStaffCard>` directly on the Home dashboard right beneath the greeting and habit summary banner.
+   - Computes daily workload commitments: available working window (from user habit preferences) vs. total scheduled task duration and calendar busy time.
+   - Highlights overdue task counts with a 1-tap "Reschedule to 6 PM" action.
+   - Recommends the highest-leverage next action grounded in priority and deadlines, with a direct 1-tap "Focus" button to trigger the timer.
+   - Explainability modal providing transparency into why each action was selected, adhering to the zero-hallucination contract.
+
+2. **Module B — Personal Productivity Intelligence & Onboarding Preferences**:
+   - Created `<OnboardingModal>` allowing users to configure work start/end times (default 09:00–18:00), planning style (Priorities vs Time-Blocking), primary productivity goal, and timezone.
+   - Persisted preferences to SQLite (`local_user_preferences`) and outbox for cloud sync.
+   - Added Adaptive Learning Controls to the Profile screen: users can Pause/Resume productivity learning and Reset learning profile data without affecting task history.
+
+3. **Module C — Work Memory / Second Brain (Knowledge Vault)**:
+   - Added horizontal collections filtering chips: `All Items`, `Ideas 💡`, `Meetings 📝`, `Decisions ⚖️`, `Projects 📁`.
+   - Added persistent note pinning (`is_pinned`): pinned notes automatically sort to the top of the vault list and show an orange pin badge.
+   - Added in-place note editing in the note detail modal: edit title and body, saving changes to local SQLite and the sync outbox with haptic feedback.
+   - Added category classification during note creation.
+
+4. **Module D — Project Intelligence**:
+   - Created `<ProjectManagerSheet>` and added a dedicated "Projects" shortcut tile on Home.
+   - Allows creating and managing projects with title, objective, color coding, target deadline date, and dynamic health status (`on_track`, `needs_attention`, `at_risk`, `completed`).
+   - Persisted projects to SQLite table `local_projects` with full offline support and outbox synchronization.
+
+5. **Module G — Connected ALIBI (Integrations Hub)**:
+   - Created `<IntegrationsHubModal>` on the Profile screen supporting 4 modular external connectors: Google Calendar, Gmail, Google Drive, and GitHub.
+   - Displays real-time connection status (`connected`, `disconnected`, `needs_credentials`, `syncing`), authorized OAuth scopes, last sync timestamp, and disconnect safety.
+
+6. **Module H — AI Assistant & Action Proposal Guardrails**:
+   - Added daily AI query entitlement metering using `checkAndIncrementAIUsage()`. Free tier receives 15 daily queries; Pro receives 100 queries; Ultra receives 1,000 queries.
+   - Automatically presents the `<UpgradeModal>` when daily query limits are reached.
+   - Added Action Proposals in Ask ALIBI: when AI recommends creating a task, an interactive card renders with `[Approve & Create]` and `[Dismiss]` buttons. Writing to data is strictly a proposal until approved by the user.
+
+7. **Commercialization & Subscription Architecture**:
+   - Created `<UpgradeModal>` with transparent tier comparisons: Free (₹0 forever), Pro (₹149/month or ₹1,499/year), and Ultra (₹299/month or ₹2,999/year).
+   - Enforces the core product guarantee: expiring subscriptions never lock users out of their offline tasks, history, or exports.
+   - Added subscription management card on the Profile screen.
 
 ---
 
