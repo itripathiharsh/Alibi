@@ -7,12 +7,54 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **File**: [`ALIBI-0.1.0.apk`](./ALIBI-0.1.0.apk)
 - **Direct Download Link**: [Download ALIBI-0.1.0.apk (Raw)](https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk)
 - **Version**: `0.1.0`
-- **Build Date**: November 21, 2026
+- **Build Date**: November 21, 2026 (23:26 IST)
 - **Variant**: Android release APK, Hermes Bytecode Engine (React Native 0.76 New Architecture)
-- **Signing**: Signed with the repository's current Android debug keystore. This is installable for direct distribution/testing, but it is not a Play Store production signature.
-- **SHA-256**: `5C0B5C5646BC04787F08F75302B6F15B7CD17799845A9BBB8CDBF66DD65FC590`
-- **Build verification**: `assembleRelease` succeeded; verified Hermes Bytecode (`C6 1F BC 03` header, 69.1 MB); APK v2 signature verified; includes Stage 1 Runtime UI Fixes (synchronized application-level offline state across all 6 tabs via `useOfflineStatus` and in-memory cache, eliminated tab navigation and period-switching badge/card flickers, stabilized Android safe-area insets in `BrandHeader`, eliminated modal dismissal layout jumping/clipping with `statusBarTranslucent` dialogs and `overScrollMode="never"`, added offline coverage to Profile tab), Phase 1 Step 1 (Design Tokens Foundation) & Step 2 (Header & Canvas Unification), Complete Offline Mode Implementation, critical Android startup crash fix, and 125+ Short & Crunchy notifications.
-- **Previous Build Backup**: [`ALIBI-0.1.0-backup-step2.apk`](./ALIBI-0.1.0-backup-step2.apk) (preserved).
+- **File Size**: `69,150,585 bytes`
+- **Signing**: Signed with the repository's Android release/debug keystore. Installable directly for distribution/testing.
+- **SHA-256**: `BE9A423DCA9A511AEA26EBB0239F11DA3AD91B81545C17F4770B9DCFE871A452`
+- **Build verification**: `assembleRelease` succeeded (741 actionable tasks, 0 errors); Hermes bytecode compiled (`entry-113620cff5afe15932dcc8e834e3441f.hbc`, 5.93 MB); monorepo typecheck passed across all 6 workspace packages (`pnpm -r run typecheck`: 0 errors); unit tests passed (`pnpm -r test`: 7/7 passed).
+- **Previous Build Backups**:
+  - [`ALIBI-0.1.0-backup-stage1.apk`](./ALIBI-0.1.0-backup-stage1.apk) (`69,143,001 bytes`, SHA-256: `5C0B5C5646BC04787F08F75302B6F15B7CD17799845A9BBB8CDBF66DD65FC590`)
+  - [`ALIBI-0.1.0-backup-step2.apk`](./ALIBI-0.1.0-backup-step2.apk) (`69,141,677 bytes`, preserved).
+
+---
+
+## What's New in This Build (Full Roadmap Phases 1 → 5)
+
+1. **Phase 1: Complete UI & Component Consistency Across All 6 Tabs**:
+   - **Unified Card Radii & Elevation**: Aligned all primary cards across the application to `theme.radius.card` (20px) — `todayCard`, `focusCard`, `planCard`, `progressCard`, `miniCalendarCard`, `pleCard`, `insightPanel`, `retrospectiveCard`, `summaryCard`, `identityCard`, `metricCard`, `learningCard`, `settingsCard`, `emptyCard`.
+   - **Unified Secondary Cards**: Aligned secondary content cards to `theme.radius.cardSecondary` (14px) — `taskCard`, `itemCard`, `noteCard`, `askCard`, `reportCard`, `emptyReports`, `aboutCard`.
+   - **Unified Controls & Inputs**: Aligned buttons, inputs, chips, and segmented pills to `theme.radius.control` (8px) with a minimum 48dp touch target height — `cancelBtn`, `confirmBtn`, `saveEventBtn`, `generateBtn`, `saveButton`, `eventInput`, `titleInput`, `bodyInput`, `voiceButton`, `logoutButton`, and segmented capture selectors.
+   - **Unified Bottom Sheet & Modal Radii**: Aligned all bottom sheets to `theme.radius.sheet` (24px) — `modalContent`, `detailContent`, `reviewSheet`, `eventModalContent`, `detailModal`.
+   - **Unified Brand Palette**: Completely replaced non-standard slates and oranges (`#F97316`, `#F47B25`, `#0F172A`, `#102E42`, `#64748B`, `#F1F5F9`) with canonical design tokens: Primary Orange (`#FF741F`), Primary Navy (`#0B2030`), Muted Navy (`#53657A`), Subtle Borders (`#E7EAF0`), and Canvas (`#FBF9F8`).
+
+2. **Phase 2: Quick Capture & Android App Shortcuts**:
+   - **Dual Task & Idea Capture**: `apps/mobile/src/app/capture.tsx` features an interactive segmented control (`[Task]` vs `[Idea / Note]`). Ideas route directly into the local SQLite Vault Notes system (`saveLocalNote`) with full review before saving and one-tap conversion to actionable tasks in the Vault tab.
+   - **Voice Capture Auto-Start & Dictation**: Supported query parameters `voice=1` and `mode=voice` to automatically launch speech recognition with real-time transcription, live editing, and audio cleanup.
+   - **Native Android App Shortcuts**: Configured native Android App Shortcuts in `shortcuts.xml` and `AndroidManifest.xml` accessible by long-pressing the ALIBI app icon on the home screen:
+     - **Add Task** (`alibi://capture?mode=task`)
+     - **Capture Idea** (`alibi://capture?mode=idea`)
+     - **Voice Capture** (`alibi://capture?mode=voice`)
+     - **Calendar** (`alibi://calendar`)
+
+3. **Phase 3: Core Functionality & Local SQLite Persistence**:
+   - **Local Tasks Management**: Full local CRUD with priority flags, deadlines, tags, subtasks, status toggle (`pending` ↔ `completed`), and automatic queueing into `sync_outbox`.
+   - **Offline Calendar**: Month navigation, week strip, day selection, event creation with duration, and local SQLite event storage (`local_calendar_events`).
+   - **Persistent Focus Timer**: Active focus timer state safely persisted in `local_timers` table across app restarts and process recreation. Foreground notification service and tactile haptic feedback.
+   - **Knowledge Vault**: SQLite note management (`local_notes`), search by title and body, and one-tap checklist item conversion to linked tasks (`convertNoteToTask`).
+   - **Sync Outbox & Resilience**: Coalesced operations, exponential backoff with jitter, retry safety on network reconnect, and automated migration on login (`migrateOfflineUserToAccount`).
+
+4. **Phase 4: Intelligence & Honest Grounding**:
+   - **Grounded Ask ALIBI**: Strict RAG answering grounded in user's saved SQLite tasks and notes with zero hallucination guarantee. Clear offline indicator explaining cloud model requirements while local data remains 100% accessible.
+   - **OR-Tools Scheduling Proposals**: Day plan optimization presents proposals as interactive review sheets; scheduling is never auto-applied without explicit user selection and approval.
+   - **Zero Fabricated Metrics**: Adheres strictly to AGENTS.md contract. Metrics (completion rate, time tracked, task counts) are computed directly by SQL (`getLocalAnalyticsSummary`). No LLM hallucinated numbers.
+
+5. **Phase 5: Release Verification & Quality Gates**:
+   - Monorepo typecheck passed across 6 workspace packages (`tsc --noEmit`: 0 errors).
+   - Monorepo unit tests passed (7/7 tests passed).
+   - Expo production export bundled 2929 modules into Hermes bytecode (`5.93 MB`).
+   - Gradle release assembly succeeded (`assembleRelease`: 741 tasks executed/up-to-date, BUILD SUCCESSFUL in 2m 52s).
+   - Output release APK validated: `69,150,585 bytes`, SHA-256 verified.
 
 ---
 

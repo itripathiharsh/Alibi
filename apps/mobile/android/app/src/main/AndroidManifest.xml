@@ -39,6 +39,9 @@
         <data android:scheme="alibi"/>
         <data android:scheme="com.alibi.app"/>
       </intent-filter>
+      <meta-data
+        android:name="android.app.shortcuts"
+        android:resource="@xml/shortcuts" />
     </activity>
     <service
       android:name=".FocusSessionService"
