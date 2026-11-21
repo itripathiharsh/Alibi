@@ -36,7 +36,7 @@ import {
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
-import { getAccessToken, ensureAuthenticated, getUserProfile } from "../../lib/auth";
+import { getAccessToken, ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder, scheduleTaskTimerReminder, syncTaskTimerReminders } from "../../lib/timer-reminders";
@@ -182,7 +182,7 @@ export default function TasksScreen() {
   const [runningTimers, setRunningTimers] = useState<RunningTimer[]>([]);
   const [clockNow, setClockNow] = useState(Date.now());
   const [isLoading, setIsLoading] = useState(true);
-  const [isOffline, setIsOffline] = useState(false);
+  const { isOffline } = useOfflineStatus();
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
   const [taskTimeEntries, setTaskTimeEntries] = useState<TaskTimeEntry[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -431,7 +431,7 @@ export default function TasksScreen() {
       if (cached) setTasks(cached as TaskItem[]);
       setRunningTimers(await getLocalTimers(effectiveUserId));
     } finally {
-      setIsOffline(userIsOffline);
+      setCachedIsOffline(userIsOffline);
       setIsLoading(false);
     }
   }, [activeView]);
@@ -1130,7 +1130,7 @@ export default function TasksScreen() {
       </Pressable>
 
       {/* Quick Capture Modal */}
-      <Modal visible={captureVisible} transparent animationType="fade">
+      <Modal visible={captureVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setCaptureVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -1405,7 +1405,7 @@ export default function TasksScreen() {
         onKeepOriginal={(rejectedFields) => { void submitExtractionDecision({}, rejectedFields); }}
       />
 
-      <Modal visible={Boolean(selectedTask)} transparent animationType="slide" onRequestClose={() => setSelectedTask(null)}>
+      <Modal visible={Boolean(selectedTask)} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setSelectedTask(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.detailContent}>
             <View style={styles.modalHeader}>
@@ -1491,7 +1491,7 @@ export default function TasksScreen() {
         onStop={stopRepeatSchedule}
       />
 
-      <Modal visible={tagModalVisible} transparent animationType="fade" onRequestClose={() => setTagModalVisible(false)}>
+      <Modal visible={tagModalVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setTagModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>

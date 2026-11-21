@@ -3,6 +3,7 @@
  * Uses expo-secure-store backed by Android Keystore (doc 12 §2).
  */
 
+import { useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import { getServerUrl } from "./config";
 import { migrateOfflineUserToAccount, syncMobileAccount } from "./offline-sync";
@@ -34,6 +35,11 @@ export async function getRefreshToken(): Promise<string | null> {
 
 export async function saveUserProfile(user: MobileUserProfile): Promise<void> {
   await SecureStore.setItemAsync(USER_PROFILE_KEY, JSON.stringify(user));
+  if (user.id === "local_user") {
+    setCachedIsOffline(true);
+  } else {
+    setCachedIsOffline(false);
+  }
 }
 
 export async function getUserProfile(): Promise<MobileUserProfile | null> {
@@ -79,6 +85,7 @@ export async function loginMobile(
     }
 
     await saveTokens(data.access_token, data.refresh_token);
+    setCachedIsOffline(false);
     if (data.user) {
       await saveUserProfile(data.user);
       try {
@@ -178,6 +185,7 @@ export async function logoutMobile(): Promise<void> {
   }
 
   await clearAuthData();
+  setCachedIsOffline(true);
 }
 
 function decodeBase64(input: string): string {
@@ -244,11 +252,63 @@ export async function ensureAuthenticated(forceRefresh: boolean = false): Promis
   return null;
 }
 
+let _cachedIsOffline: boolean | null = null;
+const _offlineListeners = new Set<(isOffline: boolean) => void>();
+
+export function getCachedIsOffline(): boolean {
+  if (_cachedIsOffline !== null) return _cachedIsOffline;
+  return false;
+}
+
+export function setCachedIsOffline(offline: boolean): void {
+  if (_cachedIsOffline !== offline) {
+    _cachedIsOffline = offline;
+    _offlineListeners.forEach((listener) => {
+      try {
+        listener(offline);
+      } catch { }
+    });
+  }
+}
+
+export function subscribeOfflineStatus(listener: (isOffline: boolean) => void): () => void {
+  _offlineListeners.add(listener);
+  return () => {
+    _offlineListeners.delete(listener);
+  };
+}
+
 export async function isOfflineUser(): Promise<boolean> {
   const token = await getAccessToken();
-  if (token && !isJwtExpired(token)) return false;
+  if (token && !isJwtExpired(token)) {
+    setCachedIsOffline(false);
+    return false;
+  }
   const profile = await getUserProfile();
-  return profile?.id === "local_user" || !token;
+  const offline = profile?.id === "local_user" || !token;
+  setCachedIsOffline(offline);
+  return offline;
 }
+
+export function useOfflineStatus(): { isOffline: boolean; refreshOfflineStatus: () => Promise<boolean> } {
+  const [isOffline, setIsOffline] = useState<boolean>(() => {
+    return _cachedIsOffline ?? false;
+  });
+
+  useEffect(() => {
+    const unsubscribe = subscribeOfflineStatus((offline) => {
+      setIsOffline(offline);
+    });
+
+    void isOfflineUser().then((offline) => {
+      setIsOffline(offline);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  return { isOffline, refreshOfflineStatus: isOfflineUser };
+}
+
 
 

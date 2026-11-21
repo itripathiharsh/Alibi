@@ -26,7 +26,7 @@ import {
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
-import { getAccessToken, ensureAuthenticated, getUserProfile } from "../../lib/auth";
+import { getAccessToken, ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { getLocalAnalyticsSummary, saveLocalNote } from "../../lib/offline-sync";
 
@@ -69,7 +69,7 @@ export default function ReportsScreen() {
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
+  const { isOffline } = useOfflineStatus();
   const [selectedPeriod, setSelectedPeriod] = useState<"daily" | "weekly" | "monthly">("daily");
   const [includePersonal, setIncludePersonal] = useState(false);
   const [reviewWorked, setReviewWorked] = useState("");
@@ -114,7 +114,7 @@ export default function ReportsScreen() {
           if (responses[5]?.ok) setHeatmap(await responses[5].json());
           if (responses[6]?.ok) setLearning(await responses[6].json());
           if (responses[7]?.ok) setTaskActivity(await responses[7].json());
-          setIsOffline(false);
+          setCachedIsOffline(false);
           setIsLoading(false);
           return;
         }
@@ -125,7 +125,7 @@ export default function ReportsScreen() {
 
     // 2. Offline fallback: Calculate genuine metrics from SQLite
     try {
-      setIsOffline(true);
+      setCachedIsOffline(true);
       const localSummary = await getLocalAnalyticsSummary(userId);
       setSummary(localSummary);
       setScore({ score: null, insufficient_data: true });

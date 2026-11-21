@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { Calendar as CalendarIcon, Check, CheckCircle2, ChevronLeft, ChevronRight, Circle, Clock, Plus, Sparkles, UserRound, X } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
-import { ensureAuthenticated, getUserProfile } from "../../lib/auth";
+import { ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
 import { getLocalCalendarData, makeOfflineId, saveLocalCalendarEvent } from "../../lib/offline-sync";
@@ -77,7 +77,7 @@ export default function CalendarScreen() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
+  const { isOffline } = useOfflineStatus();
   const [loadError, setLoadError] = useState<string | null>(null);
   const [recommendation, setRecommendation] = useState<ScheduleRecommendation | null>(null);
   const [planHorizonDays, setPlanHorizonDays] = useState(1);
@@ -123,7 +123,7 @@ export default function CalendarScreen() {
           setTasks(Array.isArray(taskData) ? taskData : []);
           if (Array.isArray(taskData)) void syncTaskDeadlineReminders(taskData, reminderLeadMin);
           setEvents(Array.isArray(eventData) ? eventData : []);
-          setIsOffline(false);
+          setCachedIsOffline(false);
           setLoadError(null);
           return;
         }
@@ -134,7 +134,7 @@ export default function CalendarScreen() {
 
     // 2. Offline fallback: Read local tasks and events from SQLite
     try {
-      setIsOffline(true);
+      setCachedIsOffline(true);
       const localData = await getLocalCalendarData(
         userId,
         range.start.toISOString(),
@@ -387,7 +387,7 @@ export default function CalendarScreen() {
       </ScrollView>
 
       {/* Add Local Event Modal */}
-      <Modal visible={createEventVisible} transparent animationType="fade" onRequestClose={() => setCreateEventVisible(false)}>
+      <Modal visible={createEventVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setCreateEventVisible(false)}>
         <View style={styles.backdrop}>
           <View style={styles.eventModalContent}>
             <View style={styles.eventModalHeader}>
@@ -437,7 +437,7 @@ export default function CalendarScreen() {
         </View>
       </Modal>
 
-      <Modal visible={Boolean(recommendation)} transparent animationType="slide" onRequestClose={() => setRecommendation(null)}>
+      <Modal visible={Boolean(recommendation)} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setRecommendation(null)}>
         <View style={styles.backdrop}><View style={styles.reviewSheet}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeading}><View style={styles.planIcon}><Sparkles size={18} color={theme.colors.accent.amber} /></View><View style={styles.headingCopy}><Text style={styles.planTitle}>Your day plan</Text><Text style={styles.planSubtitle}>Choose which work blocks to add to your calendar.</Text></View><Pressable onPress={() => setRecommendation(null)} accessibilityLabel="Close plan"><X size={21} color={theme.colors.text.secondary} /></Pressable></View>

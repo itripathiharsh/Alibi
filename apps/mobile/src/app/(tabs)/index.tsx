@@ -45,7 +45,7 @@ import {
 import * as SecureStore from "expo-secure-store";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
-import { getAccessToken, ensureAuthenticated, getUserProfile, saveUserProfile } from "../../lib/auth";
+import { getAccessToken, ensureAuthenticated, getUserProfile, saveUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder, scheduleTaskTimerReminder } from "../../lib/timer-reminders";
@@ -174,7 +174,7 @@ export default function DashboardScreen() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
+  const { isOffline } = useOfflineStatus();
 
   // Quick Capture Modal State
   const [captureVisible, setCaptureVisible] = useState(false);
@@ -419,7 +419,7 @@ export default function DashboardScreen() {
     } catch {
       offlineMode = true;
     } finally {
-      setIsOffline(offlineMode);
+      setCachedIsOffline(offlineMode);
       if (offlineMode) {
         try {
           const cachedTasks = await getCachedTaskView(effectiveUserId, "today");
@@ -894,6 +894,7 @@ export default function DashboardScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        overScrollMode="never"
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -1364,7 +1365,7 @@ export default function DashboardScreen() {
       </ScrollView>
 
       {/* Quick Capture Modal (with Real-time Voice, Status & Aligned Date/Time) */}
-      <Modal visible={captureVisible} transparent animationType="fade">
+      <Modal visible={captureVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setCaptureVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -1621,7 +1622,7 @@ export default function DashboardScreen() {
       </Modal>
 
       {/* Morning Kickoff Modal */}
-      <Modal visible={kickoffVisible} transparent animationType="fade">
+      <Modal visible={kickoffVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setKickoffVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -1673,7 +1674,7 @@ export default function DashboardScreen() {
       </Modal>
 
       {/* Evening Sunset Sweep Modal */}
-      <Modal visible={sweepVisible} transparent animationType="fade">
+      <Modal visible={sweepVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSweepVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>

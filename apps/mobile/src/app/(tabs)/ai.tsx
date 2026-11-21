@@ -29,7 +29,7 @@ import {
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
-import { getAccessToken, ensureAuthenticated, isOfflineUser } from "../../lib/auth";
+import { getAccessToken, ensureAuthenticated, isOfflineUser, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 
@@ -64,12 +64,8 @@ export default function AIScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [isVoiceMode, setIsVoiceMode] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
+  const { isOffline } = useOfflineStatus();
   const scrollViewRef = useRef<ScrollView>(null);
-
-  useEffect(() => {
-    void isOfflineUser().then(setIsOffline);
-  }, []);
 
   const handleVoiceDictation = async () => {
     if (isVoiceMode) {
@@ -128,7 +124,7 @@ export default function AIScreen() {
     try {
       let token = await ensureAuthenticated();
       if (!token) {
-        setIsOffline(true);
+        setCachedIsOffline(true);
         const offlineNotice: Message = {
           id: `offline-${Date.now()}`,
           role: "assistant",

@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Tex
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { BookOpen, CheckSquare, FileText, Link as LinkIcon, Mic, Plus, Search, Send, Sparkles, Square, Trash2, X } from "lucide-react-native";
 import theme from "../../lib/theme";
-import { ensureAuthenticated, getUserProfile } from "../../lib/auth";
+import { ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
@@ -28,13 +28,13 @@ export default function VaultScreen() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
+  const { isOffline } = useOfflineStatus();
   const [error, setError] = useState<string | null>(null);
   const [createVisible, setCreateVisible] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
-  const [privateOnly, setPrivateOnly] = useStadote(false);
+  const [privateOnly, setPrivateOnly] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<VaultNote | null>(null);
@@ -77,14 +77,14 @@ export default function VaultScreen() {
               await saveLocalNote(userId, rn);
             }
             setNotes(remoteNotes);
-            setIsOffline(false);
+            setCachedIsOffline(false);
             return;
           }
         }
       }
-      setIsOffline(true);
+      setCachedIsOffline(true);
     } catch {
-      setIsOffline(true);
+      setCachedIsOffline(true);
     } finally {
       setLoading(false);
     }
@@ -318,7 +318,7 @@ export default function VaultScreen() {
         {loading || searching ? <ActivityIndicator color={theme.colors.accent.amber} style={{ marginTop: 30 }} /> : shownItems.length === 0 ? <View style={styles.emptyCard}><BookOpen size={28} color="#E87935" /><Text style={styles.emptyTitle}>{results ? "No matching records" : "Your vault is ready"}</Text><Text style={styles.emptyText}>{results ? "Try another phrase or clear the search." : "Save a note to make it easy to find later."}</Text>{!results && <Pressable onPress={() => setCreateVisible(true)} style={styles.emptyButton}><Plus size={17} color="#fff" /><Text style={styles.emptyButtonText}>Create a note</Text></Pressable>}</View> : shownItems.map((item) => { const id = "note_id" in item ? item.note_id : item.id; return <Pressable key={id} onPress={() => openNote(id)} style={styles.noteCard} accessibilityRole="button" accessibilityLabel={`Open note ${item.title}`}><View style={styles.noteIcon}><FileText size={20} color="#F47B36" /></View><View style={styles.noteCopy}><Text style={styles.noteTitle} numberOfLines={2}>{item.title}</Text><Text style={styles.noteSummary} numberOfLines={2}>{"snippet" in item ? item.snippet : item.body}</Text><View style={styles.noteMeta}><Text style={styles.metaText}>{item.source_type.replaceAll("_", " ")}</Text><View style={styles.metaDot} /><Text style={styles.metaText}>{item.occurred_on}</Text><View style={styles.metaDot} /><Text style={styles.metaText}>{item.privacy_class}</Text></View></View><View style={styles.openNote}><LinkIcon size={17} color="#64748B" /></View></Pressable>; })}
         <Pressable style={styles.askCard} onPress={() => router.push("/ai")}><Sparkles size={22} color="#8759E8" /><View style={styles.askCopy}><Text style={styles.askTitle}>Ask ALIBI</Text><Text style={styles.askText}>Get grounded answers from your notes and work records.</Text></View><Send size={18} color="#53657A" /></Pressable>
       </ScrollView>
-      <Modal visible={selectedNote !== null} animationType="slide" transparent onRequestClose={() => setSelectedNote(null)}>
+      <Modal visible={selectedNote !== null} animationType="slide" transparent statusBarTranslucent onRequestClose={() => setSelectedNote(null)}>
         <View style={styles.modalShade}>
           <View style={styles.detailModal}>
             <View style={styles.modalHandle} />
@@ -344,7 +344,7 @@ export default function VaultScreen() {
           </View>
         </View>
       </Modal>
-      <Modal visible={createVisible} animationType="slide" transparent onRequestClose={() => { void stopSpeechRecognition(); setListening(false); setCreateVisible(false); }}><View style={styles.modalShade}><View style={styles.modal}><View style={styles.modalHandle} /><View style={styles.modalHeading}><Text style={styles.modalTitle}>New Note</Text><Pressable onPress={() => { void stopSpeechRecognition(); setListening(false); setCreateVisible(false); }} accessibilityLabel="Close"><X size={22} color="#0B2030" /></Pressable></View><TextInput value={title} onChangeText={setTitle} placeholder="Give your note a title" placeholderTextColor="#929EAC" style={styles.titleInput} /><TextInput value={body} onChangeText={setBody} placeholder="Write or dictate something worth remembering…" placeholderTextColor="#929EAC" multiline textAlignVertical="top" style={styles.bodyInput} /><Pressable onPress={toggleVoice} style={[styles.voiceButton, listening && styles.voiceButtonActive]} accessibilityRole="button" accessibilityLabel={listening ? "Stop voice note" : "Dictate note"}>{listening ? <Square size={17} color="#FFFFFF" fill="#FFFFFF" /> : <Mic size={18} color="#F97316" />}<Text style={[styles.voiceButtonText, listening && { color: "#FFFFFF" }]}>{listening ? "Listening · tap to finish" : "Dictate in real time"}</Text></Pressable>{voiceError && <Text style={styles.voiceError}>{voiceError}</Text>}<Text style={styles.privateHint}>This note is saved to your personal vault in SQLite. Review before saving.</Text><Pressable disabled={!title.trim() || !body.trim() || saving || listening} onPress={createNote} style={[styles.saveButton, (!title.trim() || !body.trim() || saving || listening) && { opacity: .55 }]}><Text style={styles.saveButtonText}>{saving ? "Saving…" : listening ? "Finish dictation to save" : "Save Note"}</Text></Pressable></View></View></Modal>
+      <Modal visible={createVisible} animationType="slide" transparent statusBarTranslucent onRequestClose={() => { void stopSpeechRecognition(); setListening(false); setCreateVisible(false); }}><View style={styles.modalShade}><View style={styles.modal}><View style={styles.modalHandle} /><View style={styles.modalHeading}><Text style={styles.modalTitle}>New Note</Text><Pressable onPress={() => { void stopSpeechRecognition(); setListening(false); setCreateVisible(false); }} accessibilityLabel="Close"><X size={22} color="#0B2030" /></Pressable></View><TextInput value={title} onChangeText={setTitle} placeholder="Give your note a title" placeholderTextColor="#929EAC" style={styles.titleInput} /><TextInput value={body} onChangeText={setBody} placeholder="Write or dictate something worth remembering…" placeholderTextColor="#929EAC" multiline textAlignVertical="top" style={styles.bodyInput} /><Pressable onPress={toggleVoice} style={[styles.voiceButton, listening && styles.voiceButtonActive]} accessibilityRole="button" accessibilityLabel={listening ? "Stop voice note" : "Dictate note"}>{listening ? <Square size={17} color="#FFFFFF" fill="#FFFFFF" /> : <Mic size={18} color="#F97316" />}<Text style={[styles.voiceButtonText, listening && { color: "#FFFFFF" }]}>{listening ? "Listening · tap to finish" : "Dictate in real time"}</Text></Pressable>{voiceError && <Text style={styles.voiceError}>{voiceError}</Text>}<Text style={styles.privateHint}>This note is saved to your personal vault in SQLite. Review before saving.</Text><Pressable disabled={!title.trim() || !body.trim() || saving || listening} onPress={createNote} style={[styles.saveButton, (!title.trim() || !body.trim() || saving || listening) && { opacity: .55 }]}><Text style={styles.saveButtonText}>{saving ? "Saving…" : listening ? "Finish dictation to save" : "Save Note"}</Text></Pressable></View></View></Modal>
     </View>
   );
 }

@@ -3,9 +3,9 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { useRouter } from "expo-router";
 import { BarChart3, BookOpen, Brain, CalendarDays, CheckCircle2, ChevronRight, CircleHelp, CloudOff, LockKeyhole, LogIn, LogOut, Settings, SlidersHorizontal, Sparkles, Timer, type LucideIcon } from "lucide-react-native";
 import theme from "../../lib/theme";
-import { ensureAuthenticated, getUserProfile, logoutMobile, type MobileUserProfile } from "../../lib/auth";
+import { ensureAuthenticated, getUserProfile, logoutMobile, useOfflineStatus, type MobileUserProfile } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
-import { BrandHeader, SunriseArt } from "../../components/brand-ui";
+import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
 import { getLocalAnalyticsSummary } from "../../lib/offline-sync";
 
 type ProfileSummary = { tasks_completed: number; tasks_pending: number; tasks_overdue: number; total_time_min: number; efficiency: number | null };
@@ -17,6 +17,7 @@ export default function ProfileScreen() {
   const [summary, setSummary] = useState<ProfileSummary | null>(null);
   const [learning, setLearning] = useState<LearningProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const { isOffline } = useOfflineStatus();
 
   // FR-AUTH-001..005, FR-DASH-002/004 and FR-LEARN-005..009: show account and measured API data only.
   const loadProfile = useCallback(async () => {
@@ -57,6 +58,8 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       <SunriseArt height={175} />
       <BrandHeader
+        showOfflineBadge={isOffline}
+        onOfflineBadgePress={() => router.push("/login")}
         right={
           <Pressable onPress={() => router.push("/settings")} style={styles.iconButton} accessibilityLabel="Open settings">
             <Settings size={20} color={theme.colors.text.primary} />
@@ -65,6 +68,14 @@ export default function ProfileScreen() {
       />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.heading}><View><Text style={styles.title}>Profile</Text><Text style={styles.subtitle}>Your account, preferences and ALIBI settings.</Text></View></View>
+        {isOffline && (
+          <OfflineNoticeCard
+            featureName="Profile"
+            description="You are using ALIBI in offline mode on this device. Sign in to sync your profile, learning insights and history with the cloud."
+            actionText="Sign in to sync"
+            onAction={() => router.push("/login")}
+          />
+        )}
     <View style={styles.identityCard}><View style={styles.avatar}><Text style={styles.initial}>{initial}</Text></View><View style={styles.identityCopy}><Text style={styles.name} numberOfLines={1}>{displayName}</Text><Text style={styles.email} numberOfLines={1}>{profile?.email || "Account details load when you connect."}</Text><View style={styles.memberBadge}><LockKeyhole size={13} color="#C65B17" /><Text style={styles.memberText}>Private by default</Text></View></View></View>
 
     <Text style={styles.metricPeriod}>Activity · this month</Text><View style={styles.metrics}>{[
