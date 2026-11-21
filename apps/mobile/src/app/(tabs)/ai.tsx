@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "expo-router";
 import {
   ScrollView,
   StyleSheet,
@@ -49,6 +50,7 @@ const QUICK_PROMPTS = [
 ];
 
 export default function AIScreen() {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome-1",
@@ -239,14 +241,19 @@ export default function AIScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
-      <SunriseArt height={170} />
-      <BrandHeader showOfflineBadge={isOffline} />
+      <SunriseArt height={175} />
+      <BrandHeader
+        showOfflineBadge={isOffline}
+        onOfflineBadgePress={() => router.push("/login")}
+      />
       <View style={styles.screenHeading}><Text style={styles.screenTitle}>Ask ALIBI</Text><Text style={styles.screenSubtitle}>Answers grounded in your tasks, notes and learning.</Text></View>
       {isOffline && (
-        <View style={{ paddingHorizontal: 16 }}>
+        <View style={{ paddingHorizontal: 20 }}>
           <OfflineNoticeCard
             featureName="Ask ALIBI"
             description="The grounded assistant requires an internet connection and an authenticated account to query server AI models. Your local tasks, focus timers, notes, and calendar remain completely available offline."
+            actionText="Sign in to sync"
+            onAction={() => router.push("/login")}
           />
         </View>
       )}

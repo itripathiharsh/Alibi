@@ -35,7 +35,7 @@ import {
   ChevronRight,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
-import { BrandHeader, SunriseArt } from "../../components/brand-ui";
+import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
 import { getAccessToken, ensureAuthenticated, getUserProfile } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
@@ -903,7 +903,7 @@ export default function TasksScreen() {
 
   return (
     <View style={styles.container}>
-      <SunriseArt height={176} />
+      <SunriseArt height={175} />
       <BrandHeader
         showOfflineBadge={isOffline}
         onOfflineBadgePress={() => router.push("/login")}
@@ -953,6 +953,14 @@ export default function TasksScreen() {
 
       {/* Task List */}
       <ScrollView contentContainerStyle={styles.content}>
+        {isOffline && (
+          <OfflineNoticeCard
+            featureName="Tasks"
+            description="Tasks and timers are stored locally in SQLite and will sync when you connect and log in."
+            actionText="Sign in to sync"
+            onAction={() => router.push("/login")}
+          />
+        )}
         {isLoading && (
           <ActivityIndicator size="small" color={theme.colors.accent.amber} style={{ marginTop: 24 }} />
         )}

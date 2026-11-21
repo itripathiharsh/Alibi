@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "expo-router";
 import {
   ScrollView,
   StyleSheet,
@@ -57,6 +58,7 @@ interface ReportItem {
 }
 
 export default function ReportsScreen() {
+  const router = useRouter();
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [score, setScore] = useState<ScoreData | null>(null);
   const [distribution, setDistribution] = useState<TimeDistribution[]>([]);
@@ -285,16 +287,21 @@ export default function ReportsScreen() {
 
   return (
     <View style={styles.screen}>
-    <SunriseArt height={190} />
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <BrandHeader showOfflineBadge={isOffline} />
-      <View style={styles.screenHeading}><Text style={styles.screenTitle}>Insights</Text><Text style={styles.screenSubtitle}>Understand your productivity, time and working patterns.</Text></View>
-      {isOffline && (
-        <OfflineNoticeCard
-          featureName="Insights"
-          description="Metrics are measured from your locally recorded tasks and time entries. Server reports and cloud trends will update when you connect."
-        />
-      )}
+      <SunriseArt height={175} />
+      <BrandHeader
+        showOfflineBadge={isOffline}
+        onOfflineBadgePress={() => router.push("/login")}
+      />
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.screenHeading}><Text style={styles.screenTitle}>Insights</Text><Text style={styles.screenSubtitle}>Understand your productivity, time and working patterns.</Text></View>
+        {isOffline && (
+          <OfflineNoticeCard
+            featureName="Insights"
+            description="Metrics are measured from your locally recorded tasks and time entries. Server reports and cloud trends will update when you connect."
+            actionText="Sign in to sync"
+            onAction={() => router.push("/login")}
+          />
+        )}
       {/* Period Selector Tabs */}
       <View style={styles.periodTabs}>
         <Pressable style={[styles.periodTab, selectedPeriod === "daily" && styles.periodTabActive]} onPress={() => setSelectedPeriod("daily")}><Text style={[styles.periodTabText, selectedPeriod === "daily" && styles.periodTabTextActive]}>Today</Text></Pressable>
@@ -510,8 +517,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.colors.background.base },
   container: { flex: 1, backgroundColor: "transparent" },
   content: {
-    paddingHorizontal: 18,
-    paddingTop: 7,
+    paddingHorizontal: 20,
+    paddingTop: 4,
     paddingBottom: 26,
     gap: 14,
   },

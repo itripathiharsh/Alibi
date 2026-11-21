@@ -18,7 +18,7 @@ export function BrandHeader({
 }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.header, { paddingTop: insets.top }, style]}>
+    <View style={[styles.header, { paddingTop: insets.top, minHeight: 48 + insets.top }, style]}>
       <View style={styles.brand}>
         <Image
           source={require("../../assets/logo_full_light.png")}
@@ -33,7 +33,7 @@ export function BrandHeader({
             accessibilityRole="button"
             accessibilityLabel="Running in offline mode"
           >
-            <CloudOff size={11} color="#C65B17" />
+            <CloudOff size={11} color={theme.colors.brand.peachText} />
             <Text style={styles.offlineBadgeText}>Offline</Text>
           </Pressable>
         )}
@@ -57,7 +57,7 @@ export function OfflineNoticeCard({
   return (
     <View style={styles.offlineNoticeCard}>
       <View style={styles.offlineNoticeHeader}>
-        <CloudOff size={15} color="#C65B17" />
+        <CloudOff size={15} color={theme.colors.brand.peachText} />
         <Text style={styles.offlineNoticeTitle}>
           {featureName ? `${featureName} in Offline Mode` : "Offline Mode"}
         </Text>
@@ -75,33 +75,42 @@ export function OfflineNoticeCard({
   );
 }
 
-export function SunriseArt({ height = 150 }: { height?: number }) {
-  return <View pointerEvents="none" style={[styles.art, { height }]}>
-    <Svg width="100%" height="100%" viewBox="0 0 420 170" preserveAspectRatio="none">
-      <Defs>
-        <LinearGradient id="sunrise-front" x1="0" y1="0" x2="0.8" y2="1">
-          <Stop offset="0" stopColor="#FFE7D3" stopOpacity=".74" />
-          <Stop offset="1" stopColor="#F5D7D4" stopOpacity=".18" />
-        </LinearGradient>
-        <LinearGradient id="sunrise-back" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#FFD3AC" stopOpacity=".55" />
-          <Stop offset="1" stopColor="#FFEBDD" stopOpacity=".12" />
-        </LinearGradient>
-      </Defs>
-      <Circle cx="334" cy="67" r="45" fill="#FFD19F" opacity=".55" />
-      <Path d="M0 132 Q72 126 128 87 T224 90 Q270 124 318 93 T420 112 V170 H0Z" fill="url(#sunrise-back)" />
-      <Path d="M0 153 Q82 135 149 105 T249 105 Q301 136 354 111 T420 126 V170 H0Z" fill="url(#sunrise-front)" />
-      <Path d="M0 160 Q102 147 190 123 T310 128 Q361 145 420 136 V170 H0Z" fill="#EBDADD" opacity=".22" />
-    </Svg>
-  </View>;
+export function SunriseArt({ height = 175 }: { height?: number }) {
+  return (
+    <View pointerEvents="none" style={[styles.art, { height }]}>
+      <Svg width="100%" height="100%" viewBox="0 0 420 170" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id="sunrise-front" x1="0" y1="0" x2="0.8" y2="1">
+            <Stop offset="0" stopColor="#FFE7D3" stopOpacity=".74" />
+            <Stop offset="1" stopColor="#F5D7D4" stopOpacity=".18" />
+          </LinearGradient>
+          <LinearGradient id="sunrise-back" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor="#FFD3AC" stopOpacity=".55" />
+            <Stop offset="1" stopColor="#FFEBDD" stopOpacity=".12" />
+          </LinearGradient>
+        </Defs>
+        <Circle cx="334" cy="67" r="45" fill="#FFD19F" opacity=".55" />
+        <Path d="M0 132 Q72 126 128 87 T224 90 Q270 124 318 93 T420 112 V170 H0Z" fill="url(#sunrise-back)" />
+        <Path d="M0 153 Q82 135 149 105 T249 105 Q301 136 354 111 T420 126 V170 H0Z" fill="url(#sunrise-front)" />
+        <Path d="M0 160 Q102 147 190 123 T310 128 Q361 145 420 136 V170 H0Z" fill="#EBDADD" opacity=".22" />
+      </Svg>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  header: { minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, zIndex: 1 },
+  header: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    zIndex: 1,
+  },
   brand: { flexDirection: "row", alignItems: "center" },
   logo: { width: 138, height: 36 },
   actions: { flexDirection: "row", alignItems: "center", gap: 8 },
-  art: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 0, opacity: .8 },
+  art: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 0, opacity: 0.8 },
   offlineBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -109,24 +118,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 3,
     marginLeft: 8,
-    borderRadius: 8,
-    backgroundColor: "#FFF1E6",
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.colors.brand.peach,
     borderWidth: 1,
-    borderColor: "rgba(244, 123, 37, 0.3)",
+    borderColor: "rgba(255, 116, 31, 0.25)",
   },
   offlineBadgeText: {
-    color: "#B75216",
+    color: theme.colors.brand.peachText,
     fontSize: 10,
     fontWeight: "700",
     letterSpacing: 0.3,
   },
   offlineNoticeCard: {
-    padding: 12,
+    padding: 14,
     marginVertical: 8,
-    borderRadius: 14,
-    backgroundColor: "#FFF8F2",
+    borderRadius: theme.radius.cardSecondary,
+    backgroundColor: theme.colors.brand.peachLight,
     borderWidth: 1,
-    borderColor: "#FED7AA",
+    borderColor: theme.colors.brand.peachBorder,
     gap: 6,
   },
   offlineNoticeHeader: {
@@ -135,12 +144,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   offlineNoticeTitle: {
-    color: "#9A3412",
+    color: theme.colors.brand.peachText,
     fontSize: 13,
     fontWeight: "700",
   },
   offlineNoticeBody: {
-    color: "#7C2D12",
+    color: theme.colors.brand.peachDarkText,
     fontSize: 12,
     lineHeight: 17,
   },
@@ -149,8 +158,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: "#EA580C",
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.colors.accent.primary,
   },
   offlineNoticeActionText: {
     color: "#FFFFFF",

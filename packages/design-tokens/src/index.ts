@@ -5,7 +5,7 @@ export type ColorTheme = typeof tokens.colors.light;
 export type Spacing = typeof tokens.spacing;
 export type Radius = typeof tokens.radius;
 export type Typography = typeof tokens.typography;
+export type Shadows = typeof tokens.shadows;
 
 export { tokens };
 export default tokens;
-

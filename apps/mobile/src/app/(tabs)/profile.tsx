@@ -53,9 +53,18 @@ export default function ProfileScreen() {
   const trackedTime = summary ? `${Math.floor(summary.total_time_min / 60)}h ${summary.total_time_min % 60}m` : "—";
   const efficiency = summary?.efficiency == null ? "—" : `${Math.round(summary.efficiency * 100)}%`;
 
-  return <View style={styles.container}><SunriseArt height={180} /><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-    <BrandHeader right={<Pressable onPress={() => router.push("/settings")} style={styles.iconButton} accessibilityLabel="Open settings"><Settings size={20} color={theme.colors.text.primary} /></Pressable>} />
-    <View style={styles.heading}><View><Text style={styles.title}>Profile</Text><Text style={styles.subtitle}>Your account, preferences and ALIBI settings.</Text></View></View>
+  return (
+    <View style={styles.container}>
+      <SunriseArt height={175} />
+      <BrandHeader
+        right={
+          <Pressable onPress={() => router.push("/settings")} style={styles.iconButton} accessibilityLabel="Open settings">
+            <Settings size={20} color={theme.colors.text.primary} />
+          </Pressable>
+        }
+      />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.heading}><View><Text style={styles.title}>Profile</Text><Text style={styles.subtitle}>Your account, preferences and ALIBI settings.</Text></View></View>
     <View style={styles.identityCard}><View style={styles.avatar}><Text style={styles.initial}>{initial}</Text></View><View style={styles.identityCopy}><Text style={styles.name} numberOfLines={1}>{displayName}</Text><Text style={styles.email} numberOfLines={1}>{profile?.email || "Account details load when you connect."}</Text><View style={styles.memberBadge}><LockKeyhole size={13} color="#C65B17" /><Text style={styles.memberText}>Private by default</Text></View></View></View>
 
     <Text style={styles.metricPeriod}>Activity · this month</Text><View style={styles.metrics}>{[
@@ -75,7 +84,9 @@ export default function ProfileScreen() {
     </View>
     <View style={styles.aboutCard}><CircleHelp size={24} color="#E97932" /><View style={styles.aboutCopy}><Text style={styles.aboutTitle}>About ALIBI</Text><Text style={styles.aboutSubtitle}>Version 0.1.0 · Personal productivity</Text></View><ChevronRight size={18} color="#E97932" /></View>
     <Pressable style={styles.logoutButton} onPress={signOut}><LogOut size={19} color="#E33535" /><Text style={styles.logoutText}>Log Out</Text></Pressable>
-  </ScrollView></View>;
+      </ScrollView>
+    </View>
+  );
 }
 
 function ProfileRow({ icon: Icon, title, subtitle, onPress, last = false }: { icon: LucideIcon; title: string; subtitle: string; onPress: () => void; last?: boolean }) {
@@ -83,8 +94,8 @@ function ProfileRow({ icon: Icon, title, subtitle, onPress, last = false }: { ic
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background.base }, content: { padding: 18, paddingBottom: 32, gap: 14 },
-  heading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4 }, title: { fontSize: 31, color: theme.colors.text.primary, fontWeight: "800", letterSpacing: -.7 }, subtitle: { color: theme.colors.text.secondary, fontSize: 14, marginTop: 2 }, iconButton: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderRadius: 15, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: "#FFFFFF" }, metricPeriod: { color: theme.colors.text.muted, fontSize: 11, fontWeight: "700", marginBottom: -9, marginLeft: 2 },
+  container: { flex: 1, backgroundColor: theme.colors.background.base }, content: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 32, gap: 14 },
+  heading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4, paddingBottom: 8 }, title: { fontSize: 31, color: theme.colors.text.primary, fontWeight: "800", letterSpacing: -.7 }, subtitle: { color: theme.colors.text.secondary, fontSize: 14, marginTop: 2 }, iconButton: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderRadius: 15, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: "#FFFFFF" }, metricPeriod: { color: theme.colors.text.muted, fontSize: 11, fontWeight: "700", marginBottom: -9, marginLeft: 2 },
   identityCard: { flexDirection: "row", alignItems: "center", gap: 13, padding: 16, borderRadius: 23, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: theme.colors.border.subtle, minHeight: 112, shadowColor: "#1A3346", shadowOpacity: .05, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2 }, avatar: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center", backgroundColor: "#0B2639", borderWidth: 3, borderColor: "#F47B25" }, initial: { color: "#FFFFFF", fontSize: 32, fontWeight: "700" }, identityCopy: { flex: 1, minWidth: 0 }, name: { color: theme.colors.text.primary, fontSize: 17, fontWeight: "800" }, email: { color: theme.colors.text.secondary, fontSize: 12, marginTop: 4 }, memberBadge: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 5, marginTop: 7, borderRadius: 10, backgroundColor: "#FFF1E6" }, memberText: { color: "#B75216", fontSize: 10, fontWeight: "800" },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: 10 }, metricCard: { width: "47%", minHeight: 118, flexGrow: 1, padding: 13, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: "#FFFFFF" }, metricIcon: { width: 36, height: 36, borderRadius: 13, alignItems: "center", justifyContent: "center" }, metricValue: { marginTop: 6, fontSize: 23, color: theme.colors.text.primary, fontWeight: "800" }, metricLabel: { marginTop: 1, color: theme.colors.text.secondary, fontSize: 12, fontWeight: "600" },
   learningCard: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16, borderRadius: 22, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: theme.colors.border.subtle }, learningIcon: { width: 54, height: 54, borderRadius: 27, alignItems: "center", justifyContent: "center", backgroundColor: "#FFF0E5" }, learningContent: { flex: 1 }, learningTitle: { color: theme.colors.text.primary, fontSize: 17, fontWeight: "800" }, learningSubtitle: { color: theme.colors.text.secondary, fontSize: 12, marginTop: 3 }, learningPills: { flexDirection: "row", marginTop: 10 }, learningPill: { backgroundColor: "#F5F3FA", color: theme.colors.text.primary, fontSize: 11, fontWeight: "600", paddingVertical: 7, paddingHorizontal: 10, borderRadius: 12 },

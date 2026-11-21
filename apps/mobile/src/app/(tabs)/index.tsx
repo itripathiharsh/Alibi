@@ -44,6 +44,7 @@ import {
 } from "lucide-react-native";
 import * as SecureStore from "expo-secure-store";
 import theme from "../../lib/theme";
+import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
 import { getAccessToken, ensureAuthenticated, getUserProfile, saveUserProfile } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
@@ -864,41 +865,31 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Top Header Bar */}
-      <View style={styles.topBar}>
-        <View style={styles.logoRow}>
-          <Image source={require("../../../assets/logo_full_light.png")} style={styles.homeLogo} resizeMode="contain" accessibilityLabel="ALIBI" />
-          {isOffline && (
+      <SunriseArt height={175} />
+      <BrandHeader
+        showOfflineBadge={isOffline}
+        onOfflineBadgePress={() => router.push("/login")}
+        right={
+          <View style={styles.topRightActions}>
             <Pressable
-              style={styles.offlinePill}
+              style={styles.bellBtn}
               onPress={() => router.push("/(tabs)/profile")}
-              accessibilityLabel="Offline mode"
+              accessibilityLabel="Notifications"
             >
-              <CloudOff size={11} color="#C2410C" />
-              <Text style={styles.offlinePillText}>Offline</Text>
+              <Bell size={20} color={theme.colors.text.primary} />
+              {hasUnreadNotifications && <View style={styles.notificationDot} />}
             </Pressable>
-          )}
-        </View>
 
-        <View style={styles.topRightActions}>
-          <Pressable
-            style={styles.bellBtn}
-            onPress={() => router.push("/(tabs)/profile")}
-            accessibilityLabel="Notifications"
-          >
-            <Bell size={20} color={theme.colors.text.primary} />
-            {hasUnreadNotifications && <View style={styles.notificationDot} />}
-          </Pressable>
-
-          <Pressable
-            style={styles.avatarBtn}
-            onPress={() => router.push("/(tabs)/profile")}
-            accessibilityLabel="Open profile"
-          >
-            <Text style={styles.avatarText}>{userInitial}</Text>
-          </Pressable>
-        </View>
-      </View>
+            <Pressable
+              style={styles.avatarBtn}
+              onPress={() => router.push("/(tabs)/profile")}
+              accessibilityLabel="Open profile"
+            >
+              <Text style={styles.avatarText}>{userInitial}</Text>
+            </Pressable>
+          </View>
+        }
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -912,6 +903,14 @@ export default function DashboardScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
+        {isOffline && (
+          <OfflineNoticeCard
+            featureName="Home"
+            description="Working in local mode. Your tasks, active timers and today's schedule are saved to SQLite."
+            actionText="Sign in to sync"
+            onAction={() => router.push("/login")}
+          />
+        )}
         {/* Hero Greeting Section with warm peach banner */}
         <View style={styles.heroSection}>
           <View style={styles.heroTextContainer}>
@@ -1731,59 +1730,12 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
-  topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 18,
-    paddingTop: 52,
-    paddingBottom: 14,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-  },
-  logoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  homeLogo: { width: 136, height: 36 },
-  offlinePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: "#FFEDD5",
-    borderWidth: 1,
-    borderColor: "#FDBA74",
-  },
-  offlinePillText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#C2410C",
-  },
-  logoIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 7,
-    backgroundColor: "#0F172A",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoText: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: "#0F172A",
-    letterSpacing: 0.5,
+    backgroundColor: theme.colors.background.base,
   },
   topRightActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
   },
   bellBtn: {
     position: "relative",
@@ -1805,11 +1757,11 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: theme.colors.border.subtle,
   },
   avatarText: {
     fontSize: 14,
@@ -1820,7 +1772,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingTop: 6,
     gap: 14,
     paddingBottom: 24,
   },

@@ -277,9 +277,10 @@ export default function CalendarScreen() {
 
   return (
     <View style={styles.container}>
-      <SunriseArt height={180} />
+      <SunriseArt height={175} />
       <BrandHeader
         showOfflineBadge={isOffline}
+        onOfflineBadgePress={() => router.push("/login")}
         right={
           <Pressable
             style={styles.headerAction}
@@ -321,6 +322,8 @@ export default function CalendarScreen() {
           <OfflineNoticeCard
             featureName="Calendar"
             description="Viewing local tasks and offline calendar events. Scheduled changes save to SQLite and sync when connected."
+            actionText="Sign in to sync"
+            onAction={() => router.push("/login")}
           />
         )}
 
