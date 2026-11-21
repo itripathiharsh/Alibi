@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ensureAuthenticated } from "../lib/auth";
+import { ensureAuthenticated, getUserProfile } from "../lib/auth";
 import { getServerUrl } from "../lib/config";
 import { stopAmbientAudio, stopFocusNotification } from "../lib/focus-session-notification";
+import { getLocalTimers, stopTaskTimerOffline, updateTaskOffline } from "../lib/offline-sync";
 import theme from "../lib/theme";
 
 type RunningEntry = { id: string; task_id: string };
@@ -17,33 +18,56 @@ export default function FocusActionScreen() {
     let active = true;
     void (async () => {
       try {
-        const token = await ensureAuthenticated();
-        if (!token) throw new Error("Sign in to use focus controls.");
-        const baseUrl = getServerUrl();
-        const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-        const runningResponse = await fetch(`${baseUrl}/api/v1/time-entries/running/all`, { headers });
-        if (!runningResponse.ok) throw new Error("The active timer could not be loaded.");
-        const running = await runningResponse.json() as RunningEntry[];
-        const entry = running.find((item) => item.task_id === taskId);
+        let token: string | null = null;
+        let profile: Awaited<ReturnType<typeof getUserProfile>> = null;
+        try {
+          token = await ensureAuthenticated();
+          profile = await getUserProfile();
+        } catch {
+          // offline
+        }
+        const userId = profile?.id ?? "local_user";
 
-        if (action === "done" && taskId) {
-          const taskResponse = await fetch(`${baseUrl}/api/v1/tasks/${taskId}`, { headers });
-          if (!taskResponse.ok) throw new Error("The task could not be loaded.");
-          const task = await taskResponse.json() as { status: string };
-          if (task.status !== "completed") {
-            const response = await fetch(`${baseUrl}/api/v1/tasks/${taskId}/status`, {
-              method: "POST", headers, body: JSON.stringify({ status: "completed" }),
-            });
-            if (!response.ok) throw new Error("The task could not be marked done.");
+        if (token) {
+          try {
+            const baseUrl = getServerUrl();
+            const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+            const runningResponse = await fetch(`${baseUrl}/api/v1/time-entries/running/all`, { headers });
+            if (runningResponse.ok) {
+              const running = (await runningResponse.json()) as RunningEntry[];
+              const entry = running.find((item) => item.task_id === taskId);
+
+              if (action === "done" && taskId) {
+                await fetch(`${baseUrl}/api/v1/tasks/${taskId}/status`, {
+                  method: "POST",
+                  headers,
+                  body: JSON.stringify({ status: "completed" }),
+                }).catch(() => undefined);
+              }
+
+              if (entry) {
+                await fetch(`${baseUrl}/api/v1/time-entries/${entry.id}/stop`, {
+                  method: "POST",
+                  headers,
+                  body: JSON.stringify({}),
+                }).catch(() => undefined);
+              }
+            }
+          } catch {
+            // Fall through to offline local timer stop
           }
         }
 
-        if (entry) {
-          const stopResponse = await fetch(`${baseUrl}/api/v1/time-entries/${entry.id}/stop`, {
-            method: "POST", headers, body: JSON.stringify({}),
-          });
-          if (!stopResponse.ok) throw new Error("The focus timer could not be stopped.");
+        // Always update local SQLite state as well
+        if (action === "done" && taskId) {
+          await updateTaskOffline(userId, taskId, { status: "completed" }).catch(() => undefined);
         }
+        const localTimers = await getLocalTimers(userId).catch(() => []);
+        const matchingTimer = localTimers.find((t) => t.task_id === taskId);
+        if (matchingTimer) {
+          await stopTaskTimerOffline(userId, matchingTimer.id).catch(() => undefined);
+        }
+
         stopAmbientAudio();
         await stopFocusNotification();
         if (!active) return;

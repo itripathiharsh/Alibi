@@ -51,6 +51,7 @@ import {
   cacheTaskView,
   cacheTaskTimeEntries,
   createTaskOffline,
+  deleteTaskOffline,
   getCachedTaskView,
   getLocalTimers,
   getLocalTaskTimeEntries,
@@ -181,6 +182,7 @@ export default function TasksScreen() {
   const [runningTimers, setRunningTimers] = useState<RunningTimer[]>([]);
   const [clockNow, setClockNow] = useState(Date.now());
   const [isLoading, setIsLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
   const [taskTimeEntries, setTaskTimeEntries] = useState<TaskTimeEntry[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -222,13 +224,32 @@ export default function TasksScreen() {
     });
   };
 
-  const runBatch = async (operation: (task: TaskItem, token: string) => Promise<Response>) => {
+  const runBatch = async (
+    operation: (task: TaskItem, token: string) => Promise<Response>,
+    offlineFallback?: (task: TaskItem, userId: string) => Promise<void>
+  ) => {
     const selectedTasks = tasks.filter((task) => selectedIds.has(task.id));
     if (!selectedTasks.length || batchBusy) return;
     setBatchBusy(true);
     try {
-      const token = await ensureAuthenticated();
-      if (!token) throw new Error("Sign in to update selected tasks.");
+      const profile = await getUserProfile();
+      const userId = profile?.id ?? "local_user";
+      const token = await ensureAuthenticated().catch(() => null);
+      if (!token) {
+        if (offlineFallback) {
+          for (const task of selectedTasks) {
+            await offlineFallback(task, userId);
+          }
+          triggerHaptic("complete");
+          setSelectionMode(false);
+          setSelectedIds(new Set());
+          setTagModalVisible(false);
+          setBatchTagText("");
+          await fetchTasks();
+          return;
+        }
+        throw new Error("Sign in to update selected tasks.");
+      }
       const responses = await Promise.all(selectedTasks.map((task) => operation(task, token)));
       const failures = responses.filter((response) => !response.ok);
       if (failures.length) {
@@ -249,17 +270,30 @@ export default function TasksScreen() {
     }
   };
 
-  const handleBatchComplete = () => runBatch((task, token) => fetch(`${getServerUrl()}/api/v1/tasks/${task.id}/status`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ status: "completed" }),
-  }));
+  const handleBatchComplete = () => runBatch(
+    (task, token) => fetch(`${getServerUrl()}/api/v1/tasks/${task.id}/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status: "completed" }),
+    }),
+    async (task, userId) => {
+      await updateTaskOffline(userId, task.id, { status: "completed" });
+    }
+  );
 
-  const handleBatchRescheduleTomorrow = () => runBatch((task, token) => fetch(`${getServerUrl()}/api/v1/tasks/${task.id}/end-of-day-action`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ action: "tomorrow" }),
-  }));
+  const handleBatchRescheduleTomorrow = () => runBatch(
+    (task, token) => fetch(`${getServerUrl()}/api/v1/tasks/${task.id}/end-of-day-action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: "tomorrow" }),
+    }),
+    async (task, userId) => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(23, 59, 0, 0);
+      await updateTaskOffline(userId, task.id, { deadline_at: tomorrow.toISOString() });
+    }
+  );
 
   const handleBatchDelete = () => Alert.alert(
     `Move ${selectedIds.size} tasks to Trash?`,
@@ -267,10 +301,15 @@ export default function TasksScreen() {
     [
       { text: "Keep tasks", style: "cancel" },
       { text: "Move to Trash", style: "destructive", onPress: () => {
-        void runBatch((task, token) => fetch(`${getServerUrl()}/api/v1/tasks/${task.id}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        }));
+        void runBatch(
+          (task, token) => fetch(`${getServerUrl()}/api/v1/tasks/${task.id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          async (task, userId) => {
+            await deleteTaskOffline(userId, task.id);
+          }
+        );
       } },
     ],
   );
@@ -328,64 +367,71 @@ export default function TasksScreen() {
   };
 
   const fetchTasks = useCallback(async () => {
+    let userIsOffline = false;
     const profile = await getUserProfile();
-    if (profile) {
-      try {
-        const cached = await getCachedTaskView(profile.id, activeView);
-        if (cached) {
-          setTasks(cached as TaskItem[]);
-          setSelectedTask((current) => current ? (cached.find((item) => item.id === current.id) as TaskItem | undefined) ?? current : current);
-          setIsLoading(false);
-        }
-        setRunningTimers(await getLocalTimers(profile.id));
-      } catch {
-        // Continue with the online request if the local database is unavailable.
-      }
+    const effectiveUserId = profile?.id ?? "local_user";
+    if (!profile || profile.id === "local_user") {
+      userIsOffline = true;
     }
+
     try {
-      let token = await ensureAuthenticated();
-      const baseUrl = getServerUrl();
-      if (!token) return;
-
-      let res = await fetch(`${baseUrl}/api/v1/tasks?view=${activeView}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401) {
-        token = await ensureAuthenticated(true);
-        if (token) {
-          res = await fetch(`${baseUrl}/api/v1/tasks?view=${activeView}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-        }
+      const cached = await getCachedTaskView(effectiveUserId, activeView);
+      if (cached) {
+        setTasks(cached as TaskItem[]);
+        setSelectedTask((current) => current ? (cached.find((item) => item.id === current.id) as TaskItem | undefined) ?? current : current);
+        setIsLoading(false);
       }
-      if (res.ok) {
-        const data = await res.json() as TaskItem[];
-        if (profile) await cacheTaskView(profile.id, activeView, data);
-        setTasks(data);
-        const lead = profile?.settings?.reminder_lead_min;
-        void syncTaskDeadlineReminders(data, typeof lead === "number" ? lead : DEFAULT_DEADLINE_REMINDER_LEAD_MIN);
-        setSelectedTask((current) => current ? data.find((item: TaskItem) => item.id === current.id) ?? current : current);
-        if (profile && token) void syncMobileAccount(profile.id, token, baseUrl).catch(() => undefined);
-      }
+      setRunningTimers(await getLocalTimers(effectiveUserId));
+    } catch {
+      // Continue with the online request if the local database is unavailable.
+    }
 
-      if (token) {
-        const timerRes = await fetch(`${baseUrl}/api/v1/time-entries/running/all`, {
+    try {
+      let token = await ensureAuthenticated().catch(() => null);
+      if (!token) {
+        userIsOffline = true;
+      } else {
+        const baseUrl = getServerUrl();
+        let res = await fetch(`${baseUrl}/api/v1/tasks?view=${activeView}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (timerRes.ok) {
-          const timerData = await timerRes.json();
-          if (profile) setRunningTimers(await cacheRunningTimers(profile.id, timerData));
-          else setRunningTimers(timerData);
-          void syncTaskTimerReminders(timerData);
+        if (res.status === 401) {
+          token = await ensureAuthenticated(true).catch(() => null);
+          if (token) {
+            res = await fetch(`${baseUrl}/api/v1/tasks?view=${activeView}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+          }
+        }
+        if (res && res.ok) {
+          const data = await res.json() as TaskItem[];
+          await cacheTaskView(effectiveUserId, activeView, data);
+          setTasks(data);
+          const lead = profile?.settings?.reminder_lead_min;
+          void syncTaskDeadlineReminders(data, typeof lead === "number" ? lead : DEFAULT_DEADLINE_REMINDER_LEAD_MIN);
+          setSelectedTask((current) => current ? data.find((item: TaskItem) => item.id === current.id) ?? current : current);
+          if (token) void syncMobileAccount(effectiveUserId, token, baseUrl).catch(() => undefined);
+          userIsOffline = false;
+        }
+
+        if (token) {
+          const timerRes = await fetch(`${baseUrl}/api/v1/time-entries/running/all`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch(() => null);
+          if (timerRes && timerRes.ok) {
+            const timerData = await timerRes.json();
+            setRunningTimers(await cacheRunningTimers(effectiveUserId, timerData));
+            void syncTaskTimerReminders(timerData);
+          }
         }
       }
     } catch {
-      if (profile) {
-        const cached = await getCachedTaskView(profile.id, activeView);
-        if (cached) setTasks(cached as TaskItem[]);
-        setRunningTimers(await getLocalTimers(profile.id));
-      }
+      userIsOffline = true;
+      const cached = await getCachedTaskView(effectiveUserId, activeView);
+      if (cached) setTasks(cached as TaskItem[]);
+      setRunningTimers(await getLocalTimers(effectiveUserId));
     } finally {
+      setIsOffline(userIsOffline);
       setIsLoading(false);
     }
   }, [activeView]);
@@ -858,7 +904,11 @@ export default function TasksScreen() {
   return (
     <View style={styles.container}>
       <SunriseArt height={176} />
-      <BrandHeader right={<><Pressable style={styles.headerAction} onPress={() => router.push("/calendar")} accessibilityLabel="Open calendar"><CalendarDays size={21} color={theme.colors.text.primary} /></Pressable><Pressable style={styles.headerAction} onPress={() => router.push("/(tabs)/profile")} accessibilityLabel="Open profile"><UserRound size={21} color={theme.colors.text.primary} /></Pressable></>} />
+      <BrandHeader
+        showOfflineBadge={isOffline}
+        onOfflineBadgePress={() => router.push("/login")}
+        right={<><Pressable style={styles.headerAction} onPress={() => router.push("/calendar")} accessibilityLabel="Open calendar"><CalendarDays size={21} color={theme.colors.text.primary} /></Pressable><Pressable style={styles.headerAction} onPress={() => router.push("/(tabs)/profile")} accessibilityLabel="Open profile"><UserRound size={21} color={theme.colors.text.primary} /></Pressable></>}
+      />
       <View style={styles.screenHeading}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <View>

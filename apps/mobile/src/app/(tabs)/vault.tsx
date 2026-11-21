@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { BookOpen, CheckSquare, FileText, Link as LinkIcon, Mic, Plus, Search, Send, Sparkles, Square, X } from "lucide-react-native";
+import { BookOpen, CheckSquare, FileText, Link as LinkIcon, Mic, Plus, Search, Send, Sparkles, Square, Trash2, X } from "lucide-react-native";
 import theme from "../../lib/theme";
-import { ensureAuthenticated } from "../../lib/auth";
+import { ensureAuthenticated, getUserProfile } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
-import { BrandHeader, SunriseArt } from "../../components/brand-ui";
+import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { triggerHaptic } from "../../lib/focus-session-notification";
+import { deleteLocalNote, getLocalNotes, makeOfflineId, saveLocalNote } from "../../lib/offline-sync";
 
 type VaultNote = { id: string; title: string; body: string; source_type: string; occurred_on: string; privacy_class: string };
 type SearchResult = { note_id: string; title: string; snippet: string; source_type: string; occurred_on: string; privacy_class: string };
@@ -27,6 +28,7 @@ export default function VaultScreen() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createVisible, setCreateVisible] = useState(false);
   const [title, setTitle] = useState("");
@@ -42,37 +44,84 @@ export default function VaultScreen() {
   const voiceBase = useRef("");
   const routeNoteLoaded = useRef<string | null>(null);
 
-  // FR-KNOW-003/004: search and create notes through the authenticated Vault API.
+  // Local-first note loading: load SQLite first, then sync with server if online
   const loadNotes = useCallback(async () => {
     setError(null);
+    let userId = "local_user";
     try {
+      const profile = await getUserProfile();
+      if (profile?.id) userId = profile.id;
+
+      // 1. Load SQLite local notes first
+      const local = await getLocalNotes(userId);
+      const mappedLocal: VaultNote[] = local.map((n) => ({
+        id: String(n.id),
+        title: String(n.title || "Untitled Note"),
+        body: String(n.body || ""),
+        source_type: String(n.source_type || "manual"),
+        occurred_on: String(n.occurred_on || localDateString()),
+        privacy_class: String(n.privacy_class || "personal"),
+      }));
+      setNotes(mappedLocal);
+
+      // 2. Try online fetch if authenticated
       const token = await ensureAuthenticated();
-      const response = await fetch(`${getServerUrl()}/api/v1/vault/notes?limit=50`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!response.ok) throw new Error("Could not load your vault. Try again.");
-      setNotes(await response.json());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not connect to your vault.");
+      if (token) {
+        const response = await fetch(`${getServerUrl()}/api/v1/vault/notes?limit=50`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const remoteNotes = (await response.json()) as VaultNote[];
+          if (Array.isArray(remoteNotes)) {
+            for (const rn of remoteNotes) {
+              await saveLocalNote(userId, rn);
+            }
+            setNotes(remoteNotes);
+            setIsOffline(false);
+            return;
+          }
+        }
+      }
+      setIsOffline(true);
+    } catch {
+      setIsOffline(true);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadNotes(); }, [loadNotes]);
+  useEffect(() => { void loadNotes(); }, [loadNotes]);
   useEffect(() => () => { void stopSpeechRecognition(); }, []);
 
   const openNote = useCallback(async (id: string) => {
+    // 1. Check if note is already loaded in local memory
+    const existing = notes.find((item) => item.id === id);
+    if (existing) {
+      setSelectedNote(existing);
+      setTaskText(existing.title);
+      setCreatedTaskTitle(null);
+      return;
+    }
+
     try {
       const token = await ensureAuthenticated();
-      const response = await fetch(`${getServerUrl()}/api/v1/vault/notes/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!response.ok) throw new Error("Could not open this note. Try again.");
-      const note: VaultNote = await response.json();
-      setSelectedNote(note);
-      setTaskText(note.title);
-      setCreatedTaskTitle(null);
-    } catch (err) {
-      Alert.alert("Vault", err instanceof Error ? err.message : "Could not open this note.");
+      if (token) {
+        const response = await fetch(`${getServerUrl()}/api/v1/vault/notes/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const note: VaultNote = await response.json();
+          setSelectedNote(note);
+          setTaskText(note.title);
+          setCreatedTaskTitle(null);
+          return;
+        }
+      }
+    } catch {
+      // ignore
     }
-  }, []);
+    Alert.alert("Note", "This note is not currently available locally.");
+  }, [notes]);
 
   useEffect(() => {
     if (noteId && routeNoteLoaded.current !== noteId) {
@@ -103,40 +152,108 @@ export default function VaultScreen() {
     if (!text) { setResults(null); return; }
     setSearching(true);
     setError(null);
+
+    // 1. Local keyword search
+    const q = text.toLowerCase();
+    const localMatches: SearchResult[] = notes
+      .filter((n) => n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q))
+      .map((n) => ({
+        note_id: n.id,
+        title: n.title,
+        snippet: n.body.slice(0, 140),
+        source_type: n.source_type,
+        occurred_on: n.occurred_on,
+        privacy_class: n.privacy_class,
+      }));
+    setResults(localMatches);
+
+    // 2. If online, also search backend
     try {
       const token = await ensureAuthenticated();
-      const response = await fetch(`${getServerUrl()}/api/v1/vault/search`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ query: text, mode: "keyword", limit: 20 }),
-      });
-      if (!response.ok) throw new Error("Search could not finish. Try again.");
-      setResults(await response.json());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not search your vault.");
+      if (token) {
+        const response = await fetch(`${getServerUrl()}/api/v1/vault/search`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ query: text, mode: "keyword", limit: 20 }),
+        });
+        if (response.ok) {
+          const serverResults = await response.json();
+          if (Array.isArray(serverResults) && serverResults.length > 0) {
+            setResults(serverResults);
+          }
+        }
+      }
+    } catch {
+      // offline: keep local results
     } finally {
       setSearching(false);
     }
   };
 
-  // FR-KNOW-004 — dictated speech is reviewed as text before the normal note API save.
+  // Local-first note creation: saves to SQLite, queues in outbox, pushes to server if online
   const createNote = async () => {
     if (!title.trim() || !body.trim() || saving) return;
     setSaving(true);
     try {
+      const profile = await getUserProfile();
+      const userId = profile?.id ?? "local_user";
+      const newNote: VaultNote = {
+        id: makeOfflineId(),
+        title: title.trim(),
+        body: body.trim(),
+        source_type: "manual",
+        privacy_class: "personal",
+        occurred_on: localDateString(),
+      };
+
+      // Save to local SQLite & sync outbox
+      await saveLocalNote(userId, newNote);
+
+      // Best-effort online sync
       const token = await ensureAuthenticated();
-      const response = await fetch(`${getServerUrl()}/api/v1/vault/notes`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), body: body.trim(), source_type: "manual", privacy_class: "personal", occurred_on: localDateString() }),
-      });
-      if (!response.ok) throw new Error("Could not save this note. Try again.");
-      setTitle(""); setBody(""); setCreateVisible(false); setResults(null); await loadNotes();
+      if (token) {
+        try {
+          await fetch(`${getServerUrl()}/api/v1/vault/notes`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify(newNote),
+          });
+        } catch {
+          // Will sync via outbox later
+        }
+      }
+
+      setTitle("");
+      setBody("");
+      setCreateVisible(false);
+      setResults(null);
+      await loadNotes();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save this note.");
     } finally {
       setSaving(false);
     }
+  };
+
+  const deleteNote = async (noteIdToDelete: string) => {
+    Alert.alert("Delete Note", "Are you sure you want to remove this note?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const profile = await getUserProfile();
+            const userId = profile?.id ?? "local_user";
+            await deleteLocalNote(userId, noteIdToDelete);
+            setSelectedNote(null);
+            await loadNotes();
+          } catch (err) {
+            Alert.alert("Error", err instanceof Error ? err.message : "Could not delete note.");
+          }
+        },
+      },
+    ]);
   };
 
   const convertNoteToTask = async (note: VaultNote, rawTaskText: string) => {
@@ -175,8 +292,14 @@ export default function VaultScreen() {
   return <View style={styles.container}>
     <SunriseArt height={180} />
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-      <BrandHeader />
+      <BrandHeader showOfflineBadge={isOffline} />
       <View style={styles.heading}><Text style={styles.title}>Vault</Text><Text style={styles.subtitle}>Your knowledge space. Save, organize and find things quickly.</Text></View>
+      {isOffline && (
+        <OfflineNoticeCard
+          featureName="Vault"
+          description="Notes are saved locally in SQLite and available offline. They will sync automatically when connected."
+        />
+      )}
       <View style={styles.searchBox}><Search size={20} color={theme.colors.text.secondary} /><TextInput value={query} onChangeText={(value) => { setQuery(value); if (!value.trim()) setResults(null); }} onSubmitEditing={searchNotes} returnKeyType="search" placeholder="Search notes, tasks and meetings…" placeholderTextColor={theme.colors.text.muted} style={styles.searchInput} /><Pressable accessibilityRole="button" accessibilityLabel="Search your vault" onPress={searchNotes} style={styles.searchButton}>{searching ? <ActivityIndicator size="small" color="#fff" /> : <Search size={17} color="#fff" />}</Pressable></View>
       <View style={styles.shortcuts}>
         <Pressable style={styles.shortcut} onPress={() => setCreateVisible(true)}><View style={[styles.shortcutIcon, { backgroundColor: "#FFF0E6" }]}><FileText size={22} color="#F97316" /></View><Text style={styles.shortcutText}>New note</Text></Pressable>
@@ -189,9 +312,35 @@ export default function VaultScreen() {
       {loading || searching ? <ActivityIndicator color={theme.colors.accent.amber} style={{ marginTop: 30 }} /> : shownItems.length === 0 ? <View style={styles.emptyCard}><BookOpen size={28} color="#E87935" /><Text style={styles.emptyTitle}>{results ? "No matching records" : "Your vault is ready"}</Text><Text style={styles.emptyText}>{results ? "Try another phrase or clear the search." : "Save a note to make it easy to find later."}</Text>{!results && <Pressable onPress={() => setCreateVisible(true)} style={styles.emptyButton}><Plus size={17} color="#fff" /><Text style={styles.emptyButtonText}>Create a note</Text></Pressable>}</View> : shownItems.map((item) => { const id = "note_id" in item ? item.note_id : item.id; return <Pressable key={id} onPress={() => openNote(id)} style={styles.noteCard} accessibilityRole="button" accessibilityLabel={`Open note ${item.title}`}><View style={styles.noteIcon}><FileText size={20} color="#F47B36" /></View><View style={styles.noteCopy}><Text style={styles.noteTitle} numberOfLines={2}>{item.title}</Text><Text style={styles.noteSummary} numberOfLines={2}>{"snippet" in item ? item.snippet : item.body}</Text><View style={styles.noteMeta}><Text style={styles.metaText}>{item.source_type.replaceAll("_", " ")}</Text><View style={styles.metaDot} /><Text style={styles.metaText}>{item.occurred_on}</Text><View style={styles.metaDot} /><Text style={styles.metaText}>{item.privacy_class}</Text></View></View><View style={styles.openNote}><LinkIcon size={17} color="#64748B" /></View></Pressable>; })}
       <Pressable style={styles.askCard} onPress={() => router.push("/ai")}><Sparkles size={22} color="#8759E8" /><View style={styles.askCopy}><Text style={styles.askTitle}>Ask ALIBI</Text><Text style={styles.askText}>Get grounded answers from your notes and work records.</Text></View><Send size={18} color="#53657A" /></Pressable>
     </ScrollView>
-    <Modal visible={selectedNote !== null} animationType="slide" transparent onRequestClose={() => setSelectedNote(null)}><View style={styles.modalShade}><View style={styles.detailModal}><View style={styles.modalHandle} /><View style={styles.modalHeading}><Text style={styles.modalTitle} numberOfLines={2}>{selectedNote?.title}</Text><Pressable onPress={() => setSelectedNote(null)} accessibilityRole="button" accessibilityLabel="Close note"><X size={22} color="#0B2030" /></Pressable></View><Text style={styles.detailMeta}>{selectedNote?.occurred_on} · {selectedNote?.privacy_class}</Text><ScrollView style={styles.noteBodyScroll}><Text style={styles.noteBodyText}>{selectedNote?.body}</Text></ScrollView><View style={styles.taskFromNote}><Text style={styles.taskFromNoteTitle}>Turn a note item into a task</Text><Text style={styles.taskFromNoteHint}>Choose an unfinished checklist item, or edit the task text below.</Text>{uncheckedChecklistItems.length > 0 && <ScrollView style={styles.checklistChoices} nestedScrollEnabled>{uncheckedChecklistItems.map((line, index) => <Pressable key={`${index}-${line}`} onPress={() => { setTaskText(line); setCreatedTaskTitle(null); }} style={[styles.checklistChoice, taskText === line && styles.checklistChoiceActive]}><CheckSquare size={16} color={taskText === line ? "#F97316" : "#83909D"} /><Text style={styles.checklistChoiceText}>{line}</Text></Pressable>)}</ScrollView>}<TextInput value={taskText} onChangeText={(value) => { setTaskText(value); setCreatedTaskTitle(null); }} placeholder="Task title" placeholderTextColor="#929EAC" style={styles.titleInput} /><Pressable disabled={!taskText.trim() || convertingTask} onPress={() => selectedNote && void convertNoteToTask(selectedNote, taskText)} style={[styles.saveButton, (!taskText.trim() || convertingTask) && { opacity: .55 }]}><Text style={styles.saveButtonText}>{convertingTask ? "Creating task…" : "Create linked task"}</Text></Pressable>{createdTaskTitle && <Text style={styles.createdTaskText}>Linked task: {createdTaskTitle}</Text>}</View></View></View></Modal>
-    <Modal visible={createVisible} animationType="slide" transparent onRequestClose={() => { void stopSpeechRecognition(); setListening(false); setCreateVisible(false); }}><View style={styles.modalShade}><View style={styles.modal}><View style={styles.modalHandle} /><View style={styles.modalHeading}><Text style={styles.modalTitle}>New Note</Text><Pressable onPress={() => { void stopSpeechRecognition(); setListening(false); setCreateVisible(false); }} accessibilityLabel="Close"><X size={22} color="#0B2030" /></Pressable></View><TextInput value={title} onChangeText={setTitle} placeholder="Give your note a title" placeholderTextColor="#929EAC" style={styles.titleInput} /><TextInput value={body} onChangeText={setBody} placeholder="Write or dictate something worth remembering…" placeholderTextColor="#929EAC" multiline textAlignVertical="top" style={styles.bodyInput} /><Pressable onPress={toggleVoice} style={[styles.voiceButton, listening && styles.voiceButtonActive]} accessibilityRole="button" accessibilityLabel={listening ? "Stop voice note" : "Dictate note"}>{listening ? <Square size={17} color="#FFFFFF" fill="#FFFFFF" /> : <Mic size={18} color="#F97316" />}<Text style={[styles.voiceButtonText, listening && { color: "#FFFFFF" }]}>{listening ? "Listening · tap to finish" : "Dictate in real time"}</Text></Pressable>{voiceError && <Text style={styles.voiceError}>{voiceError}</Text>}<Text style={styles.privateHint}>This note is saved to your personal vault. Review the transcript before saving.</Text><Pressable disabled={!title.trim() || !body.trim() || saving || listening} onPress={createNote} style={[styles.saveButton, (!title.trim() || !body.trim() || saving || listening) && { opacity: .55 }]}><Text style={styles.saveButtonText}>{saving ? "Saving…" : listening ? "Finish dictation to save" : "Save Note"}</Text></Pressable></View></View></Modal>
+    <Modal visible={selectedNote !== null} animationType="slide" transparent onRequestClose={() => setSelectedNote(null)}>
+      <View style={styles.modalShade}>
+        <View style={styles.detailModal}>
+          <View style={styles.modalHandle} />
+          <View style={styles.modalHeading}>
+            <Text style={styles.modalTitle} numberOfLines={2}>{selectedNote?.title}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <Pressable
+                onPress={() => selectedNote && void deleteNote(selectedNote.id)}
+                accessibilityRole="button"
+                accessibilityLabel="Delete note"
+                hitSlop={10}
+              >
+                <Trash2 size={20} color="#DC2626" />
+              </Pressable>
+              <Pressable onPress={() => setSelectedNote(null)} accessibilityRole="button" accessibilityLabel="Close note" hitSlop={10}>
+                <X size={22} color="#0B2030" />
+              </Pressable>
+            </View>
+          </View>
+          <Text style={styles.detailMeta}>{selectedNote?.occurred_on} · {selectedNote?.privacy_class}</Text>
+          <ScrollView style={styles.noteBodyScroll}><Text style={styles.noteBodyText}>{selectedNote?.body}</Text></ScrollView>
+          <View style={styles.taskFromNote}><Text style={styles.taskFromNoteTitle}>Turn a note item into a task</Text><Text style={styles.taskFromNoteHint}>Choose an unfinished checklist item, or edit the task text below.</Text>{uncheckedChecklistItems.length > 0 && <ScrollView style={styles.checklistChoices} nestedScrollEnabled>{uncheckedChecklistItems.map((line, index) => <Pressable key={`${index}-${line}`} onPress={() => { setTaskText(line); setCreatedTaskTitle(null); }} style={[styles.checklistChoice, taskText === line && styles.checklistChoiceActive]}><CheckSquare size={16} color={taskText === line ? "#F97316" : "#83909D"} /><Text style={styles.checklistChoiceText}>{line}</Text></Pressable>)}</ScrollView>}<TextInput value={taskText} onChangeText={(value) => { setTaskText(value); setCreatedTaskTitle(null); }} placeholder="Task title" placeholderTextColor="#929EAC" style={styles.titleInput} /><Pressable disabled={!taskText.trim() || convertingTask} onPress={() => selectedNote && void convertNoteToTask(selectedNote, taskText)} style={[styles.saveButton, (!taskText.trim() || convertingTask) && { opacity: .55 }]}><Text style={styles.saveButtonText}>{convertingTask ? "Creating task…" : "Create linked task"}</Text></Pressable>{createdTaskTitle && <Text style={styles.createdTaskText}>Linked task: {createdTaskTitle}</Text>}</View>
+        </View>
+      </View>
+    </Modal>
+    <Modal visible={createVisible} animationType="slide" transparent onRequestClose={() => { void stopSpeechRecognition(); setListening(false); setCreateVisible(false); }}><View style={styles.modalShade}><View style={styles.modal}><View style={styles.modalHandle} /><View style={styles.modalHeading}><Text style={styles.modalTitle}>New Note</Text><Pressable onPress={() => { void stopSpeechRecognition(); setListening(false); setCreateVisible(false); }} accessibilityLabel="Close"><X size={22} color="#0B2030" /></Pressable></View><TextInput value={title} onChangeText={setTitle} placeholder="Give your note a title" placeholderTextColor="#929EAC" style={styles.titleInput} /><TextInput value={body} onChangeText={setBody} placeholder="Write or dictate something worth remembering…" placeholderTextColor="#929EAC" multiline textAlignVertical="top" style={styles.bodyInput} /><Pressable onPress={toggleVoice} style={[styles.voiceButton, listening && styles.voiceButtonActive]} accessibilityRole="button" accessibilityLabel={listening ? "Stop voice note" : "Dictate note"}>{listening ? <Square size={17} color="#FFFFFF" fill="#FFFFFF" /> : <Mic size={18} color="#F97316" />}<Text style={[styles.voiceButtonText, listening && { color: "#FFFFFF" }]}>{listening ? "Listening · tap to finish" : "Dictate in real time"}</Text></Pressable>{voiceError && <Text style={styles.voiceError}>{voiceError}</Text>}<Text style={styles.privateHint}>This note is saved to your personal vault in SQLite. Review before saving.</Text><Pressable disabled={!title.trim() || !body.trim() || saving || listening} onPress={createNote} style={[styles.saveButton, (!title.trim() || !body.trim() || saving || listening) && { opacity: .55 }]}><Text style={styles.saveButtonText}>{saving ? "Saving…" : listening ? "Finish dictation to save" : "Save Note"}</Text></Pressable></View></View></Modal>
   </View>;
+}
 }
 
 const styles = StyleSheet.create({

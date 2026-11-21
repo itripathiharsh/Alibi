@@ -770,6 +770,274 @@ export async function saveLocalNote(userId: string, note: Record<string, unknown
   );
 }
 
+export async function deleteTaskOffline(userId: string, taskId: string): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    const row = await db.getFirstAsync<{ version: number }>(
+      "SELECT version FROM local_tasks WHERE user_id = ? AND id = ?",
+      userId,
+      taskId,
+    );
+    await db.runAsync("DELETE FROM local_tasks WHERE user_id = ? AND id = ?", userId, taskId);
+    await enqueue(db, userId, taskId, "delete", {}, row?.version ?? null, "task");
+    const rows = await db.getAllAsync<{ view_key: string; data_json: string }>(
+      "SELECT view_key, data_json FROM task_views WHERE user_id = ?",
+      userId,
+    );
+    for (const r of rows) {
+      try {
+        const tasks = JSON.parse(r.data_json) as LocalTask[];
+        const next = tasks.filter((t) => t.id !== taskId);
+        await db.runAsync(
+          "UPDATE task_views SET data_json = ?, cached_at = ? WHERE user_id = ? AND view_key = ?",
+          JSON.stringify(next),
+          new Date().toISOString(),
+          userId,
+          r.view_key,
+        );
+      } catch {
+        continue;
+      }
+    }
+  });
+}
+
+export async function deleteLocalNote(userId: string, noteId: string): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    const row = await db.getFirstAsync<{ version: number }>(
+      "SELECT version FROM local_notes WHERE user_id = ? AND id = ?",
+      userId,
+      noteId,
+    );
+    await db.runAsync("DELETE FROM local_notes WHERE user_id = ? AND id = ?", userId, noteId);
+    await enqueue(db, userId, noteId, "delete", {}, row?.version ?? null, "vault_note");
+  });
+}
+
+export async function deleteLocalCalendarEvent(userId: string, eventId: string): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    const row = await db.getFirstAsync<{ version: number }>(
+      "SELECT version FROM local_calendar_events WHERE user_id = ? AND id = ?",
+      userId,
+      eventId,
+    );
+    await db.runAsync("DELETE FROM local_calendar_events WHERE user_id = ? AND id = ?", userId, eventId);
+    await enqueue(db, userId, eventId, "delete", {}, row?.version ?? null, "calendar_event");
+  });
+}
+
+export async function getLocalCalendarData(
+  userId: string,
+  startIso?: string,
+  endIso?: string,
+): Promise<{
+  tasks: Array<{
+    id: string;
+    title: string;
+    status: "pending" | "in_progress" | "completed" | "cancelled";
+    deadline_at: string | null;
+    estimate_user_min: number | null;
+    tags: string[];
+  }>;
+  events: Array<{
+    id: string;
+    title: string;
+    kind: string;
+    source: string;
+    start_at: string;
+    end_at: string;
+    is_all_day: boolean;
+    task_id: string | null;
+  }>;
+}> {
+  const db = await getDatabase();
+  const taskRows = await db.getAllAsync<{ data_json: string }>(
+    "SELECT data_json FROM local_tasks WHERE user_id = ?",
+    userId,
+  );
+  const tasks = taskRows.flatMap((r) => {
+    try {
+      const t = normalizeTask(JSON.parse(r.data_json) as Record<string, unknown>);
+      if (!t || !t.deadline_at) return [];
+      if (startIso && t.deadline_at < startIso) return [];
+      if (endIso && t.deadline_at > endIso) return [];
+      return [{
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        deadline_at: t.deadline_at,
+        estimate_user_min: t.estimate_user_min ?? null,
+        tags: t.tags ?? [],
+      }];
+    } catch {
+      return [];
+    }
+  });
+
+  const eventRows = await db.getAllAsync<{ data_json: string }>(
+    "SELECT data_json FROM local_calendar_events WHERE user_id = ?",
+    userId,
+  );
+  const events = eventRows.flatMap((r) => {
+    try {
+      const e = JSON.parse(r.data_json) as Record<string, unknown>;
+      if (e.deleted === true) return [];
+      const startAt = String(e.start_at || e.start || "");
+      const endAt = String(e.end_at || e.end || startAt);
+      if (!startAt) return [];
+      if (endIso && startAt > endIso) return [];
+      if (startIso && endAt < startIso) return [];
+      return [{
+        id: String(e.id),
+        title: String(e.title || "Untitled Event"),
+        kind: String(e.kind || "event"),
+        source: String(e.source || "local"),
+        start_at: startAt,
+        end_at: endAt,
+        is_all_day: Boolean(e.is_all_day),
+        task_id: typeof e.task_id === "string" ? e.task_id : null,
+      }];
+    } catch {
+      return [];
+    }
+  });
+
+  return { tasks, events };
+}
+
+export async function getLocalAnalyticsSummary(userId: string): Promise<{
+  total_time_min: number;
+  tasks_completed: number;
+  tasks_pending: number;
+  tasks_overdue: number;
+  completion_rate: number | null;
+  on_time_rate: number | null;
+  efficiency: number | null;
+}> {
+  const db = await getDatabase();
+  const taskRows = await db.getAllAsync<{ data_json: string }>(
+    "SELECT data_json FROM local_tasks WHERE user_id = ?",
+    userId,
+  );
+  const nowIso = new Date().toISOString();
+  let completed = 0;
+  let pending = 0;
+  let overdue = 0;
+
+  for (const r of taskRows) {
+    try {
+      const t = JSON.parse(r.data_json) as LocalTask;
+      if (t.status === "completed") {
+        completed++;
+      } else {
+        pending++;
+        if (t.deadline_at && t.deadline_at < nowIso) {
+          overdue++;
+        }
+      }
+    } catch {
+      // skip unparseable
+    }
+  }
+
+  const timeRow = await db.getFirstAsync<{ total: number }>(
+    "SELECT COALESCE(SUM(duration_min), 0) AS total FROM local_time_entries WHERE user_id = ?",
+    userId,
+  );
+  const totalMin = timeRow?.total ?? 0;
+  const totalTasks = completed + pending;
+  const completionRate = totalTasks > 0 ? completed / totalTasks : null;
+  const onTimeRate = completed > 0 ? Math.max(0, (completed - overdue) / completed) : null;
+
+  return {
+    total_time_min: totalMin,
+    tasks_completed: completed,
+    tasks_pending: pending,
+    tasks_overdue: overdue,
+    completion_rate: completionRate,
+    on_time_rate: onTimeRate,
+    efficiency: null,
+  };
+}
+
+export async function migrateOfflineUserToAccount(newUserId: string): Promise<void> {
+  if (!newUserId || newUserId === "local_user") return;
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    // 1. Tasks
+    const localTasks = await db.getAllAsync<{ id: string; data_json: string; version: number; server_seq: number; updated_at: string }>(
+      "SELECT id, data_json, version, server_seq, updated_at FROM local_tasks WHERE user_id = 'local_user'",
+    );
+    for (const task of localTasks) {
+      await db.runAsync(
+        `INSERT INTO local_tasks(user_id, id, data_json, version, server_seq, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, id) DO UPDATE SET
+           data_json = excluded.data_json, version = excluded.version, updated_at = excluded.updated_at`,
+        newUserId, task.id, task.data_json, task.version, task.server_seq, task.updated_at,
+      );
+    }
+    await db.runAsync("DELETE FROM local_tasks WHERE user_id = 'local_user'");
+
+    // 2. Task Views
+    const localViews = await db.getAllAsync<{ view_key: string; data_json: string; cached_at: string }>(
+      "SELECT view_key, data_json, cached_at FROM task_views WHERE user_id = 'local_user'",
+    );
+    for (const view of localViews) {
+      await db.runAsync(
+        `INSERT INTO task_views(user_id, view_key, data_json, cached_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(user_id, view_key) DO UPDATE SET
+           data_json = excluded.data_json, cached_at = excluded.cached_at`,
+        newUserId, view.view_key, view.data_json, view.cached_at,
+      );
+    }
+    await db.runAsync("DELETE FROM task_views WHERE user_id = 'local_user'");
+
+    // 3. Notes
+    const localNotes = await db.getAllAsync<{ id: string; data_json: string; version: number; server_seq: number; updated_at: string }>(
+      "SELECT id, data_json, version, server_seq, updated_at FROM local_notes WHERE user_id = 'local_user'",
+    );
+    for (const note of localNotes) {
+      await db.runAsync(
+        `INSERT INTO local_notes(user_id, id, data_json, version, server_seq, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, id) DO UPDATE SET
+           data_json = excluded.data_json, version = excluded.version, updated_at = excluded.updated_at`,
+        newUserId, note.id, note.data_json, note.version, note.server_seq, note.updated_at,
+      );
+    }
+    await db.runAsync("DELETE FROM local_notes WHERE user_id = 'local_user'");
+
+    // 4. Calendar Events
+    const localEvents = await db.getAllAsync<{ id: string; data_json: string; version: number; server_seq: number; updated_at: string }>(
+      "SELECT id, data_json, version, server_seq, updated_at FROM local_calendar_events WHERE user_id = 'local_user'",
+    );
+    for (const event of localEvents) {
+      await db.runAsync(
+        `INSERT INTO local_calendar_events(user_id, id, data_json, version, server_seq, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, id) DO UPDATE SET
+           data_json = excluded.data_json, version = excluded.version, updated_at = excluded.updated_at`,
+        newUserId, event.id, event.data_json, event.version, event.server_seq, event.updated_at,
+      );
+    }
+    await db.runAsync("DELETE FROM local_calendar_events WHERE user_id = 'local_user'");
+
+    // 5. Timers & Time entries
+    await db.runAsync("UPDATE local_timers SET user_id = ? WHERE user_id = 'local_user'", newUserId);
+    await db.runAsync("UPDATE local_time_entries SET user_id = ? WHERE user_id = 'local_user'", newUserId);
+
+    // 6. Sync Outbox - update user_id so pending items get pushed for the new user!
+    await db.runAsync("UPDATE sync_outbox SET user_id = ? WHERE user_id = 'local_user'", newUserId);
+
+    // 7. Sync Conflicts
+    await db.runAsync("UPDATE sync_conflicts SET user_id = ? WHERE user_id = 'local_user'", newUserId);
+  });
+}
+
 export async function getSyncConflicts(userId: string): Promise<{ id: string; entity_type: string; entity_id: string; resolved: boolean }[]> {
   const db = await getDatabase();
   const rows = await db.getAllAsync<{ id: string; entity_type: string; entity_id: string; resolved: number }>(

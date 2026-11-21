@@ -27,8 +27,8 @@ import {
   Layers,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
-import { BrandHeader, SunriseArt } from "../../components/brand-ui";
-import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
+import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
+import { getAccessToken, ensureAuthenticated, isOfflineUser } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 
@@ -62,10 +62,11 @@ export default function AIScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    // Proactively detect server on mount
+    void isOfflineUser().then(setIsOffline);
   }, []);
 
   const handleVoiceDictation = async () => {
@@ -124,8 +125,21 @@ export default function AIScreen() {
 
     try {
       let token = await ensureAuthenticated();
-      const baseUrl = getServerUrl();
+      if (!token) {
+        setIsOffline(true);
+        const offlineNotice: Message = {
+          id: `offline-${Date.now()}`,
+          role: "assistant",
+          content:
+            "Ask ALIBI's grounded assistant requires an active internet connection and an authenticated account to query cloud AI models. Your local tasks, focus timers, notes, and calendar remain completely operational offline on this device.",
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, offlineNotice]);
+        setIsLoading(false);
+        return;
+      }
 
+      const baseUrl = getServerUrl();
       let res = await fetch(`${baseUrl}/api/v1/assistant/chat`, {
         method: "POST",
         headers: {
@@ -226,8 +240,16 @@ export default function AIScreen() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
       <SunriseArt height={170} />
-      <BrandHeader />
+      <BrandHeader showOfflineBadge={isOffline} />
       <View style={styles.screenHeading}><Text style={styles.screenTitle}>Ask ALIBI</Text><Text style={styles.screenSubtitle}>Answers grounded in your tasks, notes and learning.</Text></View>
+      {isOffline && (
+        <View style={{ paddingHorizontal: 16 }}>
+          <OfflineNoticeCard
+            featureName="Ask ALIBI"
+            description="The grounded assistant requires an internet connection and an authenticated account to query server AI models. Your local tasks, focus timers, notes, and calendar remain completely available offline."
+          />
+        </View>
+      )}
       {/* Top Banner: Grounding Guarantee */}
       <View style={styles.topBanner}>
         <View style={styles.bannerRow}>

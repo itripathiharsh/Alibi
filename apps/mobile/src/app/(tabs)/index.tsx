@@ -33,6 +33,7 @@ import {
   TrendingUp,
   Brain,
   Sparkles,
+  CloudOff,
   X,
   Tag as TagIcon,
   Sun,
@@ -52,7 +53,7 @@ import { triggerHaptic, startFocusNotification, stopFocusNotification } from "..
 import { filterLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
 import { CaptureReviewSheet } from "../../components/capture-review-sheet";
 import { decideTaskExtraction, type TaskExtractionProposal } from "../../lib/task-extraction";
-import { cacheRunningTimers, cacheTaskView, createTaskOffline, getCachedTaskView, getLocalTimers, makeOfflineId, removeLocalTimer, startTaskTimerOffline, stopTaskTimerOffline, syncMobileAccount, updateTaskOffline } from "../../lib/offline-sync";
+import { cacheRunningTimers, cacheTaskView, createTaskOffline, getCachedTaskView, getLocalAnalyticsSummary, getLocalTimers, makeOfflineId, removeLocalTimer, startTaskTimerOffline, stopTaskTimerOffline, syncMobileAccount, updateTaskOffline } from "../../lib/offline-sync";
 
 interface TaskItem {
   id: string;
@@ -172,6 +173,7 @@ export default function DashboardScreen() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
 
   // Quick Capture Modal State
   const [captureVisible, setCaptureVisible] = useState(false);
@@ -325,96 +327,108 @@ export default function DashboardScreen() {
 
   // Fetch all live dashboard data
   const fetchDashboardData = useCallback(async () => {
-    const profile = await getUserProfile();
-    if (profile) {
-      try {
-        const [cachedTasks, cachedTimers] = await Promise.all([
-          getCachedTaskView(profile.id, "today"),
-          getLocalTimers(profile.id),
-        ]);
-        if (cachedTasks) setTodayTasks(cachedTasks as TaskItem[]);
-        setRunningTimers(cachedTimers);
-        if (cachedTasks) setIsLoading(false);
-      } catch {
-        // Render the remote result if the local cache cannot be read.
-      }
-    }
+    let resolvedProfile = await getUserProfile();
+    const effectiveUserId = resolvedProfile?.id ?? "local_user";
+    let offlineMode = !resolvedProfile || resolvedProfile.id === "local_user";
+
     try {
-      const token = (await getAccessToken()) || (await ensureAuthenticated());
-      const baseUrl = getServerUrl();
-      const headers: Record<string, string> = { Accept: "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const [userRes, tasksRes, upcomingRes, sumRes, scoreRes, timerRes, learnRes, notifsRes] = await Promise.all([
-        fetch(`${baseUrl}/api/v1/auth/me`, { headers }).catch(() => null),
-        fetch(`${baseUrl}/api/v1/tasks?view=today`, { headers }).catch(() => null),
-        fetch(`${baseUrl}/api/v1/tasks?view=upcoming`, { headers }).catch(() => null),
-        fetch(`${baseUrl}/api/v1/analytics/summary?period=daily`, { headers }).catch(() => null),
-        fetch(`${baseUrl}/api/v1/analytics/productivity-score?period=daily`, { headers }).catch(() => null),
-        fetch(`${baseUrl}/api/v1/time-entries/running/all`, { headers }).catch(() => null),
-        fetch(`${baseUrl}/api/v1/learning/profile`, { headers }).catch(() => null),
-        fetch(`${baseUrl}/api/v1/notifications`, { headers }).catch(() => null),
+      const [cachedTasks, cachedTimers] = await Promise.all([
+        getCachedTaskView(effectiveUserId, "today"),
+        getLocalTimers(effectiveUserId),
       ]);
-
-      let reminderLeadMin = DEFAULT_DEADLINE_REMINDER_LEAD_MIN;
-      if (userRes && userRes.ok) {
-        const userData = await userRes.json() as UserProfile;
-        setUser(userData);
-        if (userData.id && userData.email && userData.timezone) {
-          await saveUserProfile({
-            id: userData.id,
-            email: userData.email,
-            display_name: userData.display_name ?? null,
-            timezone: userData.timezone,
-            settings: userData.settings,
-          });
-        }
-        const configuredLead = userData.settings?.reminder_lead_min;
-        if (typeof configuredLead === "number" && Number.isFinite(configuredLead)) reminderLeadMin = configuredLead;
-      }
-      const reminderTasks: TaskItem[] = [];
-      if (tasksRes && tasksRes.ok) {
-        const taskData = await tasksRes.json() as TaskItem[];
-        setTodayTasks(taskData);
-        reminderTasks.push(...taskData);
-        if (profile) await cacheTaskView(profile.id, "today", taskData);
-      }
-      if (upcomingRes && upcomingRes.ok) {
-        const upData = await upcomingRes.json() as TaskItem[];
-        setUpcomingTasks(upData);
-        reminderTasks.push(...upData);
-      }
-      void syncTaskDeadlineReminders(reminderTasks, reminderLeadMin);
-      if (notifsRes && notifsRes.ok) {
-        const notifs = await notifsRes.json();
-        setHasUnreadNotifications(Array.isArray(notifs) && notifs.some((n: any) => n.status !== "dismissed"));
-      }
-      if (sumRes && sumRes.ok) {
-        setSummary(await sumRes.json());
-      }
-      if (scoreRes && scoreRes.ok) {
-        setScore(await scoreRes.json());
-      }
-      if (timerRes && timerRes.ok) {
-        const timerData = await timerRes.json();
-        if (profile) setRunningTimers(await cacheRunningTimers(profile.id, timerData));
-        else setRunningTimers(timerData);
-      }
-      if (learnRes && learnRes.ok) {
-        const profile = await learnRes.json();
-        setLearnedRoutines(filterLearnedTaskRoutines(profile?.routines));
-        if (profile?.peak_window) {
-          setLearningTip(`You tend to be most productive between ${profile.peak_window}.`);
-        }
-      }
-      if (profile && token) void syncMobileAccount(profile.id, token, baseUrl).catch(() => undefined);
+      if (cachedTasks) setTodayTasks(cachedTasks as TaskItem[]);
+      setRunningTimers(cachedTimers);
+      if (cachedTasks) setIsLoading(false);
     } catch {
-      if (profile) {
-        const cachedTasks = await getCachedTaskView(profile.id, "today");
-        if (cachedTasks) setTodayTasks(cachedTasks as TaskItem[]);
-        setRunningTimers(await getLocalTimers(profile.id));
+      // Render the remote result if the local cache cannot be read.
+    }
+
+    try {
+      const token = (await getAccessToken()) || (await ensureAuthenticated().catch(() => null));
+      if (!token) {
+        offlineMode = true;
+      } else {
+        const baseUrl = getServerUrl();
+        const headers: Record<string, string> = { Accept: "application/json", Authorization: `Bearer ${token}` };
+
+        const [userRes, tasksRes, upcomingRes, sumRes, scoreRes, timerRes, learnRes, notifsRes] = await Promise.all([
+          fetch(`${baseUrl}/api/v1/auth/me`, { headers }).catch(() => null),
+          fetch(`${baseUrl}/api/v1/tasks?view=today`, { headers }).catch(() => null),
+          fetch(`${baseUrl}/api/v1/tasks?view=upcoming`, { headers }).catch(() => null),
+          fetch(`${baseUrl}/api/v1/analytics/summary?period=daily`, { headers }).catch(() => null),
+          fetch(`${baseUrl}/api/v1/analytics/productivity-score?period=daily`, { headers }).catch(() => null),
+          fetch(`${baseUrl}/api/v1/time-entries/running/all`, { headers }).catch(() => null),
+          fetch(`${baseUrl}/api/v1/learning/profile`, { headers }).catch(() => null),
+          fetch(`${baseUrl}/api/v1/notifications`, { headers }).catch(() => null),
+        ]);
+
+        let reminderLeadMin = DEFAULT_DEADLINE_REMINDER_LEAD_MIN;
+        if (userRes && userRes.ok) {
+          const userData = await userRes.json() as UserProfile;
+          setUser(userData);
+          offlineMode = false;
+          if (userData.id && userData.email && userData.timezone) {
+            await saveUserProfile({
+              id: userData.id,
+              email: userData.email,
+              display_name: userData.display_name ?? null,
+              timezone: userData.timezone,
+              settings: userData.settings,
+            });
+          }
+          const configuredLead = userData.settings?.reminder_lead_min;
+          if (typeof configuredLead === "number" && Number.isFinite(configuredLead)) reminderLeadMin = configuredLead;
+        }
+        const reminderTasks: TaskItem[] = [];
+        if (tasksRes && tasksRes.ok) {
+          const taskData = await tasksRes.json() as TaskItem[];
+          setTodayTasks(taskData);
+          reminderTasks.push(...taskData);
+          await cacheTaskView(effectiveUserId, "today", taskData);
+        }
+        if (upcomingRes && upcomingRes.ok) {
+          const upData = await upcomingRes.json() as TaskItem[];
+          setUpcomingTasks(upData);
+          reminderTasks.push(...upData);
+        }
+        void syncTaskDeadlineReminders(reminderTasks, reminderLeadMin);
+        if (notifsRes && notifsRes.ok) {
+          const notifs = await notifsRes.json();
+          setHasUnreadNotifications(Array.isArray(notifs) && notifs.some((n: any) => n.status !== "dismissed"));
+        }
+        if (sumRes && sumRes.ok) {
+          setSummary(await sumRes.json());
+        }
+        if (scoreRes && scoreRes.ok) {
+          setScore(await scoreRes.json());
+        }
+        if (timerRes && timerRes.ok) {
+          const timerData = await timerRes.json();
+          setRunningTimers(await cacheRunningTimers(effectiveUserId, timerData));
+        }
+        if (learnRes && learnRes.ok) {
+          const profileData = await learnRes.json();
+          setLearnedRoutines(filterLearnedTaskRoutines(profileData?.routines));
+          if (profileData?.peak_window) {
+            setLearningTip(`You tend to be most productive between ${profileData.peak_window}.`);
+          }
+        }
+        if (token) void syncMobileAccount(effectiveUserId, token, baseUrl).catch(() => undefined);
       }
+    } catch {
+      offlineMode = true;
     } finally {
+      setIsOffline(offlineMode);
+      if (offlineMode) {
+        try {
+          const cachedTasks = await getCachedTaskView(effectiveUserId, "today");
+          if (cachedTasks) setTodayTasks(cachedTasks as TaskItem[]);
+          setRunningTimers(await getLocalTimers(effectiveUserId));
+          const localSummary = await getLocalAnalyticsSummary(effectiveUserId);
+          setSummary(localSummary);
+          setScore({ score: null, completion_component: null, on_time_component: null, accuracy_component: null, insufficient_data: true });
+        } catch {}
+      }
       setIsLoading(false);
       setIsRefreshing(false);
     }
@@ -513,7 +527,13 @@ export default function DashboardScreen() {
       return;
     }
     const targetTask = todayTasks.find((t) => t.id === targetTaskId);
-    void startFocusNotification(targetTask?.title || "Focus Session", targetTask?.estimate_user_min || 25);
+    void startFocusNotification(
+      targetTaskId,
+      targetTask?.title || "Focus Session",
+      new Date().toISOString(),
+      targetTask?.estimate_user_min || 25,
+      true
+    );
     const profile = await getUserProfile();
     try {
       const baseUrl = getServerUrl();
@@ -848,6 +868,16 @@ export default function DashboardScreen() {
       <View style={styles.topBar}>
         <View style={styles.logoRow}>
           <Image source={require("../../../assets/logo_full_light.png")} style={styles.homeLogo} resizeMode="contain" accessibilityLabel="ALIBI" />
+          {isOffline && (
+            <Pressable
+              style={styles.offlinePill}
+              onPress={() => router.push("/(tabs)/profile")}
+              accessibilityLabel="Offline mode"
+            >
+              <CloudOff size={11} color="#C2410C" />
+              <Text style={styles.offlinePillText}>Offline</Text>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.topRightActions}>
@@ -1720,6 +1750,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   homeLogo: { width: 136, height: 36 },
+  offlinePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "#FFEDD5",
+    borderWidth: 1,
+    borderColor: "#FDBA74",
+  },
+  offlinePillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#C2410C",
+  },
   logoIcon: {
     width: 28,
     height: 28,

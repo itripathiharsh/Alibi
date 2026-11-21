@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Calendar as CalendarIcon, Check, CheckCircle2, ChevronLeft, ChevronRight, Circle, Clock, Sparkles, UserRound, X } from "lucide-react-native";
+import { Calendar as CalendarIcon, Check, CheckCircle2, ChevronLeft, ChevronRight, Circle, Clock, Plus, Sparkles, UserRound, X } from "lucide-react-native";
 import theme from "../../lib/theme";
-import { BrandHeader, SunriseArt } from "../../components/brand-ui";
+import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
 import { ensureAuthenticated, getUserProfile } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
+import { getLocalCalendarData, makeOfflineId, saveLocalCalendarEvent } from "../../lib/offline-sync";
 
 interface ScheduledTask {
   id: string;
@@ -76,6 +77,7 @@ export default function CalendarScreen() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [recommendation, setRecommendation] = useState<ScheduleRecommendation | null>(null);
   const [planHorizonDays, setPlanHorizonDays] = useState(1);
@@ -83,30 +85,63 @@ export default function CalendarScreen() {
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [isSavingPlan, setIsSavingPlan] = useState(false);
 
+  // Local Event Creation Modal
+  const [createEventVisible, setCreateEventVisible] = useState(false);
+  const [eventTitle, setEventTitle] = useState("");
+  const [eventDurationMin, setEventDurationMin] = useState("60");
+  const [isSavingEvent, setIsSavingEvent] = useState(false);
+
   const range = useMemo(() => weekRange(selectedDate), [selectedDate]);
   const fetchCalendarData = useCallback(async () => {
+    let token: string | null = null;
+    let profile: Awaited<ReturnType<typeof getUserProfile>> = null;
     try {
-      const token = await ensureAuthenticated();
-      if (!token) throw new Error("Sign in to load your calendar.");
-      const cachedUser = await getUserProfile();
-      const reminderLeadMin = typeof cachedUser?.settings?.reminder_lead_min === "number"
-        ? cachedUser.settings.reminder_lead_min
-        : DEFAULT_DEADLINE_REMINDER_LEAD_MIN;
-      const baseUrl = getServerUrl();
-      const from = encodeURIComponent(range.start.toISOString());
-      const to = encodeURIComponent(range.end.toISOString());
-      const headers = { Authorization: `Bearer ${token}`, Accept: "application/json" };
-      const [taskResponse, eventResponse] = await Promise.all([
-        fetch(`${baseUrl}/api/v1/tasks?view=all&limit=200&from=${from}&to=${to}`, { headers }),
-        fetch(`${baseUrl}/api/v1/scheduling/events?start_at=${from}&end_at=${to}`, { headers }),
-      ]);
-      if (!taskResponse.ok || !eventResponse.ok) {
-        throw new Error("Your calendar could not be refreshed. Try again.");
+      token = await ensureAuthenticated();
+      profile = await getUserProfile();
+    } catch {
+      // Offline fallback
+    }
+    const userId = profile?.id ?? "local_user";
+
+    // 1. Try online fetch if authenticated
+    if (token) {
+      try {
+        const cachedUser = profile;
+        const reminderLeadMin = typeof cachedUser?.settings?.reminder_lead_min === "number"
+          ? cachedUser.settings.reminder_lead_min
+          : DEFAULT_DEADLINE_REMINDER_LEAD_MIN;
+        const baseUrl = getServerUrl();
+        const from = encodeURIComponent(range.start.toISOString());
+        const to = encodeURIComponent(range.end.toISOString());
+        const headers = { Authorization: `Bearer ${token}`, Accept: "application/json" };
+        const [taskResponse, eventResponse] = await Promise.all([
+          fetch(`${baseUrl}/api/v1/tasks?view=all&limit=200&from=${from}&to=${to}`, { headers }),
+          fetch(`${baseUrl}/api/v1/scheduling/events?start_at=${from}&end_at=${to}`, { headers }),
+        ]);
+        if (taskResponse.ok && eventResponse.ok) {
+          const [taskData, eventData] = await Promise.all([taskResponse.json(), eventResponse.json()]);
+          setTasks(Array.isArray(taskData) ? taskData : []);
+          if (Array.isArray(taskData)) void syncTaskDeadlineReminders(taskData, reminderLeadMin);
+          setEvents(Array.isArray(eventData) ? eventData : []);
+          setIsOffline(false);
+          setLoadError(null);
+          return;
+        }
+      } catch {
+        // Fall back to local SQLite
       }
-      const [taskData, eventData] = await Promise.all([taskResponse.json(), eventResponse.json()]);
-      setTasks(Array.isArray(taskData) ? taskData : []);
-      if (Array.isArray(taskData)) void syncTaskDeadlineReminders(taskData, reminderLeadMin);
-      setEvents(Array.isArray(eventData) ? eventData : []);
+    }
+
+    // 2. Offline fallback: Read local tasks and events from SQLite
+    try {
+      setIsOffline(true);
+      const localData = await getLocalCalendarData(
+        userId,
+        range.start.toISOString(),
+        range.end.toISOString(),
+      );
+      setTasks(localData.tasks);
+      setEvents(localData.events);
       setLoadError(null);
     } catch (error: unknown) {
       setLoadError(error instanceof Error ? error.message : "Your calendar could not be loaded.");
@@ -115,6 +150,44 @@ export default function CalendarScreen() {
       setIsRefreshing(false);
     }
   }, [range]);
+
+  const handleCreateEvent = async () => {
+    const title = eventTitle.trim();
+    if (!title || isSavingEvent) return;
+    setIsSavingEvent(true);
+    try {
+      const profile = await getUserProfile();
+      const userId = profile?.id ?? "local_user";
+      const start = new Date(selectedDate);
+      if (sameDay(start, new Date())) {
+        start.setHours(new Date().getHours() + 1, 0, 0, 0);
+      } else {
+        start.setHours(10, 0, 0, 0);
+      }
+      const dur = parseInt(eventDurationMin, 10) || 60;
+      const end = new Date(start.getTime() + dur * 60000);
+
+      const eventPayload = {
+        id: makeOfflineId(),
+        title,
+        kind: "meeting",
+        source: "local",
+        start_at: start.toISOString(),
+        end_at: end.toISOString(),
+        is_all_day: false,
+        task_id: null,
+      };
+
+      await saveLocalCalendarEvent(userId, eventPayload);
+      setEventTitle("");
+      setCreateEventVisible(false);
+      await fetchCalendarData();
+    } catch (err: unknown) {
+      Alert.alert("Could not save event", err instanceof Error ? err.message : "Please try again.");
+    } finally {
+      setIsSavingEvent(false);
+    }
+  };
 
   useEffect(() => { void fetchCalendarData(); }, [fetchCalendarData]);
 
@@ -205,7 +278,18 @@ export default function CalendarScreen() {
   return (
     <View style={styles.container}>
       <SunriseArt height={180} />
-      <BrandHeader right={<Pressable style={styles.headerAction} onPress={() => router.push("/(tabs)/profile")} accessibilityLabel="Open profile"><UserRound size={21} color={theme.colors.text.primary} /></Pressable>} />
+      <BrandHeader
+        showOfflineBadge={isOffline}
+        right={
+          <Pressable
+            style={styles.headerAction}
+            onPress={() => router.push("/(tabs)/profile")}
+            accessibilityLabel="Open profile"
+          >
+            <UserRound size={21} color={theme.colors.text.primary} />
+          </Pressable>
+        }
+      />
       <View style={styles.header}>
         <View style={styles.headingCopy}>
           <Text style={styles.title}>Calendar</Text>
@@ -233,6 +317,13 @@ export default function CalendarScreen() {
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={theme.colors.accent.amber} />}>
+        {isOffline && (
+          <OfflineNoticeCard
+            featureName="Calendar"
+            description="Viewing local tasks and offline calendar events. Scheduled changes save to SQLite and sync when connected."
+          />
+        )}
+
         <View style={styles.planCard}>
           <View style={styles.planIntro}><View style={styles.planIcon}><Sparkles size={19} color={theme.colors.accent.amber} /></View><View style={styles.planCopy}><Text style={styles.planTitle}>{isGeneratingPlan ? "Building your plan…" : "Plan around your real workload"}</Text><Text style={styles.planSubtitle}>Fit estimated tasks around your calendar. Review every block before it is scheduled.</Text></View>{isGeneratingPlan && <ActivityIndicator color={theme.colors.accent.amber} />}</View>
           <View style={styles.planActions}><Pressable style={styles.planAction} onPress={() => { void generatePlan(1); }} disabled={isGeneratingPlan}><Text style={styles.planActionLabel}>Plan today</Text></Pressable><Pressable style={styles.planActionSecondary} onPress={() => { void generatePlan(7); }} disabled={isGeneratingPlan}><Text style={styles.planActionSecondaryLabel}>Plan 7 days</Text></Pressable></View>
@@ -240,13 +331,41 @@ export default function CalendarScreen() {
 
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>{selectedLabel}</Text>
-          <Text style={styles.taskCountBadge}>{dayItems.length}</Text>
+          <View style={styles.sectionHeaderActions}>
+            <Text style={styles.taskCountBadge}>{dayItems.length}</Text>
+            <Pressable
+              style={styles.addEventInlineBtn}
+              onPress={() => setCreateEventVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Add local calendar event"
+            >
+              <Plus size={14} color="#FFFFFF" />
+              <Text style={styles.addEventInlineText}>Event</Text>
+            </Pressable>
+          </View>
         </View>
 
         {isLoading ? <ActivityIndicator size="large" color={theme.colors.accent.amber} style={styles.loading} /> : loadError ? (
           <View style={styles.emptyCard}><CalendarIcon size={32} color={theme.colors.text.muted} /><Text style={styles.emptyTitle}>Calendar unavailable</Text><Text style={styles.emptySubtitle}>{loadError}</Text><Pressable style={styles.retryButton} onPress={onRefresh}><Text style={styles.retryLabel}>Try again</Text></Pressable></View>
         ) : dayItems.length === 0 ? (
-          <View style={styles.emptyCard}><CalendarIcon size={32} color={theme.colors.text.muted} /><Text style={styles.emptyTitle}>Nothing scheduled for this day</Text><Text style={styles.emptySubtitle}>Deadlines and calendar blocks will show here when you add them.</Text></View>
+          <View style={styles.emptyCard}>
+            <CalendarIcon size={32} color={theme.colors.text.muted} />
+            <Text style={styles.emptyTitle}>Nothing scheduled for this day</Text>
+            <Text style={styles.emptySubtitle}>
+              {isOffline
+                ? "No local events or due tasks for this date. You can add local events or tasks anytime."
+                : "Deadlines and calendar blocks will show here when you add them."}
+            </Text>
+            <View style={styles.emptyActionsRow}>
+              <Pressable style={styles.emptyAddEventBtn} onPress={() => setCreateEventVisible(true)}>
+                <Plus size={15} color="#FFFFFF" />
+                <Text style={styles.emptyAddEventText}>Add Event</Text>
+              </Pressable>
+              <Pressable style={styles.emptyAddTaskBtn} onPress={() => router.push("/capture")}>
+                <Text style={styles.emptyAddTaskText}>Add Task</Text>
+              </Pressable>
+            </View>
+          </View>
         ) : dayItems.map((item) => {
           const isTask = item.type === "task";
           const event = isTask ? null : item.event;
@@ -263,6 +382,57 @@ export default function CalendarScreen() {
           );
         })}
       </ScrollView>
+
+      {/* Add Local Event Modal */}
+      <Modal visible={createEventVisible} transparent animationType="fade" onRequestClose={() => setCreateEventVisible(false)}>
+        <View style={styles.backdrop}>
+          <View style={styles.eventModalContent}>
+            <View style={styles.eventModalHeader}>
+              <Text style={styles.eventModalTitle}>Add Calendar Event</Text>
+              <Pressable onPress={() => setCreateEventVisible(false)} hitSlop={10}>
+                <X size={20} color={theme.colors.text.secondary} />
+              </Pressable>
+            </View>
+            <Text style={styles.eventModalSubtitle}>
+              Date: {selectedDate.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+            </Text>
+
+            <TextInput
+              style={styles.eventInput}
+              value={eventTitle}
+              onChangeText={setEventTitle}
+              placeholder="Event title (e.g., Team Sync, Review Session)"
+              placeholderTextColor={theme.colors.text.muted}
+              autoFocus
+            />
+
+            <View style={styles.eventDurationRow}>
+              <Text style={styles.eventDurationLabel}>Duration (minutes):</Text>
+              <TextInput
+                style={styles.eventDurationInput}
+                value={eventDurationMin}
+                onChangeText={setEventDurationMin}
+                keyboardType="numeric"
+                maxLength={4}
+              />
+            </View>
+
+            <View style={styles.eventModalActions}>
+              <Pressable
+                style={[styles.saveEventBtn, (!eventTitle.trim() || isSavingEvent) && styles.buttonDisabled]}
+                disabled={!eventTitle.trim() || isSavingEvent}
+                onPress={handleCreateEvent}
+              >
+                {isSavingEvent ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveEventText}>Save to Calendar</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={Boolean(recommendation)} transparent animationType="slide" onRequestClose={() => setRecommendation(null)}>
         <View style={styles.backdrop}><View style={styles.reviewSheet}>
@@ -360,4 +530,23 @@ const styles = StyleSheet.create({
   primaryButton: { flex: 1.2, minHeight: 50, alignItems: "center", justifyContent: "center", borderRadius: 15, backgroundColor: theme.colors.text.primary },
   primaryLabel: { color: theme.colors.surface.card, fontSize: 13, fontWeight: "800" },
   buttonDisabled: { opacity: .55 },
+  sectionHeaderActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  addEventInlineBtn: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#F47B25", paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
+  addEventInlineText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
+  emptyActionsRow: { flexDirection: "row", gap: 10, marginTop: 12 },
+  emptyAddEventBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: "#F47B25" },
+  emptyAddEventText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
+  emptyAddTaskBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: theme.colors.text.primary },
+  emptyAddTaskText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
+  eventModalContent: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, margin: 20, gap: 12, borderWidth: 1, borderColor: theme.colors.border.subtle },
+  eventModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  eventModalTitle: { fontSize: 18, fontWeight: "800", color: theme.colors.text.primary },
+  eventModalSubtitle: { fontSize: 12, color: theme.colors.text.secondary, marginTop: -4 },
+  eventInput: { backgroundColor: "#F8FAFC", borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border.subtle, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, color: theme.colors.text.primary },
+  eventDurationRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 },
+  eventDurationLabel: { fontSize: 13, color: theme.colors.text.secondary, fontWeight: "600" },
+  eventDurationInput: { width: 70, backgroundColor: "#F8FAFC", borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border.subtle, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, color: theme.colors.text.primary, textAlign: "center" },
+  eventModalActions: { marginTop: 6 },
+  saveEventBtn: { backgroundColor: "#F47B25", paddingVertical: 12, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  saveEventText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
 });

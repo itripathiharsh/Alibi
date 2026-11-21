@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { BarChart3, BookOpen, Brain, CalendarDays, CheckCircle2, ChevronRight, CircleHelp, LockKeyhole, LogOut, Settings, SlidersHorizontal, Sparkles, Timer, type LucideIcon } from "lucide-react-native";
+import { BarChart3, BookOpen, Brain, CalendarDays, CheckCircle2, ChevronRight, CircleHelp, CloudOff, LockKeyhole, LogIn, LogOut, Settings, SlidersHorizontal, Sparkles, Timer, type LucideIcon } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { ensureAuthenticated, getUserProfile, logoutMobile, type MobileUserProfile } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { BrandHeader, SunriseArt } from "../../components/brand-ui";
+import { getLocalAnalyticsSummary } from "../../lib/offline-sync";
 
 type ProfileSummary = { tasks_completed: number; tasks_pending: number; tasks_overdue: number; total_time_min: number; efficiency: number | null };
 type LearningProfile = { peak_window?: string | null; focus_pattern?: string | null; work_style?: string | null };

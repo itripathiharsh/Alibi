@@ -5,6 +5,7 @@
 
 import * as SecureStore from "expo-secure-store";
 import { getServerUrl } from "./config";
+import { migrateOfflineUserToAccount, syncMobileAccount } from "./offline-sync";
 
 const ACCESS_TOKEN_KEY = "alibi_access_token";
 const REFRESH_TOKEN_KEY = "alibi_refresh_token";
@@ -80,6 +81,12 @@ export async function loginMobile(
     await saveTokens(data.access_token, data.refresh_token);
     if (data.user) {
       await saveUserProfile(data.user);
+      try {
+        await migrateOfflineUserToAccount(data.user.id);
+        void syncMobileAccount(data.user.id, data.access_token, baseUrl);
+      } catch {
+        // Best-effort migration and initial sync
+      }
     }
     return { success: true, user: data.user };
   } catch (err: unknown) {
@@ -235,6 +242,13 @@ export async function ensureAuthenticated(forceRefresh: boolean = false): Promis
     if (refreshed) return refreshed;
   }
   return null;
+}
+
+export async function isOfflineUser(): Promise<boolean> {
+  const token = await getAccessToken();
+  if (token && !isJwtExpired(token)) return false;
+  const profile = await getUserProfile();
+  return profile?.id === "local_user" || !token;
 }
 
 

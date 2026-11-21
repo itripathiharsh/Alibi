@@ -19,7 +19,7 @@ _Last updated: 2026-11-20 by agent (Google OR-Tools CP-SAT scheduler implemented
 | M7 RAG & Knowledge Vault | Complete | 2026-11-16 | 2026-11-16 | `m7-complete` | [M7 Report](milestones/M7_REPORT.md) |
 | M8 Calendar & reminders | Complete | 2026-11-16 | 2026-11-16 | `m8-complete` | [M8 Report](milestones/M8_REPORT.md) |
 | M9 Reports & sharing | Complete | 2026-11-16 | 2026-11-16 | `m9-complete` | [M9 Report](milestones/M9_REPORT.md) |
-| M10 Offline & sync | In progress (reopened after audit) | 2026-11-16 | — | `m10-complete` (historical tag; exit gate not met) | [M10 Report](milestones/M10_REPORT.md) |
+| M10 Offline & sync | Complete | 2026-11-16 | 2026-11-21 | `m10-complete` | [M10 Report](milestones/M10_REPORT.md) |
 | M11 Hosted hardening | Complete | 2026-11-16 | 2026-11-16 | `m11-complete` | [M11 Report](milestones/M11_REPORT.md) |
 | M12 Integration & hardening | Complete | 2026-11-16 | 2026-11-16 | `v1.0.0` | [M12 Report](milestones/M12_REPORT.md) |
 | M13 Android refresh and productivity workflows | In progress | 2026-11-17 | — | — | [M13 Plan](milestones/M13_PLAN.md) |

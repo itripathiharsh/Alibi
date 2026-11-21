@@ -24,9 +24,10 @@ import {
   Share2,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
-import { BrandHeader, SunriseArt } from "../../components/brand-ui";
-import { getAccessToken, ensureAuthenticated } from "../../lib/auth";
+import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
+import { getAccessToken, ensureAuthenticated, getUserProfile } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
+import { getLocalAnalyticsSummary, saveLocalNote } from "../../lib/offline-sync";
 
 interface SummaryData {
   total_time_min: number;
@@ -66,6 +67,7 @@ export default function ReportsScreen() {
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<"daily" | "weekly" | "monthly">("daily");
   const [includePersonal, setIncludePersonal] = useState(false);
   const [reviewWorked, setReviewWorked] = useState("");
@@ -75,48 +77,73 @@ export default function ReportsScreen() {
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
+    let token: string | null = null;
+    let profile: Awaited<ReturnType<typeof getUserProfile>> = null;
     try {
-      let token = await ensureAuthenticated();
-      const baseUrl = getServerUrl();
-      if (!token) return;
-
-      const headers = { Authorization: `Bearer ${token}` };
-      const endpoints = [
-        `${baseUrl}/api/v1/analytics/summary?period=${selectedPeriod}`,
-        `${baseUrl}/api/v1/reports`,
-        `${baseUrl}/api/v1/analytics/productivity-score?period=${selectedPeriod}`,
-        `${baseUrl}/api/v1/analytics/charts/time-distribution?period=${selectedPeriod}`,
-        `${baseUrl}/api/v1/analytics/charts/completion-trend?period=${selectedPeriod}`,
-        `${baseUrl}/api/v1/analytics/charts/consistency-heatmap?days=365`,
-        `${baseUrl}/api/v1/learning/profile`,
-        `${baseUrl}/api/v1/analytics/task-activity?period=${selectedPeriod}&limit=12`,
-      ];
-      const responses = await Promise.all(endpoints.map((url) => fetch(url, { headers }).catch(() => null)));
-      if (responses[0]?.ok) setSummary(await responses[0].json());
-      if (responses[1]?.ok) setReports(await responses[1].json());
-      if (responses[2]?.ok) setScore(await responses[2].json());
-      if (responses[3]?.ok) setDistribution(await responses[3].json());
-      if (responses[4]?.ok) setTrend(await responses[4].json());
-      if (responses[5]?.ok) setHeatmap(await responses[5].json());
-      if (responses[6]?.ok) setLearning(await responses[6].json());
-      if (responses[7]?.ok) setTaskActivity(await responses[7].json());
+      token = await ensureAuthenticated();
+      profile = await getUserProfile();
     } catch {
-      // Degrade gracefully
+      // offline
+    }
+    const userId = profile?.id ?? "local_user";
+
+    // 1. If online and authenticated, fetch from server
+    if (token) {
+      try {
+        const baseUrl = getServerUrl();
+        const headers = { Authorization: `Bearer ${token}` };
+        const endpoints = [
+          `${baseUrl}/api/v1/analytics/summary?period=${selectedPeriod}`,
+          `${baseUrl}/api/v1/reports`,
+          `${baseUrl}/api/v1/analytics/productivity-score?period=${selectedPeriod}`,
+          `${baseUrl}/api/v1/analytics/charts/time-distribution?period=${selectedPeriod}`,
+          `${baseUrl}/api/v1/analytics/charts/completion-trend?period=${selectedPeriod}`,
+          `${baseUrl}/api/v1/analytics/charts/consistency-heatmap?days=365`,
+          `${baseUrl}/api/v1/learning/profile`,
+          `${baseUrl}/api/v1/analytics/task-activity?period=${selectedPeriod}&limit=12`,
+        ];
+        const responses = await Promise.all(endpoints.map((url) => fetch(url, { headers }).catch(() => null)));
+        if (responses[0]?.ok) {
+          setSummary(await responses[0].json());
+          if (responses[1]?.ok) setReports(await responses[1].json());
+          if (responses[2]?.ok) setScore(await responses[2].json());
+          if (responses[3]?.ok) setDistribution(await responses[3].json());
+          if (responses[4]?.ok) setTrend(await responses[4].json());
+          if (responses[5]?.ok) setHeatmap(await responses[5].json());
+          if (responses[6]?.ok) setLearning(await responses[6].json());
+          if (responses[7]?.ok) setTaskActivity(await responses[7].json());
+          setIsOffline(false);
+          setIsLoading(false);
+          return;
+        }
+      } catch {
+        // Fall through to offline SQLite analytics
+      }
+    }
+
+    // 2. Offline fallback: Calculate genuine metrics from SQLite
+    try {
+      setIsOffline(true);
+      const localSummary = await getLocalAnalyticsSummary(userId);
+      setSummary(localSummary);
+      setScore({ score: null, insufficient_data: true });
+    } catch {
+      // Graceful degraded state
     } finally {
       setIsLoading(false);
     }
   }, [selectedPeriod]);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
   const saveWeeklyRetrospective = async () => {
     if (savingReview || ![reviewWorked, reviewBlocked, reviewNext].some((value) => value.trim())) return;
     setSavingReview(true);
     try {
-      const token = await ensureAuthenticated();
-      if (!token) throw new Error("Sign in to save your private weekly review.");
+      const profile = await getUserProfile();
+      const userId = profile?.id ?? "local_user";
       const today = new Date();
       const occurredOn = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
       const lines = [
@@ -128,24 +155,38 @@ export default function ReportsScreen() {
         `What got stuck: ${reviewBlocked.trim() || "Not recorded"}`,
         `Next week priorities: ${reviewNext.trim() || "Not recorded"}`,
       ];
-      const response = await fetch(`${getServerUrl()}/api/v1/vault/notes`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: `Weekly review · ${occurredOn}`,
-          body: lines.join("\n"),
-          source_type: "manual",
-          privacy_class: "personal",
-          occurred_on: occurredOn,
-        }),
-      });
-      if (!response.ok) throw new Error("Could not save the weekly review. Try again.");
+
+      const notePayload = {
+        title: `Weekly review · ${occurredOn}`,
+        body: lines.join("\n"),
+        source_type: "manual",
+        privacy_class: "personal",
+        occurred_on: occurredOn,
+      };
+
+      // Save locally to SQLite vault notes
+      await saveLocalNote(userId, notePayload);
+
+      // Best effort remote push if token exists
+      const token = await ensureAuthenticated();
+      if (token) {
+        try {
+          await fetch(`${getServerUrl()}/api/v1/vault/notes`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify(notePayload),
+          });
+        } catch {
+          // Will sync via outbox
+        }
+      }
+
       setReviewWorked("");
       setReviewBlocked("");
       setReviewNext("");
-      Alert.alert("Review saved", "Your weekly retrospective is in your private Vault.");
-    } catch (error) {
-      Alert.alert("Weekly review", error instanceof Error ? error.message : "Could not save the review.");
+      Alert.alert("Review Saved", "Your weekly retrospective is saved to your private vault.");
+    } catch (err: unknown) {
+      Alert.alert("Could not save review", err instanceof Error ? err.message : "Please try again.");
     } finally {
       setSavingReview(false);
     }
@@ -246,8 +287,14 @@ export default function ReportsScreen() {
     <View style={styles.screen}>
     <SunriseArt height={190} />
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <BrandHeader />
+      <BrandHeader showOfflineBadge={isOffline} />
       <View style={styles.screenHeading}><Text style={styles.screenTitle}>Insights</Text><Text style={styles.screenSubtitle}>Understand your productivity, time and working patterns.</Text></View>
+      {isOffline && (
+        <OfflineNoticeCard
+          featureName="Insights"
+          description="Metrics are measured from your locally recorded tasks and time entries. Server reports and cloud trends will update when you connect."
+        />
+      )}
       {/* Period Selector Tabs */}
       <View style={styles.periodTabs}>
         <Pressable style={[styles.periodTab, selectedPeriod === "daily" && styles.periodTabActive]} onPress={() => setSelectedPeriod("daily")}><Text style={[styles.periodTabText, selectedPeriod === "daily" && styles.periodTabTextActive]}>Today</Text></Pressable>
