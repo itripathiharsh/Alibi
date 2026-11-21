@@ -30,3 +30,5 @@ coverage/
 /models/
 !backend/app/models/
 .DS_Store
+.test_pg/
+backend/.test_pg/

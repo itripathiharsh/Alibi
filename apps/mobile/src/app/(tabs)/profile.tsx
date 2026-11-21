@@ -41,6 +41,7 @@ import {
 import { UpgradeModal } from "../../components/upgrade-modal";
 import { IntegrationsHubModal } from "../../components/integrations-hub-modal";
 import { OnboardingModal } from "../../components/onboarding-modal";
+import { resetLearningProfile, syncLearningPausedPreference } from "../../lib/personal-learning-engine";
 
 type ProfileSummary = { tasks_completed: number; tasks_pending: number; tasks_overdue: number; total_time_min: number; efficiency: number | null };
 type LearningProfile = { peak_window?: string | null; focus_pattern?: string | null; work_style?: string | null };
@@ -125,9 +126,10 @@ export default function ProfileScreen() {
   const toggleLearningPaused = async () => {
     const userId = profile?.id || "local_user";
     const nextState = !preferences.learning_paused;
-    const updated = { ...preferences, learning_paused: nextState };
+    const token = await ensureAuthenticated().catch(() => null);
+    const baseUrl = getServerUrl();
+    const updated = await syncLearningPausedPreference(baseUrl, token, userId, nextState);
     setPreferences(updated);
-    await saveLocalUserPreferences(userId, updated);
     Alert.alert(
       nextState ? "Learning Paused" : "Learning Resumed",
       nextState
@@ -139,15 +141,18 @@ export default function ProfileScreen() {
   const handleResetLearningData = () => {
     Alert.alert(
       "Reset Learning Profile?",
-      "This will clear all learned task duration ratios, routine patterns, and peak focus hour estimates on this device. Your actual tasks and history remain intact.",
+      "This will clear all learned task duration ratios, routine patterns, and peak focus hour estimates on this device and on the server. Your actual tasks and history remain intact.",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Reset",
           style: "destructive",
           onPress: async () => {
+            const token = await ensureAuthenticated().catch(() => null);
+            const baseUrl = getServerUrl();
+            const result = await resetLearningProfile(baseUrl, token);
             setLearning(null);
-            Alert.alert("Reset Complete", "Productivity learning profile has been cleared.");
+            Alert.alert("Reset Complete", result.message);
           },
         },
       ]

@@ -110,18 +110,18 @@ export function UpgradeModal({
     setUpdating(false);
     onSubscriptionUpdated(updated);
     Alert.alert(
-      "Plan Updated",
+      "Entitlements Activated (Developer Preview)",
       tier === "free"
         ? "You are now on the Free tier. Your local data remains completely accessible."
-        : `Welcome to ALIBI ${tier.toUpperCase()}! Your entitlements have been activated on this device.`,
+        : `Google Play In-App Billing is scheduled for v0.2.0. ${tier.toUpperCase()} entitlements are active in developer preview mode on this device.`,
       [{ text: "Continue", onPress: onClose }],
     );
   };
 
   const handleRestore = () => {
     Alert.alert(
-      "Purchases Restored",
-      "Your subscription entitlement was checked against your local device profile. Active tier: " +
+      "Google Play Restore Purchases",
+      "Google Play In-App Billing is scheduled for v0.2.0. Current active preview entitlement: " +
         currentSubscription.tier.toUpperCase(),
     );
   };
@@ -152,6 +152,14 @@ export function UpgradeModal({
           <Text style={styles.subtitle}>
             Choose the plan that fits your workflow. Core tasks and offline storage will always remain free.
           </Text>
+
+          {/* Billing Roadmap Notice */}
+          <View style={styles.billingNoticeBox}>
+            <Sparkles size={14} color={theme.colors.brand.orange} />
+            <Text style={styles.billingNoticeText}>
+              Google Play In-App Billing coming in v0.2.0. Plan selection below operates in Developer Preview mode to evaluate Pro & Ultra entitlements.
+            </Text>
+          </View>
 
           <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
             {TIERS.map((tier) => {
@@ -428,5 +436,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: theme.colors.text.secondary,
+  },
+  billingNoticeBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255, 116, 31, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 116, 31, 0.25)",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+  },
+  billingNoticeText: {
+    flex: 1,
+    fontSize: 11,
+    lineHeight: 15,
+    color: theme.colors.brand.navy,
+    fontWeight: "500",
   },
 });

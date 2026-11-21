@@ -4,6 +4,7 @@ Implements savepoint-isolated idempotent push processing, field-level 3-way merg
 and explicit non-destructive conflict surfacing.
 """
 
+import hashlib
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -18,6 +19,7 @@ from app.models.sync import SyncConflict, SyncOperation
 from app.models.tag import Tag
 from app.models.task import Task
 from app.models.time_entry import TimeEntry
+from app.models.vault import Note
 from app.models.workspace import Workspace
 from app.vault.links import append_task_completion
 
@@ -91,6 +93,24 @@ class ServerSyncService:
                     user_id=user_id,
                     entity_id=entity_id,
                     op_type=op_type,
+                    payload=payload,
+                )
+            elif entity_type == "project":
+                result, result_detail, new_version = await self._apply_project_op(
+                    user_id=user_id,
+                    op_id=op_id,
+                    entity_id=entity_id,
+                    op_type=op_type,
+                    base_version=base_version,
+                    payload=payload,
+                )
+            elif entity_type in ("vault_note", "note"):
+                result, result_detail, new_version = await self._apply_vault_note_op(
+                    user_id=user_id,
+                    op_id=op_id,
+                    entity_id=entity_id,
+                    op_type=op_type,
+                    base_version=base_version,
                     payload=payload,
                 )
             else:
@@ -425,34 +445,322 @@ class ServerSyncService:
             return ("applied", {"created": True}, 1)
         return ("applied", {}, 1)
 
+    async def _get_or_create_default_workspace(self, user_id: uuid.UUID) -> uuid.UUID:
+        ws_res = await self.session.execute(
+            select(Workspace.id).where(Workspace.user_id == user_id).limit(1)
+        )
+        ws_id = ws_res.scalar_one_or_none()
+        if not ws_id:
+            default_ws = Workspace(
+                user_id=user_id, name="Default Workspace", is_default=True
+            )
+            self.session.add(default_ws)
+            await self.session.flush()
+            ws_id = default_ws.id
+        return ws_id
+
+    async def _apply_project_op(
+        self,
+        user_id: uuid.UUID,
+        op_id: uuid.UUID,
+        entity_id: uuid.UUID,
+        op_type: str,
+        base_version: int | None,
+        payload: dict[str, Any],
+    ) -> tuple[str, dict[str, Any], int]:
+        """Apply project create, update (with field merge), or delete."""
+        stmt = select(Project).where(Project.id == entity_id, Project.user_id == user_id)
+        res = await self.session.execute(stmt)
+        project = res.scalar_one_or_none()
+
+        if op_type == "create":
+            if project is not None:
+                return ("merged", {"note": "Project already exists on server"}, project.version)
+
+            ws_id: uuid.UUID
+            if payload.get("workspace_id"):
+                try:
+                    requested_ws_id = uuid.UUID(str(payload["workspace_id"]))
+                    ws_exists = await self.session.scalar(
+                        select(Workspace.id).where(Workspace.id == requested_ws_id, Workspace.user_id == user_id)
+                    )
+                    ws_id = requested_ws_id if ws_exists else await self._get_or_create_default_workspace(user_id)
+                except Exception:
+                    ws_id = await self._get_or_create_default_workspace(user_id)
+            else:
+                ws_id = await self._get_or_create_default_workspace(user_id)
+
+            cat_id: uuid.UUID | None = None
+            if payload.get("category_id"):
+                try:
+                    requested_cat_id = uuid.UUID(str(payload["category_id"]))
+                    cat_exists = await self.session.scalar(
+                        select(Category.id).where(Category.id == requested_cat_id, Category.user_id == user_id)
+                    )
+                    if cat_exists:
+                        cat_id = requested_cat_id
+                except Exception:
+                    pass
+
+            name_val = str(payload.get("name", "Untitled Project")).strip() or "Untitled Project"
+            desc_val = str(payload.get("description", "")).strip() or None
+            status_val = str(payload.get("status", "active")).strip().lower()
+            if status_val not in ("active", "paused", "done", "archived"):
+                status_val = "active"
+            color_val = str(payload.get("color", "#FF741F")).strip() or "#FF741F"
+
+            new_project = Project(
+                id=entity_id,
+                user_id=user_id,
+                workspace_id=ws_id,
+                category_id=cat_id,
+                name=name_val,
+                description=desc_val,
+                status=status_val,
+                color=color_val,
+                version=1,
+            )
+            self.session.add(new_project)
+            await self.session.flush()
+            return ("applied", {"created": True}, new_project.version)
+
+        elif op_type == "update":
+            if project is None:
+                return await self._apply_project_op(
+                    user_id=user_id,
+                    op_id=op_id,
+                    entity_id=entity_id,
+                    op_type="create",
+                    base_version=base_version,
+                    payload=payload,
+                )
+
+            if "name" in payload and payload["name"]:
+                project.name = str(payload["name"]).strip()
+            if "description" in payload:
+                project.description = str(payload["description"]).strip() if payload["description"] else None
+            if "status" in payload:
+                s_val = str(payload["status"]).strip().lower()
+                if s_val in ("active", "paused", "done", "archived"):
+                    project.status = s_val
+            if "color" in payload and payload["color"]:
+                project.color = str(payload["color"]).strip()
+            if "category_id" in payload:
+                try:
+                    cid = uuid.UUID(str(payload["category_id"])) if payload["category_id"] else None
+                    if cid:
+                        cat_exists = await self.session.scalar(
+                            select(Category.id).where(Category.id == cid, Category.user_id == user_id)
+                        )
+                        if cat_exists:
+                            project.category_id = cid
+                    else:
+                        project.category_id = None
+                except Exception:
+                    pass
+
+            project.version += 1
+            await self.session.flush()
+            return ("applied", {"updated": True}, project.version)
+
+        elif op_type == "delete":
+            if project is not None:
+                project.deleted_at = utc_now()
+                project.version += 1
+                await self.session.flush()
+                return ("applied", {"deleted": True}, project.version)
+            return ("applied", {"note": "Already deleted"}, 0)
+
+        return ("rejected", {"error": f"Unknown op_type: {op_type}"}, 0)
+
+    async def _apply_vault_note_op(
+        self,
+        user_id: uuid.UUID,
+        op_id: uuid.UUID,
+        entity_id: uuid.UUID,
+        op_type: str,
+        base_version: int | None,
+        payload: dict[str, Any],
+    ) -> tuple[str, dict[str, Any], int]:
+        """Apply vault note create, update, or delete."""
+        stmt = select(Note).where(Note.id == entity_id, Note.user_id == user_id)
+        res = await self.session.execute(stmt)
+        note = res.scalar_one_or_none()
+
+        if op_type == "create":
+            if note is not None:
+                return ("merged", {"note": "Note already exists on server"}, note.version)
+
+            title_val = str(payload.get("title", "Untitled Note")).strip() or "Untitled Note"
+            body_val = str(payload.get("body", "")).strip()
+            source_type_val = str(payload.get("source_type", "manual")).strip().lower()
+            valid_sources = (
+                "task_description",
+                "completion_note",
+                "work_log",
+                "project_note",
+                "meeting_note",
+                "document",
+                "decision",
+                "deliverable",
+                "manual",
+            )
+            if source_type_val not in valid_sources:
+                source_type_val = "manual"
+
+            privacy_val = str(payload.get("privacy_class", "personal")).strip().lower()
+            if privacy_val not in ("personal", "work", "shared", "confidential"):
+                privacy_val = "personal"
+
+            raw_date = payload.get("occurred_on")
+            occurred_on_val: datetime.date
+            if isinstance(raw_date, str) and raw_date:
+                try:
+                    occurred_on_val = datetime.fromisoformat(raw_date.split("T")[0]).date()
+                except Exception:
+                    occurred_on_val = utc_now().date()
+            else:
+                occurred_on_val = utc_now().date()
+
+            content_hash_val = hashlib.sha256(body_val.encode("utf-8")).hexdigest()
+
+            proj_id: uuid.UUID | None = None
+            if payload.get("project_id"):
+                try:
+                    p_uuid = uuid.UUID(str(payload["project_id"]))
+                    p_exists = await self.session.scalar(
+                        select(Project.id).where(Project.id == p_uuid, Project.user_id == user_id)
+                    )
+                    if p_exists:
+                        proj_id = p_uuid
+                except Exception:
+                    pass
+
+            new_note = Note(
+                id=entity_id,
+                user_id=user_id,
+                source_type=source_type_val,
+                title=title_val,
+                body=body_val,
+                occurred_on=occurred_on_val,
+                privacy_class=privacy_val,
+                content_hash=content_hash_val,
+                project_id=proj_id,
+                version=1,
+            )
+            self.session.add(new_note)
+            await self.session.flush()
+            return ("applied", {"created": True}, new_note.version)
+
+        elif op_type == "update":
+            if note is None:
+                return await self._apply_vault_note_op(
+                    user_id=user_id,
+                    op_id=op_id,
+                    entity_id=entity_id,
+                    op_type="create",
+                    base_version=base_version,
+                    payload=payload,
+                )
+
+            if "title" in payload and payload["title"]:
+                note.title = str(payload["title"]).strip()
+            if "body" in payload and payload["body"] is not None:
+                note.body = str(payload["body"]).strip()
+                note.content_hash = hashlib.sha256(note.body.encode("utf-8")).hexdigest()
+            if "privacy_class" in payload:
+                p_val = str(payload["privacy_class"]).strip().lower()
+                if p_val in ("personal", "work", "shared", "confidential"):
+                    note.privacy_class = p_val
+            if "project_id" in payload:
+                try:
+                    p_uuid = uuid.UUID(str(payload["project_id"])) if payload["project_id"] else None
+                    if p_uuid:
+                        p_exists = await self.session.scalar(
+                            select(Project.id).where(Project.id == p_uuid, Project.user_id == user_id)
+                        )
+                        if p_exists:
+                            note.project_id = p_uuid
+                    else:
+                        note.project_id = None
+                except Exception:
+                    pass
+
+            note.version += 1
+            await self.session.flush()
+            return ("applied", {"updated": True}, note.version)
+
+        elif op_type == "delete":
+            if note is not None:
+                note.deleted_at = utc_now()
+                note.version += 1
+                await self.session.flush()
+                return ("applied", {"deleted": True}, note.version)
+            return ("applied", {"note": "Already deleted"}, 0)
+
+        return ("rejected", {"error": f"Unknown op_type: {op_type}"}, 0)
+
     async def pull_changes(
         self,
         user_id: uuid.UUID,
         since_seq: int = 0,
         limit: int = 200,
     ) -> dict[str, Any]:
-        """Pull changed entities since a sequence cursor (doc 11 §4.3)."""
-        stmt = (
+        """Pull changed entities since a sequence cursor across tasks, projects, and notes (doc 11 §4.3)."""
+        # 1. Tasks
+        t_stmt = (
             select(Task)
             .where(Task.user_id == user_id, Task.server_seq > since_seq)
             .order_by(Task.server_seq.asc())
             .limit(limit)
         )
-        res = await self.session.execute(stmt)
-        tasks = list(res.scalars().all())
+        t_res = await self.session.execute(t_stmt)
+        tasks = list(t_res.scalars().all())
+
+        # 2. Projects
+        p_stmt = (
+            select(Project)
+            .where(Project.user_id == user_id, Project.server_seq > since_seq)
+            .order_by(Project.server_seq.asc())
+            .limit(limit)
+        )
+        p_res = await self.session.execute(p_stmt)
+        projects = list(p_res.scalars().all())
+
+        # 3. Notes
+        n_stmt = (
+            select(Note)
+            .where(Note.user_id == user_id, Note.server_seq > since_seq)
+            .order_by(Note.server_seq.asc())
+            .limit(limit)
+        )
+        n_res = await self.session.execute(n_stmt)
+        notes = list(n_res.scalars().all())
 
         max_seq = since_seq
-        task_items: list[dict[str, Any]] = []
+        changes: list[dict[str, Any]] = []
         for t in tasks:
             if t.server_seq > max_seq:
                 max_seq = t.server_seq
-            task_items.append(self._serialize_task(t))
+            changes.append(self._serialize_task(t))
+
+        for p in projects:
+            if p.server_seq > max_seq:
+                max_seq = p.server_seq
+            changes.append(self._serialize_project(p))
+
+        for n in notes:
+            if n.server_seq > max_seq:
+                max_seq = n.server_seq
+            changes.append(self._serialize_note(n))
+
+        changes.sort(key=lambda c: int(c.get("server_seq") or 0))
 
         return {
             "server_epoch": str(SERVER_EPOCH),
             "since_seq": since_seq,
             "next_seq": max_seq,
-            "changes": task_items,
+            "changes": changes[:limit],
         }
 
     async def bootstrap(self, user_id: uuid.UUID) -> dict[str, Any]:
@@ -465,9 +773,13 @@ class ServerSyncService:
         c_res = await self.session.execute(c_stmt)
         categories = [{"id": str(c.id), "name": c.name} for c in c_res.scalars().all()]
 
-        p_stmt = select(Project).where(Project.user_id == user_id)
+        p_stmt = select(Project).where(Project.user_id == user_id, Project.deleted_at.is_(None))
         p_res = await self.session.execute(p_stmt)
-        projects = [{"id": str(p.id), "name": p.name} for p in p_res.scalars().all()]
+        projects = [self._serialize_project(p) for p in p_res.scalars().all()]
+
+        n_stmt = select(Note).where(Note.user_id == user_id, Note.deleted_at.is_(None))
+        n_res = await self.session.execute(n_stmt)
+        notes = [self._serialize_note(n) for n in n_res.scalars().all()]
 
         tag_stmt = select(Tag).where(Tag.user_id == user_id)
         tag_res = await self.session.execute(tag_stmt)
@@ -478,6 +790,7 @@ class ServerSyncService:
             "tasks": tasks,
             "categories": categories,
             "projects": projects,
+            "notes": notes,
             "tags": tags,
         }
 
@@ -517,6 +830,46 @@ class ServerSyncService:
             "version": task.version,
             "server_seq": task.server_seq,
             "deleted": task.deleted_at is not None,
+        }
+
+    @staticmethod
+    def _serialize_project(project: Project) -> dict[str, Any]:
+        return {
+            "entity_type": "project",
+            "id": str(project.id),
+            "user_id": str(project.user_id),
+            "workspace_id": str(project.workspace_id),
+            "category_id": str(project.category_id) if project.category_id else None,
+            "name": project.name,
+            "description": project.description,
+            "status": project.status,
+            "color": project.color,
+            "version": project.version,
+            "server_seq": project.server_seq,
+            "created_at": project.created_at.isoformat(),
+            "updated_at": project.updated_at.isoformat(),
+            "deleted": project.deleted_at is not None,
+        }
+
+    @staticmethod
+    def _serialize_note(note: Note) -> dict[str, Any]:
+        return {
+            "entity_type": "vault_note",
+            "id": str(note.id),
+            "user_id": str(note.user_id),
+            "source_type": note.source_type,
+            "title": note.title,
+            "body": note.body,
+            "occurred_on": note.occurred_on.isoformat() if hasattr(note.occurred_on, "isoformat") else str(note.occurred_on),
+            "privacy_class": note.privacy_class,
+            "category_id": str(note.category_id) if note.category_id else None,
+            "project_id": str(note.project_id) if note.project_id else None,
+            "task_id": str(note.task_id) if note.task_id else None,
+            "version": getattr(note, "version", 1),
+            "server_seq": getattr(note, "server_seq", 0),
+            "created_at": note.created_at.isoformat(),
+            "updated_at": note.updated_at.isoformat(),
+            "deleted": note.deleted_at is not None,
         }
 
     async def list_conflicts(self, user_id: uuid.UUID) -> list[SyncConflict]:

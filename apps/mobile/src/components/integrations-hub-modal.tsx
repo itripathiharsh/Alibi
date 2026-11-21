@@ -84,28 +84,13 @@ export function IntegrationsHubModal({
   onRefreshIntegrations,
   onClose,
 }: IntegrationsHubModalProps) {
-  const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
-  const [manualToken, setManualToken] = useState("");
-  const [accountEmail, setAccountEmail] = useState("");
+  const [waitlistJoined, setWaitlistJoined] = useState<Record<string, boolean>>({});
 
-  const handleConnect = async (provider: LocalIntegrationRecord["provider"]) => {
-    // Check if user provided manual token or simulate local development connection
-    const email = accountEmail.trim() || `user@${provider.split("_")[0]}.com`;
-    await saveLocalIntegration(userId, {
-      provider,
-      status: "connected",
-      account_email: email,
-      scopes: PROVIDER_METADATA.find((p) => p.provider === provider)?.scopes || [],
-      last_synced_at: new Date().toISOString(),
-    });
-
-    setConnectingProvider(null);
-    setManualToken("");
-    setAccountEmail("");
-    onRefreshIntegrations();
+  const handleJoinWaitlist = (name: string, provider: string) => {
+    setWaitlistJoined((prev) => ({ ...prev, [provider]: true }));
     Alert.alert(
-      "Connected Successfully",
-      `Your ${provider.replaceAll("_", " ")} integration has been linked on this device.`,
+      "Beta Waitlist Joined!",
+      `Native OAuth synchronization for ${name} is scheduled for v0.2.0. You will receive priority access when live connectors are deployed.`,
     );
   };
 
@@ -141,9 +126,9 @@ export function IntegrationsHubModal({
 
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>Connected ALIBI</Text>
+              <Text style={styles.title}>External Integrations</Text>
               <Text style={styles.subtitle}>
-                Connect external calendars, email and code repositories. ALIBI never performs write actions without your explicit approval.
+                Upcoming OAuth integrations with external calendars, email, and repositories. Private by default with zero unapproved write actions.
               </Text>
             </View>
             <Pressable onPress={onClose} hitSlop={10}>
@@ -156,7 +141,7 @@ export function IntegrationsHubModal({
               const Icon = meta.icon;
               const record = integrations.find((i) => i.provider === meta.provider);
               const isConnected = record?.status === "connected";
-              const isConfiguring = connectingProvider === meta.provider;
+              const isWaitlisted = waitlistJoined[meta.provider];
 
               return (
                 <View key={meta.provider} style={styles.providerCard}>
@@ -181,16 +166,20 @@ export function IntegrationsHubModal({
                       <View
                         style={[
                           styles.statusDot,
-                          { backgroundColor: isConnected ? theme.colors.accent.emerald : theme.colors.text.muted },
+                          { backgroundColor: isConnected ? theme.colors.accent.emerald : theme.colors.brand.orange },
                         ]}
                       />
                       <Text
                         style={[
                           styles.statusText,
-                          { color: isConnected ? "#065F46" : theme.colors.text.secondary },
+                          { color: isConnected ? "#065F46" : theme.colors.brand.navy },
                         ]}
                       >
-                        {isConnected ? `Connected: ${record?.account_email || "Active"}` : "Disconnected"}
+                        {isConnected
+                          ? `Connected: ${record?.account_email || "Active"}`
+                          : isWaitlisted
+                            ? "Waitlist Joined (v0.2.0)"
+                            : "Coming Soon (Beta Waitlist)"}
                       </Text>
                     </View>
 
@@ -204,49 +193,24 @@ export function IntegrationsHubModal({
                       </Pressable>
                     ) : (
                       <Pressable
-                        style={styles.connectBtn}
-                        onPress={() => setConnectingProvider(isConfiguring ? null : meta.provider)}
+                        style={[
+                          styles.connectBtn,
+                          isWaitlisted && { backgroundColor: "rgba(11, 32, 48, 0.08)" },
+                        ]}
+                        disabled={isWaitlisted}
+                        onPress={() => handleJoinWaitlist(meta.name, meta.provider)}
                       >
-                        <Text style={styles.connectBtnText}>
-                          {isConfiguring ? "Cancel" : "Connect"}
+                        <Text
+                          style={[
+                            styles.connectBtnText,
+                            isWaitlisted && { color: theme.colors.text.secondary },
+                          ]}
+                        >
+                          {isWaitlisted ? "On Waitlist" : "Join Beta"}
                         </Text>
                       </Pressable>
                     )}
                   </View>
-
-                  {/* Setup Box when configuring */}
-                  {isConfiguring && (
-                    <View style={styles.setupBox}>
-                      <Text style={styles.setupTitle}>Connect Account</Text>
-                      <Text style={styles.setupDesc}>
-                        {meta.docNote}
-                      </Text>
-                      <TextInput
-                        style={styles.setupInput}
-                        value={accountEmail}
-                        onChangeText={setAccountEmail}
-                        placeholder="Your account email (e.g. dev@company.com)"
-                        placeholderTextColor={theme.colors.text.muted}
-                        autoCapitalize="none"
-                      />
-                      <TextInput
-                        style={styles.setupInput}
-                        value={manualToken}
-                        onChangeText={setManualToken}
-                        placeholder="OAuth Access Token / API Key (optional)"
-                        placeholderTextColor={theme.colors.text.muted}
-                        secureTextEntry
-                        autoCapitalize="none"
-                      />
-                      <Pressable
-                        style={styles.confirmConnectBtn}
-                        onPress={() => handleConnect(meta.provider)}
-                      >
-                        <CheckCircle2 size={16} color="#FFFFFF" />
-                        <Text style={styles.confirmConnectText}>Authorize Connection</Text>
-                      </Pressable>
-                    </View>
-                  )}
                 </View>
               );
             })}

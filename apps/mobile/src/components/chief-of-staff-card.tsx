@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -16,11 +18,14 @@ import {
   HelpCircle,
   Play,
   RotateCcw,
+  ShieldCheck,
   Sparkles,
   X,
 } from "lucide-react-native";
 import theme from "../lib/theme";
 import { LocalUserPreferences } from "../lib/offline-sync";
+import { ensureAuthenticated } from "../lib/auth";
+import { getServerUrl } from "../lib/config";
 
 export interface ChiefOfStaffProps {
   todayTasks: Array<{
@@ -53,6 +58,10 @@ export function ChiefOfStaffCard({
   onOpenTask,
 }: ChiefOfStaffProps) {
   const [explainVisible, setExplainVisible] = useState(false);
+  const [briefingVisible, setBriefingVisible] = useState(false);
+  const [briefingText, setBriefingText] = useState<string | null>(null);
+  const [isLoadingBriefing, setIsLoadingBriefing] = useState(false);
+  const [briefingSource, setBriefingSource] = useState<string>("SQL Grounded Intelligence");
 
   // 1. Pending tasks for today
   const pendingTasks = todayTasks.filter((t) => t.status !== "completed");
@@ -75,6 +84,57 @@ export function ChiefOfStaffCard({
     pendingTasks[0] ||
     null;
 
+  const handleRequestBriefing = async () => {
+    setBriefingVisible(true);
+    setIsLoadingBriefing(true);
+    try {
+      const token = await ensureAuthenticated().catch(() => null);
+      const baseUrl = getServerUrl();
+      if (token && baseUrl) {
+        const queryText = `Give me my daily Chief of Staff briefing. Grounded facts: ${pendingTasks.length} pending tasks (${Math.round(estimatedMin / 60)}h ${estimatedMin % 60}m planned), ${overdueTasks.length} overdue tasks, ${Math.round(availableMin / 60)}h ${availableMin % 60}m available work time${recommendedTask ? `, next action: "${recommendedTask.title}"` : ""}.`;
+        const res = await fetch(`${baseUrl}/api/v1/assistant/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            message: queryText,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.content) {
+            setBriefingText(data.content);
+            setBriefingSource(data.model ? `ALIBI ${data.model} (Grounded)` : "Grounded Assistant");
+            setIsLoadingBriefing(false);
+            return;
+          }
+        }
+      }
+    } catch {
+      // Fall through to deterministic grounded fallback
+    }
+
+    // Local deterministic briefing fallback (strictly grounded in verified facts, 0 fabrication)
+    const lines = [
+      `Chief of Staff Daily Briefing:`,
+      `• Workload: You have ${pendingTasks.length} pending tasks (${Math.round(estimatedMin / 60)}h ${estimatedMin % 60}m estimated) within ${Math.round(availableMin / 60)}h ${availableMin % 60}m of available working hours.`,
+      isWorkloadOverloaded
+        ? `• Capacity Warning: Planned work exceeds remaining focus capacity. Consider deferring non-urgent backlog items.`
+        : `• Capacity: Your current workload is within your daily capacity window.`,
+      overdueTasks.length > 0
+        ? `• Attention Needed: ${overdueTasks.length} task${overdueTasks.length > 1 ? "s are" : " is"} overdue. Review and push to today.`
+        : `• Overdue Status: Zero overdue tasks. Your schedule is clean.`,
+      recommendedTask
+        ? `• Recommended Focus: Start with "${recommendedTask.title}" (${recommendedTask.estimate_user_min || 30} min).`
+        : `• Status: All planned priority tasks completed.`,
+    ];
+    setBriefingText(lines.join("\n\n"));
+    setBriefingSource("Local SQL-Grounded Engine");
+    setIsLoadingBriefing(false);
+  };
+
   return (
     <View style={styles.card}>
       {/* Briefing Header */}
@@ -83,14 +143,25 @@ export function ChiefOfStaffCard({
           <Sparkles size={14} color={theme.colors.accent.primary} />
           <Text style={styles.briefingBadgeText}>AI CHIEF OF STAFF</Text>
         </View>
-        <Pressable
-          hitSlop={10}
-          onPress={() => setExplainVisible(true)}
-          style={styles.helpButton}
-          accessibilityLabel="How Chief of Staff works"
-        >
-          <HelpCircle size={16} color={theme.colors.text.secondary} />
-        </Pressable>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Pressable
+            style={styles.briefMeBtn}
+            onPress={handleRequestBriefing}
+            accessibilityRole="button"
+            accessibilityLabel="Request Chief of Staff AI Briefing"
+          >
+            <Sparkles size={13} color="#FFFFFF" />
+            <Text style={styles.briefMeBtnText}>Brief Me</Text>
+          </Pressable>
+          <Pressable
+            hitSlop={10}
+            onPress={() => setExplainVisible(true)}
+            style={styles.helpButton}
+            accessibilityLabel="How Chief of Staff works"
+          >
+            <HelpCircle size={16} color={theme.colors.text.secondary} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Daily Pulse Summary */}
@@ -184,6 +255,54 @@ export function ChiefOfStaffCard({
           </View>
         </View>
       )}
+
+      {/* AI Daily Chief of Staff Briefing Modal */}
+      <Modal
+        visible={briefingVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setBriefingVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <Sparkles size={18} color={theme.colors.accent.primary} />
+                <Text style={styles.modalTitle}>Daily Chief of Staff Briefing</Text>
+              </View>
+              <Pressable onPress={() => setBriefingVisible(false)} hitSlop={10}>
+                <X size={20} color={theme.colors.text.secondary} />
+              </Pressable>
+            </View>
+
+            <View style={styles.briefingSourcePill}>
+              <ShieldCheck size={13} color={theme.colors.accent.emerald} />
+              <Text style={styles.briefingSourceText}>{briefingSource}</Text>
+            </View>
+
+            {isLoadingBriefing ? (
+              <View style={{ paddingVertical: 28, alignItems: "center", gap: 10 }}>
+                <ActivityIndicator size="small" color={theme.colors.accent.primary} />
+                <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
+                  Compiling grounded daily briefing...
+                </Text>
+              </View>
+            ) : (
+              <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+                <Text style={styles.briefingBodyText}>{briefingText}</Text>
+              </ScrollView>
+            )}
+
+            <Pressable
+              style={styles.modalCloseBtn}
+              onPress={() => setBriefingVisible(false)}
+            >
+              <Text style={styles.modalCloseBtnText}>Acknowledge Briefing</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       {/* Explainability Modal */}
       <Modal
@@ -499,5 +618,39 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "700",
+  },
+  briefMeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: theme.colors.brand.orange,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 7,
+  },
+  briefMeBtnText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  briefingSourcePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(16, 185, 129, 0.1)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+  },
+  briefingSourceText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#065F46",
+  },
+  briefingBodyText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: theme.colors.text.primary,
   },
 });

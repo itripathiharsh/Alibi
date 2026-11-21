@@ -354,6 +354,9 @@ export async function createTaskOffline(userId: string, input: {
   status?: LocalTask["status"];
   deadline_at?: string | null;
   origin?: string;
+  estimate_user_min?: number | null;
+  estimate_final_min?: number | null;
+  category_id?: string | null;
 }): Promise<LocalTask> {
   const db = await getDatabase();
   const task: LocalTask = {
@@ -362,10 +365,11 @@ export async function createTaskOffline(userId: string, input: {
     status: input.status ?? "pending",
     priority: null,
     deadline_at: input.deadline_at ?? null,
-    estimate_user_min: null,
-    estimate_final_min: null,
+    estimate_user_min: input.estimate_user_min ?? null,
+    estimate_final_min: input.estimate_final_min ?? null,
     actual_min: 0,
     reschedule_count: 0,
+    category_id: input.category_id ?? null,
     tags: [],
     subtasks: [],
     origin: input.origin ?? "manual",
@@ -379,6 +383,9 @@ export async function createTaskOffline(userId: string, input: {
       status: task.status,
       deadline_at: task.deadline_at,
       origin: task.origin,
+      estimate_user_min: task.estimate_user_min,
+      estimate_final_min: task.estimate_final_min,
+      category_id: task.category_id,
     }, null);
     await updateTaskViews(db, userId, task.id, task, true);
   });
