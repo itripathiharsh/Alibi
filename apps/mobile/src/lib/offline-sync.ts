@@ -25,112 +25,126 @@ export interface LocalTask {
 
 let database: SQLite.SQLiteDatabase | null = null;
 let orm: ReturnType<typeof drizzle> | null = null;
+let dbInitPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
-async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
+export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (database) return database;
-  database = await SQLite.openDatabaseAsync("alibi-local.db");
-  orm = drizzle(database);
-  await orm.run(sql`PRAGMA foreign_keys = ON`);
-  await database.execAsync(`
-    CREATE TABLE IF NOT EXISTS local_tasks (
-      user_id TEXT NOT NULL,
-      id TEXT NOT NULL,
-      data_json TEXT NOT NULL,
-      version INTEGER NOT NULL DEFAULT 1,
-      server_seq INTEGER NOT NULL DEFAULT 0,
-      updated_at TEXT NOT NULL,
-      PRIMARY KEY (user_id, id)
-    );
-    CREATE TABLE IF NOT EXISTS task_views (
-      user_id TEXT NOT NULL,
-      view_key TEXT NOT NULL,
-      data_json TEXT NOT NULL,
-      cached_at TEXT NOT NULL,
-      PRIMARY KEY (user_id, view_key)
-    );
-    CREATE TABLE IF NOT EXISTS sync_outbox (
-      op_id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      entity_type TEXT NOT NULL,
-      entity_id TEXT NOT NULL,
-      op_type TEXT NOT NULL,
-      base_version INTEGER,
-      payload_json TEXT NOT NULL,
-      client_ts TEXT NOT NULL,
-      attempts INTEGER NOT NULL DEFAULT 0,
-      state TEXT NOT NULL DEFAULT 'pending',
-      error TEXT
-    );
-    CREATE INDEX IF NOT EXISTS ix_sync_outbox_user_state_ts
-      ON sync_outbox(user_id, state, client_ts);
-    CREATE TABLE IF NOT EXISTS sync_state (
-      user_id TEXT PRIMARY KEY,
-      server_epoch TEXT,
-      last_seq INTEGER NOT NULL DEFAULT 0,
-      last_synced_at TEXT,
-      in_progress INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE TABLE IF NOT EXISTS local_timers (
-      user_id TEXT NOT NULL,
-      id TEXT NOT NULL,
-      task_id TEXT NOT NULL,
-      started_at TEXT NOT NULL,
-      source TEXT NOT NULL DEFAULT 'server',
-      PRIMARY KEY (user_id, id),
-      UNIQUE (user_id, task_id)
-    );
-    CREATE TABLE IF NOT EXISTS local_time_entries (
-      user_id TEXT NOT NULL,
-      id TEXT NOT NULL,
-      task_id TEXT NOT NULL,
-      started_at TEXT NOT NULL,
-      ended_at TEXT,
-      duration_min INTEGER,
-      source TEXT NOT NULL,
-      PRIMARY KEY (user_id, id)
-    );
-    CREATE TABLE IF NOT EXISTS local_calendar_events (
-      user_id TEXT NOT NULL,
-      id TEXT NOT NULL,
-      data_json TEXT NOT NULL,
-      version INTEGER NOT NULL DEFAULT 1,
-      server_seq INTEGER NOT NULL DEFAULT 0,
-      updated_at TEXT NOT NULL,
-      PRIMARY KEY (user_id, id)
-    );
-    CREATE TABLE IF NOT EXISTS local_notes (
-      user_id TEXT NOT NULL,
-      id TEXT NOT NULL,
-      data_json TEXT NOT NULL,
-      version INTEGER NOT NULL DEFAULT 1,
-      server_seq INTEGER NOT NULL DEFAULT 0,
-      updated_at TEXT NOT NULL,
-      PRIMARY KEY (user_id, id)
-    );
-    CREATE TABLE IF NOT EXISTS sync_conflicts (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      entity_type TEXT NOT NULL,
-      entity_id TEXT NOT NULL,
-      client_data TEXT NOT NULL,
-      server_data TEXT NOT NULL,
-      resolved INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS offline_meta (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-  `);
-  const timerColumns = await database.getAllAsync<{ name: string }>("PRAGMA table_info(local_timers)");
-  if (!timerColumns.some((column) => column.name === "source")) {
-    await database.execAsync("ALTER TABLE local_timers ADD COLUMN source TEXT NOT NULL DEFAULT 'server'");
-  }
-  await database.runAsync("UPDATE sync_outbox SET state='pending' WHERE state='inflight'");
-  await database.runAsync(
-    "INSERT INTO offline_meta(key, value) VALUES ('schema_version', '2') ON CONFLICT(key) DO UPDATE SET value='2'",
-  );
-  return database;
+  if (dbInitPromise) return dbInitPromise;
+
+  dbInitPromise = (async () => {
+    try {
+      const db = await SQLite.openDatabaseAsync("alibi-local.db");
+      const d = drizzle(db);
+      await d.run(sql`PRAGMA foreign_keys = ON`);
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS local_tasks (
+          user_id TEXT NOT NULL,
+          id TEXT NOT NULL,
+          data_json TEXT NOT NULL,
+          version INTEGER NOT NULL DEFAULT 1,
+          server_seq INTEGER NOT NULL DEFAULT 0,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (user_id, id)
+        );
+        CREATE TABLE IF NOT EXISTS task_views (
+          user_id TEXT NOT NULL,
+          view_key TEXT NOT NULL,
+          data_json TEXT NOT NULL,
+          cached_at TEXT NOT NULL,
+          PRIMARY KEY (user_id, view_key)
+        );
+        CREATE TABLE IF NOT EXISTS sync_outbox (
+          op_id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          op_type TEXT NOT NULL,
+          base_version INTEGER,
+          payload_json TEXT NOT NULL,
+          client_ts TEXT NOT NULL,
+          attempts INTEGER NOT NULL DEFAULT 0,
+          state TEXT NOT NULL DEFAULT 'pending',
+          error TEXT
+        );
+        CREATE INDEX IF NOT EXISTS ix_sync_outbox_user_state_ts
+          ON sync_outbox(user_id, state, client_ts);
+        CREATE TABLE IF NOT EXISTS sync_state (
+          user_id TEXT PRIMARY KEY,
+          server_epoch TEXT,
+          last_seq INTEGER NOT NULL DEFAULT 0,
+          last_synced_at TEXT,
+          in_progress INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS local_timers (
+          user_id TEXT NOT NULL,
+          id TEXT NOT NULL,
+          task_id TEXT NOT NULL,
+          started_at TEXT NOT NULL,
+          source TEXT NOT NULL DEFAULT 'server',
+          PRIMARY KEY (user_id, id),
+          UNIQUE (user_id, task_id)
+        );
+        CREATE TABLE IF NOT EXISTS local_time_entries (
+          user_id TEXT NOT NULL,
+          id TEXT NOT NULL,
+          task_id TEXT NOT NULL,
+          started_at TEXT NOT NULL,
+          ended_at TEXT,
+          duration_min INTEGER,
+          source TEXT NOT NULL,
+          PRIMARY KEY (user_id, id)
+        );
+        CREATE TABLE IF NOT EXISTS local_calendar_events (
+          user_id TEXT NOT NULL,
+          id TEXT NOT NULL,
+          data_json TEXT NOT NULL,
+          version INTEGER NOT NULL DEFAULT 1,
+          server_seq INTEGER NOT NULL DEFAULT 0,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (user_id, id)
+        );
+        CREATE TABLE IF NOT EXISTS local_notes (
+          user_id TEXT NOT NULL,
+          id TEXT NOT NULL,
+          data_json TEXT NOT NULL,
+          version INTEGER NOT NULL DEFAULT 1,
+          server_seq INTEGER NOT NULL DEFAULT 0,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (user_id, id)
+        );
+        CREATE TABLE IF NOT EXISTS sync_conflicts (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          client_data TEXT NOT NULL,
+          server_data TEXT NOT NULL,
+          resolved INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS offline_meta (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        );
+      `);
+      const timerColumns = await db.getAllAsync<{ name: string }>("PRAGMA table_info(local_timers)");
+      if (!timerColumns.some((column) => column.name === "source")) {
+        await db.execAsync("ALTER TABLE local_timers ADD COLUMN source TEXT NOT NULL DEFAULT 'server'");
+      }
+      await db.runAsync("UPDATE sync_outbox SET state='pending' WHERE state='inflight'");
+      await db.runAsync(
+        "INSERT INTO offline_meta(key, value) VALUES ('schema_version', '2') ON CONFLICT(key) DO UPDATE SET value='2'",
+      );
+      database = db;
+      orm = d;
+      return db;
+    } catch (error) {
+      dbInitPromise = null;
+      throw error;
+    }
+  })();
+
+  return dbInitPromise;
 }
 
 export function makeOfflineId(): string {

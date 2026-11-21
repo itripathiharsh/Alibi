@@ -10,14 +10,20 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **Build Date**: November 21, 2026
 - **Variant**: Android release APK, Hermes Bytecode Engine (React Native 0.76 New Architecture)
 - **Signing**: Signed with the repository's current Android debug keystore. This is installable for direct distribution/testing, but it is not a Play Store production signature.
-- **SHA-256**: `B667E59C411229A87EC69244DCD7CFB864047E1ADDFD5F78C42E0031477D167B`
-- **Build verification**: `assembleRelease` succeeded; verified Hermes Bytecode (`C6 1F BC 03` header, 69.1 MB); APK v2 signature verified; includes First-Launch Intro & Feature Tour modal, Android 13+ POST_NOTIFICATIONS runtime prompt on boot, high-importance heads-up notification channels (v2) with audible sound and vibration, RECEIVE_BOOT_COMPLETED & SCHEDULE_EXACT_ALARM permissions, 125+ Short & Crunchy Zomato-style pop-culture notifications across 5 scenarios, in-settings instant 2-second test notification trigger, intro-to-login smooth transition fix, local-first offline task capture fallback, and Hermes engine bridge.
+- **SHA-256**: `7644D90820AA11D17029CFA29854315DCDC8527949D743F7C0BD8BD3E7F474D9`
+- **Build verification**: `assembleRelease` succeeded; verified Hermes Bytecode (`C6 1F BC 03` header, 69.1 MB); APK v2 signature verified; includes critical Android startup crash fix (eliminated FragmentManager transaction race conditions, prevented dashboard from mounting during onboarding animation, resolved SQLite singleton connection pool closure), resilient offline task capture fallback for unauthenticated/offline sessions, First-Launch Intro & Feature Tour modal, Android 13+ POST_NOTIFICATIONS runtime prompt on boot, high-importance heads-up notification channels (v2) with audible sound and vibration, RECEIVE_BOOT_COMPLETED & SCHEDULE_EXACT_ALARM permissions, 125+ Short & Crunchy Zomato-style pop-culture notifications across 5 scenarios, and in-settings instant 2-second test notification trigger.
 
 ---
 
 ## What's New in This Build
 
-1. **Intro Transition & Black Screen Fix**:
+1. **Android Startup Crash Fix ("ALIBI keeps stopping" resolved)**:
+   - **Eliminated Navigation Race Conditions**: Removed competing `router.replace()` calls between `finishIntro()` and `guardRoute()`. Consolidated route guarding into a single authoritative handler with active navigation locks to prevent simultaneous native FragmentManager transactions.
+   - **Gated Dashboard Mounting**: The application navigation stack (`<Stack>`) is no longer rendered underneath the intro animation or splash screen. During startup (`checking`), only the branded launch cover renders. During onboarding (`intro`), only the intro animation renders. The dashboard mounts strictly after intro completion and auth check.
+   - **Resolved SQLite Connection Pool Premature Closure**: Eliminated `database.closeAsync()` in `hasLegacyLocalData()` which previously closed the native SQLite connection pool out from under `offline-sync.ts` and the Dashboard. Added a singleton mutex initialization promise (`dbInitPromise`) in `offline-sync.ts` to serialize database setup and prevent concurrent schema races.
+   - **Guaranteed Task Capture Offline**: Defaulted offline task creation to `"local_user"` when no profile is yet saved locally, ensuring quick capture and dashboard task adds never fail or drop tasks when the server is unavailable or cold-starting.
+
+2. **Intro Transition & Black Screen Fix**:
    - Replaced modal presentation on `login` and `signup` routes with standard stack navigation. Android Fragment Manager previously threw an unhandled state exception when replacing the root screen with a modal.
    - Pre-checks auth tokens before dismissing the intro animation to transition directly to `/login` or `/(tabs)` without screen flicker or race conditions.
    - Guarded notification scheduling so background alarms only schedule once the user is authenticated.

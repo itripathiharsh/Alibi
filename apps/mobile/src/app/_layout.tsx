@@ -1,11 +1,11 @@
 import "../polyfills";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Pressable, StyleSheet, Text, View, Image } from "react-native";
 import { User } from "lucide-react-native";
 import theme from "../lib/theme";
-import { getAccessToken, getRefreshToken } from "../lib/auth";
+import { getAccessToken, getRefreshToken, getUserProfile } from "../lib/auth";
 import FirstLaunchIntro from "../components/first-launch-intro";
 import { completeFirstLaunchIntro, shouldShowFirstLaunchIntro } from "../lib/first-launch";
 import { registerNotificationHandler, scheduleDailyWittyReminders, scheduleInactivityNudge } from "../lib/notification-witty-engine";
@@ -19,6 +19,7 @@ export default function RootLayout() {
   const segments = useSegments();
   const firstSegment = segments[0];
   const [launchState, setLaunchState] = useState<"checking" | "intro" | "ready">("checking");
+  const isNavigatingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,16 +30,10 @@ export default function RootLayout() {
   }, []);
 
   const finishIntro = useCallback(() => {
-    void completeFirstLaunchIntro().finally(async () => {
-      const [accessToken, refreshToken] = await Promise.all([getAccessToken(), getRefreshToken()]);
-      if (accessToken || refreshToken) {
-        router.replace("/(tabs)");
-      } else {
-        router.replace("/login");
-      }
+    void completeFirstLaunchIntro().finally(() => {
       setLaunchState("ready");
     });
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     if (launchState !== "ready") return;
@@ -47,20 +42,58 @@ export default function RootLayout() {
       const isAuthRoute = firstSegment === "login" || firstSegment === "signup";
       // Route from local session state immediately. Refresh/auth API calls happen
       // in the screen data loaders so a sleeping hosted backend cannot block the shell.
-      const [accessToken, refreshToken] = await Promise.all([getAccessToken(), getRefreshToken()]);
+      const [accessToken, refreshToken, profile] = await Promise.all([
+        getAccessToken(),
+        getRefreshToken(),
+        getUserProfile(),
+      ]);
       if (cancelled) return;
-      if (accessToken || refreshToken) {
+      const isAuthenticated = Boolean(accessToken || refreshToken || profile);
+      if (isAuthenticated) {
         void scheduleDailyWittyReminders();
         void scheduleInactivityNudge();
-        if (isAuthRoute) router.replace("/(tabs)");
+        if (isAuthRoute && !isNavigatingRef.current) {
+          isNavigatingRef.current = true;
+          router.replace("/(tabs)");
+          setTimeout(() => { isNavigatingRef.current = false; }, 400);
+        }
         return;
       }
-      if (isAuthRoute) return;
-      router.replace("/login");
+      if (!isAuthRoute && !isNavigatingRef.current) {
+        isNavigatingRef.current = true;
+        router.replace("/login");
+        setTimeout(() => { isNavigatingRef.current = false; }, 400);
+      }
     };
     void guardRoute();
     return () => { cancelled = true; };
   }, [firstSegment, launchState, router]);
+
+  if (launchState === "checking") {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="dark" backgroundColor={theme.colors.background.base} />
+        <View style={styles.launchCover}>
+          <Image
+            source={require("../../assets/icon_mark.png")}
+            style={styles.launchMark}
+            resizeMode="contain"
+          />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
+  if (launchState === "intro") {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="dark" backgroundColor={theme.colors.background.base} />
+        <View style={styles.root}>
+          <FirstLaunchIntro onFinish={finishIntro} />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>
@@ -131,12 +164,6 @@ export default function RootLayout() {
             }}
           />
         </Stack>
-        {launchState === "checking" && (
-          <View style={styles.launchCover}>
-            <Image source={require("../../assets/icon_mark.png")} style={styles.launchMark} resizeMode="contain" />
-          </View>
-        )}
-        {launchState === "intro" && <FirstLaunchIntro onFinish={finishIntro} />}
       </View>
     </SafeAreaProvider>
   );

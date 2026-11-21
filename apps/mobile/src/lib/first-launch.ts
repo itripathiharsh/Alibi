@@ -1,6 +1,6 @@
 import * as SecureStore from "expo-secure-store";
-import * as SQLite from "expo-sqlite";
 import { getAccessToken, getRefreshToken, getUserProfile } from "./auth";
+import { getDatabase } from "./offline-sync";
 
 const FIRST_LAUNCH_INTRO_KEY = "alibi_first_launch_intro_seen_v1";
 const LEGACY_LOCAL_TABLES = ["local_tasks", "task_views", "sync_state"] as const;
@@ -14,9 +14,8 @@ async function markIntroSeen(): Promise<void> {
 }
 
 async function hasLegacyLocalData(): Promise<boolean> {
-  let database: SQLite.SQLiteDatabase | null = null;
   try {
-    database = await SQLite.openDatabaseAsync("alibi-local.db");
+    const database = await getDatabase();
     const placeholders = LEGACY_LOCAL_TABLES.map(() => "?").join(", ");
     const tables = await database.getAllAsync<{ name: string }>(
       `SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (${placeholders}) LIMIT 1`,
@@ -25,8 +24,6 @@ async function hasLegacyLocalData(): Promise<boolean> {
     return tables.length > 0;
   } catch {
     return false;
-  } finally {
-    await database?.closeAsync().catch(() => undefined);
   }
 }
 

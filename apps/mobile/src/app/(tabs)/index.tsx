@@ -48,7 +48,7 @@ import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder, scheduleTaskTimerReminder } from "../../lib/timer-reminders";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
-import { triggerHaptic, startFocusNotification, stopFocusNotification, startAmbientAudio, stopAmbientAudio } from "../../lib/focus-session-notification";
+import { triggerHaptic, startFocusNotification, stopFocusNotification } from "../../lib/focus-session-notification";
 import { filterLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
 import { CaptureReviewSheet } from "../../components/capture-review-sheet";
 import { decideTaskExtraction, type TaskExtractionProposal } from "../../lib/task-extraction";
@@ -97,10 +97,6 @@ interface RunningTimer {
   started_at: string;
   source?: string;
 }
-
-interface KickoffSuggestion { id: string; title: string; reasons: string[] }
-interface EndOfDayTask { id: string; title: string; status: string }
-interface EndOfDayReview { completed_count: number; unfinished: EndOfDayTask[] }
 
 function computeDeadlineIso(
   dateChoice: "today" | "tomorrow" | "next_week" | "custom" | null,
@@ -164,9 +160,6 @@ export default function DashboardScreen() {
   // State
   const [user, setUser] = useState<UserProfile | null>(null);
   const [todayTasks, setTodayTasks] = useState<TaskItem[]>([]);
-  const [openTasks, setOpenTasks] = useState<TaskItem[]>([]);
-  const [kickoffSuggestions, setKickoffSuggestions] = useState<KickoffSuggestion[]>([]);
-  const [endOfDayReview, setEndOfDayReview] = useState<EndOfDayReview>({ completed_count: 0, unfinished: [] });
   const [upcomingTasks, setUpcomingTasks] = useState<TaskItem[]>([]);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [summary, setSummary] = useState<SummaryData | null>(null);
@@ -176,9 +169,6 @@ export default function DashboardScreen() {
   );
   const [runningTimers, setRunningTimers] = useState<RunningTimer[]>([]);
   const [timerNow, setTimerNow] = useState(Date.now());
-  const [preferredFocusHours, setPreferredFocusHours] = useState<number[]>([]);
-  const [focusSessionCount, setFocusSessionCount] = useState(0);
-  const [ambientStyle, setAmbientStyle] = useState<"rain" | "white" | "brown" | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -199,8 +189,6 @@ export default function DashboardScreen() {
 
   // Top 3 Daily Kickoff & Evening Sunset Sweep State
   const [top3TaskIds, setTop3TaskIds] = useState<string[]>([]);
-  const [kickoffDraftTaskIds, setKickoffDraftTaskIds] = useState<string[]>([]);
-  const [kickoffLocalDate, setKickoffLocalDate] = useState("");
   const [kickoffVisible, setKickoffVisible] = useState(false);
   const [sweepVisible, setSweepVisible] = useState(false);
 
@@ -209,38 +197,23 @@ export default function DashboardScreen() {
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
   }, []);
 
-  const isAfterConfiguredWorkday = useMemo(() => {
-    const settings = user?.settings ?? {};
-    const workingHours = settings.working_hours as Record<string, { enabled?: boolean; end?: string }> | undefined;
-    const dayName = new Date(timerNow).toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
-    const todaySchedule = workingHours?.[dayName];
-    if (!todaySchedule?.enabled || !todaySchedule.end) return false;
-    const [hours, minutes] = todaySchedule.end.split(":").map(Number);
-    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return false;
-    const end = new Date(timerNow);
-    end.setHours(hours, minutes, 0, 0);
-    return timerNow >= end.getTime();
-  }, [timerNow, user]);
+  const isEvening = useMemo(() => {
+    return new Date().getHours() >= 17;
+  }, []);
 
   useEffect(() => {
-    if (!user?.id) return;
-    SecureStore.getItemAsync(`alibi_top3_${user.id}_${kickoffLocalDate || todayDateKey}`).then((val) => {
+    SecureStore.getItemAsync(`alibi_top3_${todayDateKey}`).then((val) => {
       if (val) {
         try {
-          const parsed = JSON.parse(val);
-          if (Array.isArray(parsed)) {
-            const accepted = parsed.filter((id) => typeof id === "string").slice(0, 3);
-            setTop3TaskIds(accepted);
-            setKickoffDraftTaskIds(accepted);
-          }
-        } catch {}
+          setTop3TaskIds(JSON.parse(val));
+        } catch { }
       }
     });
-  }, [kickoffLocalDate, todayDateKey, user?.id]);
+  }, [todayDateKey]);
 
   const toggleTop3Selection = (taskId: string) => {
     triggerHaptic("tap");
-    setKickoffDraftTaskIds((prev) => {
+    setTop3TaskIds((prev) => {
       let next: string[];
       if (prev.includes(taskId)) {
         next = prev.filter((id) => id !== taskId);
@@ -251,72 +224,39 @@ export default function DashboardScreen() {
         }
         next = [...prev, taskId];
       }
+      void SecureStore.setItemAsync(`alibi_top3_${todayDateKey}`, JSON.stringify(next));
       return next;
     });
   };
 
-  const handleEndOfDayAction = async (task: EndOfDayTask, action: "tomorrow" | "backlog" | "cancel") => {
-    try {
-      const token = await ensureAuthenticated();
-      if (!token) throw new Error("Sign in to update this task.");
-      const response = await fetch(`${getServerUrl()}/api/v1/tasks/${task.id}/end-of-day-action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action }),
-      });
-      const result = await response.json().catch(() => ({})) as { detail?: string };
-      if (!response.ok) throw new Error(result.detail ?? "This task could not be updated.");
-      triggerHaptic(action === "cancel" ? "alert" : "complete");
-      await fetchDashboardData();
-    } catch (error) {
-      Alert.alert("Review not saved", error instanceof Error ? error.message : "Try again.");
-    }
-  };
+  const handleSweepAllTomorrow = async () => {
+    triggerHaptic("alert");
+    const uncompleted = todayTasks.filter((t) => t.status !== "completed");
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(23, 59, 0, 0);
+    const deadlineIso = tomorrow.toISOString();
 
-  const handleMarkReviewedTaskDone = async (taskId: string) => {
-    try {
-      const token = await ensureAuthenticated();
-      if (!token) throw new Error("Sign in to complete this task.");
-      const response = await fetch(`${getServerUrl()}/api/v1/tasks/${taskId}/status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status: "completed" }),
-      });
-      if (!response.ok) throw new Error("This task could not be marked complete.");
-      triggerHaptic("complete");
-      await fetchDashboardData();
-    } catch (error) {
-      Alert.alert("Task not completed", error instanceof Error ? error.message : "Try again.");
-    }
-  };
+    setTodayTasks((prev) => prev.filter((t) => t.status === "completed"));
+    setSweepVisible(false);
 
-  const handleSweepAllTomorrow = () => {
-    if (!endOfDayReview.unfinished.length) return;
-    Alert.alert(
-      "Move all unfinished tasks?",
-      "Each open task will move to the start of your next configured workday. ALIBI will keep existing calendar events unchanged.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Move tasks", onPress: () => {
-          void (async () => {
-            const token = await ensureAuthenticated();
-            if (!token) return Alert.alert("Sign in required", "Sign in to move these tasks.");
-            const results = await Promise.all(endOfDayReview.unfinished.map(async (task) => {
-              const response = await fetch(`${getServerUrl()}/api/v1/tasks/${task.id}/end-of-day-action`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ action: "tomorrow" }),
-              });
-              return response.ok;
-            }));
-            const failed = results.filter((ok) => !ok).length;
-            if (failed) Alert.alert("Some tasks were not moved", `${failed} task${failed === 1 ? "" : "s"} need another review.`);
-            else setSweepVisible(false);
-            await fetchDashboardData();
-          })();
-        } },
-      ],
-    );
+    try {
+      const baseUrl = getServerUrl();
+      const token = await ensureAuthenticated();
+      if (token) {
+        await Promise.all(
+          uncompleted.map((t) =>
+            fetch(`${baseUrl}/api/v1/tasks/${t.id}/reschedule`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ new_deadline_at: deadlineIso, reason: "Evening sunset sweep" }),
+            }).catch(() => undefined)
+          )
+        );
+      }
+    } finally {
+      fetchDashboardData();
+    }
   };
 
   const sortedTodayTasks = useMemo(() => {
@@ -330,8 +270,8 @@ export default function DashboardScreen() {
   }, [todayTasks, top3TaskIds]);
 
   const top3CompletedCount = useMemo(() => {
-    return openTasks.filter((t) => top3TaskIds.includes(t.id) && t.status === "completed").length;
-  }, [openTasks, top3TaskIds]);
+    return todayTasks.filter((t) => top3TaskIds.includes(t.id) && t.status === "completed").length;
+  }, [todayTasks, top3TaskIds]);
 
   // Dynamic greeting based on current local time
   const greeting = useMemo(() => {
@@ -405,13 +345,10 @@ export default function DashboardScreen() {
       const headers: Record<string, string> = { Accept: "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const [userRes, tasksRes, upcomingRes, allTasksRes, kickoffRes, endOfDayRes, sumRes, scoreRes, timerRes, learnRes, notifsRes] = await Promise.all([
+      const [userRes, tasksRes, upcomingRes, sumRes, scoreRes, timerRes, learnRes, notifsRes] = await Promise.all([
         fetch(`${baseUrl}/api/v1/auth/me`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/tasks?view=today`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/tasks?view=upcoming`, { headers }).catch(() => null),
-        fetch(`${baseUrl}/api/v1/tasks?view=all&limit=200`, { headers }).catch(() => null),
-        fetch(`${baseUrl}/api/v1/tasks/daily-kickoff`, { headers }).catch(() => null),
-        fetch(`${baseUrl}/api/v1/tasks/end-of-day`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/analytics/summary?period=daily`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/analytics/productivity-score?period=daily`, { headers }).catch(() => null),
         fetch(`${baseUrl}/api/v1/time-entries/running/all`, { headers }).catch(() => null),
@@ -420,13 +357,9 @@ export default function DashboardScreen() {
       ]);
 
       let reminderLeadMin = DEFAULT_DEADLINE_REMINDER_LEAD_MIN;
-      let accountId = profile?.id;
-      let accountTimezone = profile?.timezone;
       if (userRes && userRes.ok) {
         const userData = await userRes.json() as UserProfile;
         setUser(userData);
-        accountId = userData.id ?? accountId;
-        accountTimezone = userData.timezone ?? accountTimezone;
         if (userData.id && userData.email && userData.timezone) {
           await saveUserProfile({
             id: userData.id,
@@ -451,50 +384,6 @@ export default function DashboardScreen() {
         setUpcomingTasks(upData);
         reminderTasks.push(...upData);
       }
-      if (allTasksRes && allTasksRes.ok) {
-        const allTaskData = await allTasksRes.json() as TaskItem[];
-        setOpenTasks(allTaskData.filter((task) => task.status !== "cancelled"));
-      }
-      if (kickoffRes && kickoffRes.ok) {
-        const kickoff = await kickoffRes.json() as { suggestions?: KickoffSuggestion[]; local_date?: string };
-        const suggestions = Array.isArray(kickoff.suggestions) ? kickoff.suggestions : [];
-        const localDate = kickoff.local_date ?? todayDateKey;
-        setKickoffLocalDate(localDate);
-        setKickoffSuggestions(suggestions);
-        if (accountId) {
-          const storageKey = `alibi_top3_${accountId}_${localDate}`;
-          const promptKey = `alibi_kickoff_prompted_${accountId}_${localDate}`;
-          const [saved, prompted] = await Promise.all([
-            SecureStore.getItemAsync(storageKey),
-            SecureStore.getItemAsync(promptKey),
-          ]);
-          if (saved) {
-            try {
-              const parsed = JSON.parse(saved);
-              if (Array.isArray(parsed)) {
-                const accepted = parsed.filter((id) => typeof id === "string").slice(0, 3);
-                setTop3TaskIds(accepted);
-                setKickoffDraftTaskIds(accepted);
-              }
-            } catch {
-              setKickoffDraftTaskIds(suggestions.map((item) => item.id).slice(0, 3));
-            }
-          } else {
-            const suggestedIds = suggestions.map((item) => item.id).slice(0, 3);
-            setKickoffDraftTaskIds(suggestedIds);
-            const morningHour = Number(new Intl.DateTimeFormat("en-US", {
-              hour: "2-digit",
-              hourCycle: "h23",
-              ...(accountTimezone ? { timeZone: accountTimezone } : {}),
-            }).format(new Date()));
-            if (!prompted && suggestedIds.length > 0 && morningHour >= 6 && morningHour <= 10) {
-              await SecureStore.setItemAsync(promptKey, "1");
-              setKickoffVisible(true);
-            }
-          }
-        }
-      }
-      if (endOfDayRes && endOfDayRes.ok) setEndOfDayReview(await endOfDayRes.json() as EndOfDayReview);
       void syncTaskDeadlineReminders(reminderTasks, reminderLeadMin);
       if (notifsRes && notifsRes.ok) {
         const notifs = await notifsRes.json();
@@ -512,23 +401,10 @@ export default function DashboardScreen() {
         else setRunningTimers(timerData);
       }
       if (learnRes && learnRes.ok) {
-        const learningProfile = await learnRes.json();
-        setLearnedRoutines(filterLearnedTaskRoutines(learningProfile?.routines));
-        const preference = Array.isArray(learningProfile?.preferences)
-          ? learningProfile.preferences.find((item: { preferred_hours?: unknown }) => Array.isArray(item.preferred_hours) && item.preferred_hours.length > 0)
-          : null;
-        const learnedHours = Array.isArray(preference?.preferred_hours)
-          ? preference.preferred_hours.filter((hour: unknown): hour is number => Number.isInteger(hour) && Number(hour) >= 0 && Number(hour) < 24)
-          : [];
-        setPreferredFocusHours(learnedHours);
-        const samples = typeof preference?.session_count === "number" ? preference.session_count : 0;
-        setFocusSessionCount(samples);
-        if (learnedHours.length > 0 && samples > 0) {
-          const peak = new Date();
-          peak.setHours(learnedHours[0], 0, 0, 0);
-          setLearningTip(`Most recorded work starts around ${peak.toLocaleTimeString([], { hour: "numeric" })} (${samples} timed sessions).`);
-        } else {
-          setLearningTip("ALIBI will surface a focus pattern after you record more work sessions.");
+        const profile = await learnRes.json();
+        setLearnedRoutines(filterLearnedTaskRoutines(profile?.routines));
+        if (profile?.peak_window) {
+          setLearningTip(`You tend to be most productive between ${profile.peak_window}.`);
         }
       }
       if (profile && token) void syncMobileAccount(profile.id, token, baseUrl).catch(() => undefined);
@@ -542,7 +418,7 @@ export default function DashboardScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [todayDateKey]);
+  }, []);
 
   useEffect(() => {
     fetchDashboardData();
@@ -552,8 +428,6 @@ export default function DashboardScreen() {
     const interval = setInterval(() => setTimerNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => () => { stopAmbientAudio(); }, []);
 
 
   const onRefresh = () => {
@@ -639,21 +513,8 @@ export default function DashboardScreen() {
       return;
     }
     const targetTask = todayTasks.find((t) => t.id === targetTaskId);
+    void startFocusNotification(targetTask?.title || "Focus Session", targetTask?.estimate_user_min || 25);
     const profile = await getUserProfile();
-    const shallowTags = (targetTask?.tags ?? []).map((tag) => tag.trim().toLowerCase().replace(/^#/, ""));
-    const isShallowTask = shallowTags.some((tag) => tag === "admin" || tag === "routine");
-    if (isShallowTask && preferredFocusHours.includes(new Date().getHours())) {
-      const continueNow = await new Promise<boolean>((resolve) => Alert.alert(
-        "Your learned focus hour",
-        `${learningTip} This task is tagged for routine or admin work. You can review the calendar or continue now.`,
-        [
-          { text: "Not now", style: "cancel", onPress: () => resolve(false) },
-          { text: "Review calendar", onPress: () => { resolve(false); router.push("/calendar"); } },
-          { text: "Start anyway", onPress: () => resolve(true) },
-        ],
-      ));
-      if (!continueNow) return;
-    }
     try {
       const baseUrl = getServerUrl();
       const token = await ensureAuthenticated();
@@ -661,13 +522,6 @@ export default function DashboardScreen() {
         if (profile) {
           const localTimer = await startTaskTimerOffline(profile.id, targetTaskId);
           setRunningTimers((prev) => [localTimer, ...prev]);
-          void startFocusNotification(
-            targetTaskId,
-            targetTask?.title ?? "Focus session",
-            localTimer.started_at,
-            targetTask?.estimate_user_min,
-            profile.settings?.focus_show_task_name === true,
-          );
           await scheduleTaskTimerReminder({
             timerId: localTimer.id,
             taskId: targetTaskId,
@@ -692,13 +546,6 @@ export default function DashboardScreen() {
       if (res.ok) {
         const timerData = await res.json();
         setRunningTimers((prev) => [timerData, ...prev]);
-        void startFocusNotification(
-          targetTaskId,
-          targetTask?.title ?? "Focus session",
-          timerData.started_at,
-          targetTask?.estimate_user_min,
-          profile?.settings?.focus_show_task_name === true,
-        );
         if (profile) await cacheRunningTimers(profile.id, [timerData, ...runningTimers]);
         await scheduleTaskTimerReminder({
           timerId: timerData.id,
@@ -716,13 +563,6 @@ export default function DashboardScreen() {
       if (profile) {
         const localTimer = await startTaskTimerOffline(profile.id, targetTaskId);
         setRunningTimers((prev) => [localTimer, ...prev]);
-        void startFocusNotification(
-          targetTaskId,
-          targetTask?.title ?? "Focus session",
-          localTimer.started_at,
-          targetTask?.estimate_user_min,
-          profile.settings?.focus_show_task_name === true,
-        );
         await scheduleTaskTimerReminder({
           timerId: localTimer.id,
           taskId: targetTaskId,
@@ -827,8 +667,8 @@ export default function DashboardScreen() {
       const baseUrl = getServerUrl();
       const token = await ensureAuthenticated();
       if (!token) {
-        if (!profile?.id) return;
-        const task = await createTaskOffline(profile.id, {
+        const userId = profile?.id ?? "local_user";
+        const task = await createTaskOffline(userId, {
           id: taskId,
           title: captureText.trim(),
           deadline_at: deadlineIso,
@@ -869,8 +709,9 @@ export default function DashboardScreen() {
         Alert.alert("Capture Error", paramErrors || errJson.detail || "Failed to parse task.");
       }
     } catch (err: any) {
-      if (profile?.id) {
-        const task = await createTaskOffline(profile.id, {
+      const userId = profile?.id ?? "local_user";
+      try {
+        const task = await createTaskOffline(userId, {
           id: taskId || makeOfflineId(),
           title: captureText.trim(),
           deadline_at: deadlineIso,
@@ -879,7 +720,7 @@ export default function DashboardScreen() {
         setTodayTasks((previous) => [task as TaskItem, ...previous]);
         resetModal();
         setCaptureVisible(false);
-      } else {
+      } catch (offlineErr: any) {
         Alert.alert("Network Error", err?.message || "Failed to capture task.");
       }
     } finally {
@@ -1139,9 +980,9 @@ export default function DashboardScreen() {
               <Award size={20} color="#F59E0B" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.kickoffBannerTitle}>Today's Big Rocks ({top3CompletedCount}/{top3TaskIds.length} completed)</Text>
+              <Text style={styles.kickoffBannerTitle}>Today's Big Rocks ({top3CompletedCount}/3 completed)</Text>
               <Text style={styles.kickoffBannerSubtitle}>
-                {top3TaskIds.length > 0 && top3CompletedCount === top3TaskIds.length ? "Your selected priorities are complete." : "Stay with the priorities you chose."}
+                {top3CompletedCount === 3 ? "All 3 big rocks finished! Outstanding work!" : "Stay locked into your primary objectives."}
               </Text>
             </View>
             <View style={styles.kickoffBannerBadgeEdit}>
@@ -1151,7 +992,7 @@ export default function DashboardScreen() {
         )}
 
         {/* Evening Sunset Sweep Banner */}
-        {user?.settings?.eod_sweep_enabled === true && isAfterConfiguredWorkday && endOfDayReview.unfinished.length > 0 && (
+        {isEvening && todayTasks.some((t) => t.status !== "completed") && (
           <Pressable style={styles.sunsetBanner} onPress={() => { triggerHaptic("tap"); setSweepVisible(true); }}>
             <View style={styles.sunsetBannerIcon}>
               <Sunset size={20} color="#D97706" />
@@ -1159,7 +1000,7 @@ export default function DashboardScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.sunsetBannerTitle}>Evening Sunset Sweep</Text>
               <Text style={styles.sunsetBannerSubtitle}>
-                {endOfDayReview.completed_count} completed · {endOfDayReview.unfinished.length} unfinished. Choose what happens next.
+                {todayTasks.filter((t) => t.status !== "completed").length} tasks left. Clear your plate with zero guilt.
               </Text>
             </View>
             <View style={styles.sunsetBannerBadge}>
@@ -1212,15 +1053,15 @@ export default function DashboardScreen() {
 
                       <View style={styles.taskItemContent}>
                         <Pressable onPress={() => router.push({ pathname: "/(tabs)/tasks", params: { taskId: task.id } })} accessibilityRole="button" accessibilityLabel={`Open work log for ${task.title}`}>
-                        <Text
-                          style={[
-                            styles.taskItemTitle,
-                            isCompleted && styles.taskTitleDone,
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {task.title}
-                        </Text>
+                          <Text
+                            style={[
+                              styles.taskItemTitle,
+                              isCompleted && styles.taskTitleDone,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {task.title}
+                          </Text>
                         </Pressable>
                         <View style={styles.taskItemMeta}>
                           {top3TaskIds.includes(task.id) && (
@@ -1298,34 +1139,6 @@ export default function DashboardScreen() {
                 />
               </View>
 
-              <View style={styles.ambientControls}>
-                <Text style={styles.ambientCaption}>Offline sound</Text>
-                {([
-                  ["rain", "Rain"],
-                  ["white", "White"],
-                  ["brown", "Brown"],
-                ] as const).map(([style, label]) => (
-                  <Pressable
-                    key={style}
-                    disabled={!activeTimer}
-                    onPress={() => {
-                      if (!activeTimer) return;
-                      if (ambientStyle === style) {
-                        stopAmbientAudio();
-                        setAmbientStyle(null);
-                      } else if (startAmbientAudio(style)) {
-                        setAmbientStyle(style);
-                      }
-                    }}
-                    style={[styles.ambientChip, ambientStyle === style && styles.ambientChipActive, !activeTimer && styles.ambientChipDisabled]}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${ambientStyle === style ? "Stop" : "Play"} ${label.toLowerCase()} focus sound`}
-                  >
-                    <Text style={[styles.ambientChipText, ambientStyle === style && styles.ambientChipTextActive]}>{label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-
               {/* Soft decorative bottom peach accent */}
               <View style={styles.focusCardWave} />
             </View>
@@ -1337,14 +1150,11 @@ export default function DashboardScreen() {
                 <Text style={styles.planTitle}>Today's Plan</Text>
               </View>
 
-              {preferredFocusHours.length > 0 && focusSessionCount > 0 && (() => {
-                const localHour = new Date();
-                localHour.setHours(preferredFocusHours[0], 0, 0, 0);
-                return <View style={styles.energyShieldBanner}>
-                  <Shield size={12} color="#10B981" />
-                  <Text style={styles.energyShieldBannerText}>Learned start: {localHour.toLocaleTimeString([], { hour: "numeric" })} · {focusSessionCount} sessions</Text>
-                </View>;
-              })()}
+              {/* PLE Peak Energy Shield Indicator */}
+              <View style={styles.energyShieldBanner}>
+                <Shield size={12} color="#10B981" />
+                <Text style={styles.energyShieldBannerText}>Peak Focus: 9:30 AM – 11:30 AM</Text>
+              </View>
 
               <View style={styles.planList}>
                 {planTasks.length === 0 ? (
@@ -1799,14 +1609,13 @@ export default function DashboardScreen() {
             </Text>
 
             <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
-              {openTasks.filter((task) => task.status === "pending" || task.status === "in_progress").length === 0 ? (
+              {todayTasks.length === 0 ? (
                 <Text style={{ textAlign: "center", color: theme.colors.text.secondary, marginVertical: 20 }}>
-                  No open tasks are available. Capture a task to get started.
+                  No tasks created for today yet. Add tasks to select your top priorities!
                 </Text>
               ) : (
-                openTasks.filter((task) => task.status === "pending" || task.status === "in_progress").map((t) => {
-                  const isSelected = kickoffDraftTaskIds.includes(t.id);
-                  const suggestion = kickoffSuggestions.find((item) => item.id === t.id);
+                todayTasks.map((t) => {
+                  const isSelected = top3TaskIds.includes(t.id);
                   return (
                     <Pressable
                       key={t.id}
@@ -1816,12 +1625,9 @@ export default function DashboardScreen() {
                       <View style={[styles.kickoffItemStar, isSelected && styles.kickoffItemStarActive]}>
                         <Star size={16} color={isSelected ? "#D97706" : theme.colors.text.muted} fill={isSelected ? "#D97706" : "transparent"} />
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.kickoffItemTitle, isSelected && styles.kickoffItemTitleActive]} numberOfLines={1}>{t.title}</Text>
-                        <Text style={styles.kickoffItemReason} numberOfLines={1}>
-                          {suggestion?.reasons?.length ? `Suggested · ${suggestion.reasons.join(" · ")}` : t.deadline_at ? `Due ${new Date(t.deadline_at).toLocaleDateString()}` : "Open task"}
-                        </Text>
-                      </View>
+                      <Text style={[styles.kickoffItemTitle, isSelected && styles.kickoffItemTitleActive]} numberOfLines={1}>
+                        {t.title}
+                      </Text>
                     </Pressable>
                   );
                 })
@@ -1829,16 +1635,8 @@ export default function DashboardScreen() {
             </ScrollView>
 
             <View style={styles.modalActions}>
-              <Pressable style={styles.confirmBtn} onPress={() => {
-                triggerHaptic("complete");
-                setTop3TaskIds(kickoffDraftTaskIds);
-                if (user?.id) void SecureStore.setItemAsync(
-                  `alibi_top3_${user.id}_${kickoffLocalDate || todayDateKey}`,
-                  JSON.stringify(kickoffDraftTaskIds),
-                );
-                setKickoffVisible(false);
-              }}>
-                <Text style={styles.confirmBtnText}>Lock In Top 3 ({kickoffDraftTaskIds.length}/3)</Text>
+              <Pressable style={styles.confirmBtn} onPress={() => { triggerHaptic("complete"); setKickoffVisible(false); }}>
+                <Text style={styles.confirmBtnText}>Lock In Top 3 ({top3TaskIds.length}/3)</Text>
               </Pressable>
             </View>
           </View>
@@ -1859,29 +1657,19 @@ export default function DashboardScreen() {
               </Pressable>
             </View>
             <Text style={styles.modalSubheading}>
-              {endOfDayReview.completed_count} tasks completed today. Choose an action for each unfinished task; ALIBI updates only the tasks you select.
+              Unfinished tasks left today? Sweep them to tomorrow with zero guilt, or complete them now.
             </Text>
 
             <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
-              {endOfDayReview.unfinished.map((t) => (
+              {todayTasks.filter((t) => t.status !== "completed").map((t) => (
                 <View key={t.id} style={styles.sweepTaskItem}>
                   <Text style={styles.sweepTaskTitle} numberOfLines={1}>{t.title}</Text>
-                  <View style={styles.sweepActions}>
-                    <Pressable style={styles.sweepTaskTomorrowBtn} onPress={() => { void handleEndOfDayAction(t, "tomorrow"); }}>
-                      <Text style={styles.sweepTaskBtnText}>Next workday</Text>
-                    </Pressable>
-                    <Pressable style={styles.sweepTaskBacklogBtn} onPress={() => { void handleEndOfDayAction(t, "backlog"); }}>
-                      <Text style={styles.sweepTaskBtnText}>Backlog</Text>
-                    </Pressable>
-                    <Pressable style={styles.sweepTaskDropBtn} onPress={() => Alert.alert("Cancel this task?", t.title, [
-                      { text: "Keep task", style: "cancel" },
-                      { text: "Cancel task", style: "destructive", onPress: () => { void handleEndOfDayAction(t, "cancel"); } },
-                    ])}>
-                      <Text style={styles.sweepTaskBtnText}>Drop</Text>
-                    </Pressable>
+                  <View style={{ flexDirection: "row", gap: 6 }}>
                     <Pressable
                       style={styles.sweepTaskDoneBtn}
-                      onPress={() => { void handleMarkReviewedTaskDone(t.id); }}
+                      onPress={() => {
+                        handleToggleTask(t.id, t.status);
+                      }}
                     >
                       <CheckCircle2 size={13} color="#10B981" />
                       <Text style={styles.sweepTaskBtnText}>Done</Text>
@@ -1893,7 +1681,7 @@ export default function DashboardScreen() {
 
             <View style={styles.modalActions}>
               <Pressable style={[styles.confirmBtn, { backgroundColor: "#0284C7" }]} onPress={handleSweepAllTomorrow}>
-                <Text style={styles.confirmBtnText}>Move All to Next Workday</Text>
+                <Text style={styles.confirmBtnText}>Move All Remaining to Tomorrow</Text>
               </Pressable>
             </View>
           </View>
@@ -2263,31 +2051,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F97316",
     borderRadius: 2,
   },
-  ambientControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 9,
-  },
-  ambientCaption: {
-    color: "#64748B",
-    fontSize: 9.5,
-    fontWeight: "600",
-    marginRight: 2,
-  },
-  ambientChip: {
-    minHeight: 48,
-    minWidth: 43,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    backgroundColor: "#F1F5F9",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ambientChipActive: { backgroundColor: "#102E42" },
-  ambientChipDisabled: { opacity: 0.45 },
-  ambientChipText: { fontSize: 10, fontWeight: "700", color: "#475569" },
-  ambientChipTextActive: { color: "#FFFFFF" },
   focusCardWave: {
     position: "absolute",
     right: -10,
@@ -2954,14 +2717,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#92400E",
   },
-  kickoffItemReason: {
-    fontSize: 10.5,
-    color: "#64748B",
-    marginTop: 2,
-  },
   sweepTaskItem: {
-    flexDirection: "column",
-    alignItems: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 9,
     paddingHorizontal: 12,
     borderRadius: 10,
@@ -2973,43 +2732,15 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: theme.colors.text.primary,
     flex: 1,
-    marginBottom: 8,
-  },
-  sweepActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  sweepTaskTomorrowBtn: {
-    minHeight: 48,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    borderRadius: 9,
-    backgroundColor: "#E0F2FE",
-  },
-  sweepTaskBacklogBtn: {
-    minHeight: 48,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    borderRadius: 9,
-    backgroundColor: "#E2E8F0",
-  },
-  sweepTaskDropBtn: {
-    minHeight: 48,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    borderRadius: 9,
-    backgroundColor: "#FEE2E2",
+    marginRight: 8,
   },
   sweepTaskDoneBtn: {
-    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     gap: 3,
     paddingHorizontal: 8,
     paddingVertical: 5,
-    borderRadius: 9,
+    borderRadius: 6,
     backgroundColor: "#ECFDF5",
   },
   sweepTaskBtnText: {
