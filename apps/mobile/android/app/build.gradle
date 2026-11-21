@@ -12,7 +12,14 @@ react {
     root = file("../../")
     entryFile = file("../../index.js")
     reactNativeDir = new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
-    hermesCommand = new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsolutePath() + "/sdks/hermesc/%OS-BIN%/hermesc"
+    def standardHermes = new File(["node", "--print", "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim()).getParentFile().getAbsolutePath() + "/sdks/hermesc/%OS-BIN%/hermesc"
+    def isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
+    def bridgeFile = new File(projectDir, "../../hermesc_wsl_bridge.bat")
+    if (isWindows && bridgeFile.exists()) {
+        hermesCommand = bridgeFile.getAbsolutePath()
+    } else {
+        hermesCommand = standardHermes
+    }
     codegenDir = new File(["node", "--print", "require.resolve('@react-native/codegen/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
 
     // Use Expo CLI to bundle the app, this ensures the Metro config

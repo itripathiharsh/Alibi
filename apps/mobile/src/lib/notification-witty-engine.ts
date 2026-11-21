@@ -413,7 +413,6 @@ export async function scheduleInactivityNudge(): Promise<void> {
     await Promise.all(ghostNotifs.map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => undefined)));
 
     const copy = await getNotificationCopy("GHOSTING");
-    const fireDate = new Date(Date.now() + 36 * 60 * 60 * 1000); // 36 hours from now
 
     await Notifications.scheduleNotificationAsync({
       content: {
@@ -424,11 +423,12 @@ export async function scheduleInactivityNudge(): Promise<void> {
         priority: Notifications.AndroidNotificationPriority.HIGH,
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: fireDate,
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 36 * 3600, // 36 hours
+        repeats: false,
         ...(Platform.OS === "android" ? { channelId: DAILY_CHANNEL_ID } : {}),
       },
-    });
+    }).catch(() => undefined);
   } catch {
     // Non-fatal
   }

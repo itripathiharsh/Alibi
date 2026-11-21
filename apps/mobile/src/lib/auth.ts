@@ -134,7 +134,11 @@ export async function refreshMobileTokens(): Promise<string | null> {
     });
 
     if (!response.ok) {
-      await clearAuthData();
+      // Only clear credentials if the server explicitly rejected the token as unauthorized (401).
+      // Never wipe credentials on transient 502/503 (Render cold start) or Cloudflare blocks.
+      if (response.status === 401) {
+        await clearAuthData();
+      }
       return null;
     }
 

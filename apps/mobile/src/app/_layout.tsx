@@ -29,8 +29,16 @@ export default function RootLayout() {
   }, []);
 
   const finishIntro = useCallback(() => {
-    void completeFirstLaunchIntro().finally(() => setLaunchState("ready"));
-  }, []);
+    void completeFirstLaunchIntro().finally(async () => {
+      const [accessToken, refreshToken] = await Promise.all([getAccessToken(), getRefreshToken()]);
+      if (accessToken || refreshToken) {
+        router.replace("/(tabs)");
+      } else {
+        router.replace("/login");
+      }
+      setLaunchState("ready");
+    });
+  }, [router]);
 
   useEffect(() => {
     if (launchState !== "ready") return;
@@ -42,6 +50,8 @@ export default function RootLayout() {
       const [accessToken, refreshToken] = await Promise.all([getAccessToken(), getRefreshToken()]);
       if (cancelled) return;
       if (accessToken || refreshToken) {
+        void scheduleDailyWittyReminders();
+        void scheduleInactivityNudge();
         if (isAuthRoute) router.replace("/(tabs)");
         return;
       }
@@ -49,8 +59,6 @@ export default function RootLayout() {
       router.replace("/login");
     };
     void guardRoute();
-    void scheduleDailyWittyReminders();
-    void scheduleInactivityNudge();
     return () => { cancelled = true; };
   }, [firstSegment, launchState, router]);
 
@@ -113,13 +121,14 @@ export default function RootLayout() {
           <Stack.Screen
             name="login"
             options={{
-              presentation: "modal",
-              headerTitle: "Sign In",
+              headerShown: false,
             }}
           />
           <Stack.Screen
             name="signup"
-            options={{ presentation: "modal", headerTitle: "Create Account" }}
+            options={{
+              headerShown: false,
+            }}
           />
         </Stack>
         {launchState === "checking" && (

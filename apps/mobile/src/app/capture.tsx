@@ -47,28 +47,46 @@ export default function QuickCaptureScreen() {
     setSaving(true);
     triggerHaptic("complete");
     try {
-      const token = await ensureAuthenticated();
-      if (!token) throw new Error("Sign in to save a task.");
-      const response = await fetch(`${getServerUrl()}/api/v1/tasks/capture`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ raw_input: title, origin: listening ? "voice" : "manual", status: "pending" }),
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({})) as { detail?: string };
-        throw new Error(data.detail ?? "Task could not be saved.");
-      }
-      router.replace("/(tabs)");
-    } catch (error) {
-      if (error instanceof TypeError) {
-        const profile = await getUserProfile();
-        if (profile) {
-          await createTaskOffline(profile.id, { title, status: "pending", origin: listening ? "voice" : "manual" });
-          Alert.alert("Saved on this device", "This task will sync when ALIBI is back online.");
-          router.replace("/(tabs)");
-          return;
+      const profile = await getUserProfile().catch(() => null);
+      let savedOnline = false;
+
+      // 1. Try online first if authenticated
+      const token = await ensureAuthenticated().catch(() => null);
+      if (token) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
+          const response = await fetch(`${getServerUrl()}/api/v1/tasks/capture`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ raw_input: title, origin: listening ? "voice" : "manual", status: "pending" }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          if (response.ok) {
+            savedOnline = true;
+          }
+        } catch {
+          // Network failed, timeout, or server error -> fall back to offline
         }
       }
+
+      // 2. If online save succeeded, navigate back
+      if (savedOnline) {
+        router.replace("/(tabs)");
+        return;
+      }
+
+      // 3. Local-first offline save guarantee (never drop user tasks)
+      const userId = profile?.id ?? "local_user";
+      await createTaskOffline(userId, {
+        title,
+        status: "pending",
+        origin: listening ? "voice" : "manual",
+      });
+      Alert.alert("Saved on this device", "This task is saved locally and will sync when ALIBI is online.");
+      router.replace("/(tabs)");
+    } catch (error) {
       Alert.alert("Could not save task", error instanceof Error ? error.message : "Try again.");
     } finally {
       setSaving(false);

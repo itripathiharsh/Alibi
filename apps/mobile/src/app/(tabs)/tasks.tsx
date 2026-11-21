@@ -402,29 +402,13 @@ export default function TasksScreen() {
   const handleCapture = async () => {
     if (!captureText.trim() || isCapturing) return;
     setIsCapturing(true);
-    let queuedOffline = false;
     let offlineProfileId: string | null = null;
     const deadlineIso = computeDeadlineIso(selectedDate, customDateStr, selectedTime, customTimeStr);
     try {
       const profile = await getUserProfile();
       offlineProfileId = profile?.id ?? null;
-      let token = await ensureAuthenticated();
+      let token = await ensureAuthenticated().catch(() => null);
       const baseUrl = getServerUrl();
-      if (!token) {
-        if (!profile) throw new Error("Sign in once while online before capturing work offline.");
-        const task = await createTaskOffline(profile.id, {
-          title: captureText.trim(),
-          status: taskStatus,
-          deadline_at: deadlineIso,
-          origin: isListening ? "voice" : "manual",
-        });
-        setTasks((previous) => [task as TaskItem, ...previous.filter((item) => item.id !== task.id)]);
-        if (!deadlineIso && taskStatus === "pending") setActiveView("backlog");
-        queuedOffline = true;
-        resetModal();
-        setCaptureVisible(false);
-        return;
-      }
 
       const payload: Record<string, any> = {
         raw_input: captureText.trim(),
@@ -435,19 +419,11 @@ export default function TasksScreen() {
         payload.deadline_at = deadlineIso;
       }
 
-      let res = await fetch(`${baseUrl}/api/v1/tasks/capture`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      // If token expired, force re-authenticate and retry once
-      if (res.status === 401) {
-        token = await ensureAuthenticated(true);
-        if (token) {
+      let res: Response | null = null;
+      if (token) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
           res = await fetch(`${baseUrl}/api/v1/tasks/capture`, {
             method: "POST",
             headers: {
@@ -455,11 +431,34 @@ export default function TasksScreen() {
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify(payload),
+            signal: controller.signal,
           });
+          clearTimeout(timeoutId);
+
+          // If token expired, force re-authenticate and retry once
+          if (res.status === 401) {
+            token = await ensureAuthenticated(true).catch(() => null);
+            if (token) {
+              const retryCtrl = new AbortController();
+              const retryTimeout = setTimeout(() => retryCtrl.abort(), 6000);
+              res = await fetch(`${baseUrl}/api/v1/tasks/capture`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(payload),
+                signal: retryCtrl.signal,
+              });
+              clearTimeout(retryTimeout);
+            }
+          }
+        } catch {
+          res = null;
         }
       }
 
-      if (res.ok) {
+      if (res && res.ok) {
         const result = await res.json();
         const capturedTask = result.task;
         if (result.extraction) setPendingExtraction(result.extraction as TaskExtractionProposal);
@@ -486,27 +485,24 @@ export default function TasksScreen() {
         resetModal();
         setCaptureVisible(false);
         fetchTasks();
-      } else {
-        const errJson = await res.json().catch(() => ({})) as any;
-        const paramErrors = errJson.invalid_params?.map((p: any) => `${p.name}: ${p.reason}`).join("\n");
-        Alert.alert("Capture Error", paramErrors || errJson.detail || "Failed to parse and capture task.");
+        return;
       }
+
+      // Local-first fallback guarantee: save in offline SQLite and outbox
+      const userId = offlineProfileId ?? profile?.id ?? "local_user";
+      const task = await createTaskOffline(userId, {
+        title: captureText.trim(),
+        status: taskStatus,
+        deadline_at: deadlineIso,
+        origin: isListening ? "voice" : "manual",
+      });
+      setTasks((previous) => [task as TaskItem, ...previous.filter((item) => item.id !== task.id)]);
+      if (!deadlineIso && taskStatus === "pending") setActiveView("backlog");
+      resetModal();
+      setCaptureVisible(false);
+      Alert.alert("Saved on this device", "Task saved locally. It will sync automatically when ALIBI is online.");
     } catch (err: unknown) {
-      const profile = offlineProfileId ? { id: offlineProfileId } : await getUserProfile();
-      if (profile && !queuedOffline) {
-        const task = await createTaskOffline(profile.id, {
-          title: captureText.trim(),
-          status: taskStatus,
-          deadline_at: deadlineIso,
-          origin: isListening ? "voice" : "manual",
-        });
-        setTasks((previous) => [task as TaskItem, ...previous.filter((item) => item.id !== task.id)]);
-        if (!deadlineIso && taskStatus === "pending") setActiveView("backlog");
-        resetModal();
-        setCaptureVisible(false);
-      } else {
-        Alert.alert("Network Error", err instanceof Error ? err.message : "Failed to capture task. Check server connectivity.");
-      }
+      Alert.alert("Could not capture task", err instanceof Error ? err.message : "Please try again.");
     } finally {
       setIsCapturing(false);
     }

@@ -7,17 +7,28 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **File**: [`ALIBI-0.1.0.apk`](./ALIBI-0.1.0.apk)
 - **Direct Download Link**: [Download ALIBI-0.1.0.apk (Raw)](https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk)
 - **Version**: `0.1.0`
-- **Build Date**: November 20, 2026
+- **Build Date**: November 21, 2026
 - **Variant**: Android release APK, Hermes Bytecode Engine (React Native 0.76 New Architecture)
 - **Signing**: Signed with the repository's current Android debug keystore. This is installable for direct distribution/testing, but it is not a Play Store production signature.
-- **SHA-256**: `B078B87851340E6833146442F85A727B9B98744C3E6D597F966BFBF7CD4AF6DC`
-- **Build verification**: `assembleRelease` succeeded; verified Hermes Bytecode (`0x1F1903C103BC1FC6` header, 69.1 MB); APK v2 signature verified; includes First-Launch Intro & Feature Tour modal, Android 13+ POST_NOTIFICATIONS runtime prompt on boot, high-importance heads-up notification channels (v2) with audible sound and vibration, RECEIVE_BOOT_COMPLETED & SCHEDULE_EXACT_ALARM permissions, 125+ Short & Crunchy Zomato-style pop-culture notifications across 5 scenarios, in-settings instant 2-second test notification trigger, and Hermes engine fix.
+- **SHA-256**: `B667E59C411229A87EC69244DCD7CFB864047E1ADDFD5F78C42E0031477D167B`
+- **Build verification**: `assembleRelease` succeeded; verified Hermes Bytecode (`C6 1F BC 03` header, 69.1 MB); APK v2 signature verified; includes First-Launch Intro & Feature Tour modal, Android 13+ POST_NOTIFICATIONS runtime prompt on boot, high-importance heads-up notification channels (v2) with audible sound and vibration, RECEIVE_BOOT_COMPLETED & SCHEDULE_EXACT_ALARM permissions, 125+ Short & Crunchy Zomato-style pop-culture notifications across 5 scenarios, in-settings instant 2-second test notification trigger, intro-to-login smooth transition fix, local-first offline task capture fallback, and Hermes engine bridge.
 
 ---
 
 ## What's New in This Build
 
-1. **Hermes Engine Restored (Fixes White Screen)**:
+1. **Intro Transition & Black Screen Fix**:
+   - Replaced modal presentation on `login` and `signup` routes with standard stack navigation. Android Fragment Manager previously threw an unhandled state exception when replacing the root screen with a modal.
+   - Pre-checks auth tokens before dismissing the intro animation to transition directly to `/login` or `/(tabs)` without screen flicker or race conditions.
+   - Guarded notification scheduling so background alarms only schedule once the user is authenticated.
+   - Converted inactivity nudges to safe non-exact `TIME_INTERVAL` triggers to avoid permission crashes on Android 14.
+
+2. **Local-First Offline Task Capture (Never Lose Tasks)**:
+   - Added automatic fallback to local SQLite (`createTaskOffline`) and `sync_outbox` in Quick Capture and the Tasks tab. If the cloud backend is sleeping (Render cold start), offline, or behind a Cloudflare challenge, tasks are safely saved locally on device and synced when connected.
+   - Safe token refresh: transient 502/503/403 errors will no longer clear stored credentials or log the user out.
+   - Added an offline mode shortcut on the login screen for instant device-only usage without waiting for cloud sign-in.
+
+3. **Hermes Engine Restored (Fixes White Screen)**:
    - React Native 0.76 with New Architecture (Fabric + TurboModules) strictly requires Hermes bytecode. Restoring `hermesEnabled=true` resolves the blank white screen crash on boot.
 2. **125+ Short & Crunchy Zomato-Style Notifications**:
    - 25 unique, short & punchy lines for each of the 5 scenarios:

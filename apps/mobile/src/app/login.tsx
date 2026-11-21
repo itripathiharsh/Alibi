@@ -12,7 +12,7 @@ import {
   Image,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { loginMobile } from "../lib/auth";
+import { loginMobile, saveUserProfile } from "../lib/auth";
 import theme from "../lib/theme";
 
 export default function MobileLoginScreen() {
@@ -21,6 +21,16 @@ export default function MobileLoginScreen() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleOfflineMode = async () => {
+    await saveUserProfile({
+      id: "local_user",
+      email: "local@device.user",
+      display_name: "Local User",
+      timezone: "Asia/Kolkata",
+    });
+    router.replace("/(tabs)");
+  };
 
   const handleLogin = async () => {
     setErrorMessage(null);
@@ -94,6 +104,7 @@ export default function MobileLoginScreen() {
             )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push("/signup")} style={styles.signupLink} accessibilityRole="button"><Text style={styles.signupText}>Create your ALIBI account</Text></TouchableOpacity>
+          <TouchableOpacity onPress={handleOfflineMode} style={styles.offlineLink} accessibilityRole="button"><Text style={styles.offlineText}>Continue in offline mode</Text></TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -183,5 +194,7 @@ const styles = StyleSheet.create({
   },
   signupLink: { minHeight: 48, alignItems: "center", justifyContent: "center", marginTop: 6 },
   signupText: { color: theme.colors.accent.amber, fontSize: 14, fontWeight: "700" },
+  offlineLink: { minHeight: 44, alignItems: "center", justifyContent: "center", marginTop: 4 },
+  offlineText: { color: theme.colors.text.secondary, fontSize: 13, fontWeight: "600" },
 });
 
