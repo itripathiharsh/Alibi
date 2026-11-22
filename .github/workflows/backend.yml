@@ -74,6 +74,9 @@ jobs:
         working-directory: backend
         run: uv run lint-imports
 
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
       - name: Run database migrations
         working-directory: backend
         env:

@@ -7,11 +7,12 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **File**: [`ALIBI-0.1.0.apk`](./ALIBI-0.1.0.apk)
 - **Direct Download Link**: [Download ALIBI-0.1.0.apk (Raw)](https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk)
 - **Version**: `0.1.0`
-- **Build Date**: November 22, 2026 (built from the uncommitted working tree with ADR-028)
+- **Build Date**: November 22, 2026 (rebuilt from main with fresh react-native-svg 15.8.0 JS bundle and direct backup restore drill)
 - **Variant**: Android release APK, Hermes Bytecode Engine (React Native 0.76 New Architecture)
-- **File Size**: `69,218,793 bytes` (66.01 MB)
+- **File Size**: `72,295,681 bytes` (68.95 MB)
 - **Signing**: Signed with the repository's debug keystore, not an owner-managed release key.
-- **SHA-256**: `8B66C19DF8FF1FE4FBD46046C7E297EE6677A9F40925AB6DB044437C2FF836CE`
+- **SHA-256**: `6F588B1143565811CE87EBB5F65D922742BA6EC742DF378DB68B74D883431373`
+- **JS Bundle SHA-256**: `83e5bf892893ee6520077aa6ed777bc0903bbd42c78c0358c9bf69535358e197`
 
 > Includes the 2026-11-22 review fixes and ADR-028: brain dump on the Add screen, "Did it get done?" check-ins, recommendations card, and the round "ALIBI Today" home-screen widget with a quick-action menu. Not yet tested on a physical device (KI-032).
 >
