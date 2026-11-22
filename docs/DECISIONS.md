@@ -327,3 +327,18 @@ No migration, no new dependency, no new hosted service. OpenAPI and the TS clien
 - Update 2026-11-22 (owner: "it must come in as a popup … check out our new features"): from 0.2.2 the app checks whenever it opens or returns to the screen (at most every 10 minutes), and the popup is a full "ALIBI x.y is here" card with a headline, up to four "What's new" highlights written as user benefits, a progress bar and "Download update" / "Later".
 - Why not silent auto-update: Android does not allow a sideloaded app to replace itself without the user's confirmation.
 - Consequences: Adds the `REQUEST_INSTALL_PACKAGES` permission (Google Play restricts it; remove it, and this feature, before any Play Store release). No new dependency or paid service. The first install of 0.2.0 must still be done by hand. The manifest URL points at the owner's public repository.
+
+## ADR-032 — Execution tracking on Today, overdue tasks, Start/End Day, time report
+- Status: Accepted by the owner on 2026-11-23 (owner brief "Brain Dump, Today & Insights Improvements")
+- Date: 2026-11-23
+- Requirement IDs affected: FR-TASK-022, FR-TASK-023, FR-PROD-014, FR-PROD-015, FR-DASH-010
+- Decisions:
+  1. **Execution tracking reuses `time_entries`** (no new table). A work session is one time entry: Start opens it, Pause closes it (start = resume time, end = pause time), Start again opens the next one, completing a task closes the running one. Sessions, total active minutes and session counts all come from these rows. Elapsed time is computed from stored timestamps, so it survives restarts and backgrounding. Sessions under 30 s are discarded as mis-taps.
+  2. **One running task on the Today page.** ADR-025 allows concurrent timers, and the Tasks tab still does; starting a task on Today pauses any other running one so time is never counted twice. A task never gets a second running timer (phone and server both check).
+  3. **Idle time** is not detected automatically (Android gives no reliable signal). Pausing is the user's action; the existing two-hour timer check-in (FR-PROD-003) asks about long-running timers.
+  4. **Original due date:** migration 0016 adds `tasks.original_deadline_at`, set once by a SQLAlchemy listener when a due date that had already passed is moved (any path: PATCH, reschedule, end-of-day review, sync). The phone sets the same value locally. A task is overdue while it is open and its due date is before today; it stays overdue until completed or rescheduled.
+  5. **Start Day / End Day** are `users.settings.day_start` / `day_end` ("HH:MM", default 09:00 / 21:00), edited in Settings → Your day. The brain-dump planner never suggests a time outside them; tasks that don't fit move to the next day's Start Day.
+  6. **AI title correction:** the brain-dump prompt now asks for clean, correctly spelled sentences in the user's own language. Grounding still requires ≥50% of the title's words to match the user's words, now allowing spelling variants ("jaana"/"jana", "leni"/"lena"). Without cloud AI the review says the titles are the user's own words.
+  7. **12-hour times** everywhere through `lib/time-format.ts` (not `toLocaleTimeString`, whose output depends on the phone).
+  8. **Time report** `GET /analytics/time-report`: totals, today/this week, daily average over elapsed days, per-task minutes and sessions, average active time of completed tasks (only those with recorded time), planned vs actual where an estimate exists, daily and weekly series, per-category averages. Numbers come only from rows (AGENTS.md §2).
+- Consequences: one additive migration; no new dependency; OpenAPI and TS client regenerated. Device QA pending (KI-047).

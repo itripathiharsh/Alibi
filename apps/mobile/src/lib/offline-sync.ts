@@ -9,6 +9,8 @@ export interface LocalTask {
   status: "pending" | "in_progress" | "completed" | "cancelled";
   priority: number | null;
   deadline_at: string | null;
+  /** First missed due date, kept after rescheduling (ADR-032). */
+  original_deadline_at?: string | null;
   estimate_user_min: number | null;
   estimate_final_min?: number | null;
   actual_min: number;
@@ -257,6 +259,7 @@ function normalizeTask(value: Record<string, unknown>): LocalTask | null {
     status,
     priority: typeof value.priority === "number" ? value.priority : null,
     deadline_at: typeof value.deadline_at === "string" ? value.deadline_at : null,
+    original_deadline_at: typeof value.original_deadline_at === "string" ? value.original_deadline_at : null,
     estimate_user_min: typeof value.estimate_user_min === "number" ? value.estimate_user_min : null,
     estimate_final_min: typeof value.estimate_final_min === "number" ? value.estimate_final_min : null,
     actual_min: typeof value.actual_min === "number" ? value.actual_min : 0,
@@ -453,6 +456,14 @@ export async function updateTaskOffline(
     const current = normalizeTask(JSON.parse(row.data_json) as Record<string, unknown>);
     if (!current) return;
     updated = { ...current, ...patch };
+    // Moving a due date that already passed: remember the missed date once (the server
+    // does the same when the change syncs).
+    if (
+      patch.deadline_at !== undefined && patch.deadline_at !== current.deadline_at
+      && current.deadline_at && !current.original_deadline_at && Date.parse(current.deadline_at) < Date.now()
+    ) {
+      updated.original_deadline_at = current.deadline_at;
+    }
     if (patch.status === "completed" && current.status !== "completed" && patch.completed_at === undefined) {
       updated.completed_at = new Date().toISOString();
     } else if (patch.status !== undefined && patch.status !== "completed") {
@@ -576,6 +587,13 @@ export async function getLocalTaskTimeEntries(userId: string, taskId: string): P
 
 export async function startTaskTimerOffline(userId: string, taskId: string): Promise<{ id: string; task_id: string; started_at: string; source: string }> {
   const db = await getDatabase();
+  // Never two running timers for the same task (a double tap, or a timer started elsewhere).
+  const existing = await db.getFirstAsync<{ id: string; task_id: string; started_at: string; source: string }>(
+    "SELECT id, task_id, started_at, source FROM local_timers WHERE user_id = ? AND task_id = ?",
+    userId,
+    taskId,
+  );
+  if (existing) return existing;
   const timer = { id: makeOfflineId(), task_id: taskId, started_at: new Date().toISOString(), source: "local" };
   await db.runAsync(
     "INSERT INTO local_timers(user_id, id, task_id, started_at, source) VALUES (?, ?, ?, ?, 'local')",

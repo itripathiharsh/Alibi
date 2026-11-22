@@ -37,6 +37,7 @@ import {
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
 import { ProfileAvatar } from "../../components/profile-avatar";
+import { formatClock, formatShortDay } from "../../lib/time-format";
 import { getAccessToken, ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
@@ -1606,8 +1607,8 @@ export default function TasksScreen() {
                   const active = entry.ended_at == null;
                   const minutes = entry.duration_min ?? (active ? Math.max(0, Math.floor((clockNow - Date.parse(entry.started_at)) / 60000)) : 0);
                   const maxMinutes = Math.max(1, ...taskTimeEntries.map((item) => item.duration_min ?? 0));
-                  const start = new Date(entry.started_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-                  const end = entry.ended_at ? new Date(entry.ended_at).toLocaleString([], { hour: "numeric", minute: "2-digit" }) : "In progress · live";
+                  const start = `${formatShortDay(entry.started_at)} ${formatClock(entry.started_at)}`;
+                  const end = entry.ended_at ? formatClock(entry.ended_at) : "In progress · live";
                   return <View key={entry.id} style={styles.sessionCard}>
                     <View style={styles.sessionHeader}>
                       <View><Text style={styles.sessionDate}>Started {start}</Text><Text style={styles.sessionRange}>Ended {end}</Text></View>

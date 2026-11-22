@@ -5,6 +5,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics.time_report import TimeReportBuilder
 from app.api.deps import AuthContext, get_auth_context, get_db
 from app.schemas.analytics import (
     CategoryWorkloadItem,
@@ -17,6 +18,7 @@ from app.schemas.analytics import (
     SummaryMetricsResponse,
     TaskActivityItem,
     TimeDistributionItem,
+    TimeReportResponse,
 )
 from app.services.analytics_service import AnalyticsService
 
@@ -40,6 +42,24 @@ async def get_task_activity(
         from_date=from_date,
         to_date=to_date,
         limit=limit,
+    )
+
+
+@router.get("/time-report", response_model=TimeReportResponse)
+async def get_time_report(
+    period: PeriodType = Query("weekly", description="daily, weekly, monthly, or custom"),
+    from_date: date | None = Query(None, alias="from", description="YYYY-MM-DD, custom only"),
+    to_date: date | None = Query(None, alias="to", description="YYYY-MM-DD, custom only"),
+    auth: AuthContext = Depends(get_auth_context),
+    session: AsyncSession = Depends(get_db),
+) -> TimeReportResponse:
+    """Recorded work time: totals, per task, planned vs actual, daily/weekly trends (FR-DASH-010)."""
+    return await TimeReportBuilder(session).build(
+        user_id=auth.user_id,
+        tz_name=auth.user.timezone,
+        period=period,
+        from_date=from_date,
+        to_date=to_date,
     )
 
 

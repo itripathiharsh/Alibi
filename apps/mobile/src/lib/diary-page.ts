@@ -5,15 +5,22 @@
  *   - timed: tasks due that day, in time order
  *   - anytime: tasks finished that day without a due time that day, plus (today only)
  *     open tasks with no due date
- *   - carried (today only): open tasks whose due time passed on an earlier day
+ *   - carried (today only): open tasks whose due time passed on an earlier day. These are
+ *     overdue: they keep their original due date and stay overdue until completed or
+ *     explicitly rescheduled (ADR-032). On a past day's page, its unfinished tasks are
+ *     overdue too. Completed tasks are never overdue.
  * Finished tasks stay on the page, struck out, like a written diary.
  */
 import type { LocalTask } from "./offline-sync";
+import { formatClock } from "./time-format";
 
 export interface DiaryEntry {
   task: LocalTask;
   dueAt: Date | null;
   done: boolean;
+  overdue: boolean;
+  /** The first due date that was missed (kept after rescheduling), when there is one. */
+  originalDueAt: Date | null;
 }
 
 export interface DiaryPage {
@@ -46,6 +53,7 @@ export function buildDiaryPage(tasks: LocalTask[], day: Date, now: Date = new Da
   const start = startOfDay(day);
   const end = addDays(start, 1);
   const isToday = start.getTime() === startOfDay(now).getTime();
+  const todayStart = startOfDay(now);
   const inDay = (date: Date | null) => date !== null && date >= start && date < end;
 
   const carried: DiaryEntry[] = [];
@@ -57,7 +65,9 @@ export function buildDiaryPage(tasks: LocalTask[], day: Date, now: Date = new Da
     const dueAt = parse(task.deadline_at);
     const completedAt = parse(task.completed_at);
     const done = task.status === "completed";
-    const entry: DiaryEntry = { task, dueAt, done };
+    const missed = parse(task.original_deadline_at);
+    const overdue = !done && dueAt !== null && dueAt < todayStart;
+    const entry: DiaryEntry = { task, dueAt, done, overdue, originalDueAt: missed ?? (overdue ? dueAt : null) };
 
     if (inDay(dueAt)) {
       timed.push(entry);
@@ -77,11 +87,11 @@ export function buildDiaryPage(tasks: LocalTask[], day: Date, now: Date = new Da
   return { carried, timed, anytime, done: all.filter((entry) => entry.done).length, total: all.length };
 }
 
-/** "18:00"-style label; a due time at the very end of the day reads as "by night". */
+/** "06:00 PM"-style label; a due time at the very end of the day reads as "by night". */
 export function timeLabel(date: Date | null): string {
   if (!date) return "";
   if (date.getHours() === 23 && date.getMinutes() === 59) return "by night";
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  return formatClock(date);
 }
 
 /** Text that clearly lists several things goes to brain dump instead of one line. */

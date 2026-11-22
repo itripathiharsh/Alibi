@@ -1,27 +1,32 @@
 {
-  "versionCode": 5,
-  "versionName": "0.2.3",
+  "versionCode": 6,
+  "versionName": "0.2.4",
   "url": "https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk",
-  "sha256": "b67e2a0c264f42c1ee0e42344bc46385feeda6968bb67ae69e6583519dd04ebf",
-  "headline": "Everything you write now shows up everywhere, right away.",
+  "sha256": "e87eba6babd47df619e3c3453dffcc4b2e79c9dcd0e21be0b0175c0e1ebf61b1",
+  "headline": "See where your time really goes, one task at a time.",
   "highlights": [
     {
-      "title": "Your tasks, in sync everywhere",
-      "body": "Tasks from your Today page, brain dump and voice now reach Tasks and Insights reliably, even after a while away."
+      "title": "Tap play, get to work",
+      "body": "Start a task on Today, pause it, pick it up later. ALIBI keeps every session, even if you close the app."
     },
     {
-      "title": "A widget that matches your day",
-      "body": "The home-screen ring now counts exactly what's on your Today page, and shows your next unfinished task."
+      "title": "Know where your hours went",
+      "body": "Insights now shows your productive time, your biggest tasks, and planned versus actual, for any day, week or month."
     },
     {
-      "title": "Opens straight into your day",
-      "body": "No more sign-in prompts while ALIBI wakes up. Your tasks are there instantly and sync in the background."
+      "title": "Nothing slips past you",
+      "body": "Overdue tasks stand out with their original due date, and you can move them to a new day in two taps."
+    },
+    {
+      "title": "Plans that fit your day",
+      "body": "Set when your day starts and ends, and brain dump only suggests times inside it, with clean, spell-checked titles."
     }
   ],
   "notes": [
-    "Your tasks, in sync everywhere: Today, Tasks and Insights now always agree",
-    "A widget that matches your day: the ring counts exactly what's on your Today page",
-    "Opens straight into your day: no more sign-in prompts while ALIBI wakes up"
+    "Tap play, get to work: start, pause and finish tasks with a timer",
+    "Know where your hours went: time insights for any day, week or month",
+    "Nothing slips past you: overdue tasks show their original due date",
+    "Plans that fit your day: set your day's start and end"
   ],
-  "publishedAt": "2026-11-22"
+  "publishedAt": "2026-11-23"
 }

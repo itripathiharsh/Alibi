@@ -6,6 +6,12 @@
  * days carried to the top of today's page, and one "write a task…" line at the bottom.
  * Everything reads from and writes to the on-device task store, so the page works offline.
  * The dashboard (focus score, Chief of Staff, kickoff, plan) now lives in Insights.
+ *
+ * Execution tracking (ADR-032): "Start" records a work session on the phone (local_timers,
+ * timestamp-based, survives restarts). "Pause" ends the session and saves it as a time entry
+ * (synced to the server); "Start" again opens a new session; completing a task stops its
+ * running session first. Starting a task here pauses any other running one, so time is
+ * never double-counted. Overdue tasks keep their original due date and can be rescheduled.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -24,20 +30,27 @@ import {
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Check, ChevronLeft, ChevronRight, CloudOff, Mic, PenLine } from "lucide-react-native";
+import { CalendarClock, Check, ChevronLeft, ChevronRight, CloudOff, Mic, Pause, PenLine, Play } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { ProfileAvatar } from "../../components/profile-avatar";
 import { ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import {
+  cacheRunningTimers,
   cacheTasks,
   createTaskOffline,
   getAllLocalTasks,
+  getLocalTimers,
   onLocalTasksChanged,
+  removeLocalTimer,
+  startTaskTimerOffline,
+  stopTaskTimerOffline,
   syncMobileAccount,
   updateTaskOffline,
   type LocalTask,
 } from "../../lib/offline-sync";
+import { formatDayMonthYear, formatElapsed, formatMinutes } from "../../lib/time-format";
+import { DateChooser, FieldLabel, Sheet, TimeChooser } from "../../components/time-pickers";
 import { currentUserId } from "../../lib/learning-signals";
 import { addDays, buildDiaryPage, looksLikeManyTasks, startOfDay, timeLabel, type DiaryEntry } from "../../lib/diary-page";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
@@ -49,6 +62,9 @@ const RULE = "#EDE3D6";
 const INK = "#1F2A37";
 const PEN = "#E0612A";
 const SERIF = Platform.select({ android: "serif", ios: "Georgia", default: undefined });
+
+type Timer = { id: string; task_id: string; started_at: string; source: string };
+const MIN_SESSION_MS = 30_000; // a start/pause shorter than this is a mis-tap, not work
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -63,6 +79,11 @@ export default function TodayDiaryScreen() {
   const [dayOffset, setDayOffset] = useState(0);
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
+  const [timers, setTimers] = useState<Timer[]>([]);
+  const [now, setNow] = useState(Date.now());
+  const [moving, setMoving] = useState<DiaryEntry | null>(null);
+  const [moveDate, setMoveDate] = useState<Date | null>(null);
+  const [moveMinutes, setMoveMinutes] = useState(18 * 60);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const day = useMemo(() => addDays(startOfDay(new Date()), dayOffset), [dayOffset]);
@@ -70,8 +91,19 @@ export default function TodayDiaryScreen() {
 
   const readLocal = useCallback(async () => {
     const userId = await currentUserId();
-    setTasks(await getAllLocalTasks(userId));
+    const [localTasks, localTimers] = await Promise.all([getAllLocalTasks(userId), getLocalTimers(userId)]);
+    setTasks(localTasks);
+    setTimers(localTimers);
   }, []);
+
+  // A live clock only while something is running; elapsed time always comes from the
+  // stored start timestamp, never from counting ticks.
+  useEffect(() => {
+    if (timers.length === 0) return undefined;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [timers.length]);
 
   /** Pull fresh tasks from the server into the device store, then push local edits. */
   const refreshFromServer = useCallback(async () => {
@@ -82,13 +114,19 @@ export default function TodayDiaryScreen() {
     const baseUrl = getServerUrl();
     try {
       await syncMobileAccount(userId, token, baseUrl).catch(() => undefined);
-      const response = await fetch(`${baseUrl}/api/v1/tasks?view=all&limit=200`, {
-        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
-      });
+      const headers = { Accept: "application/json", Authorization: `Bearer ${token}` };
+      const [response, running] = await Promise.all([
+        fetch(`${baseUrl}/api/v1/tasks?view=all&limit=200`, { headers }),
+        fetch(`${baseUrl}/api/v1/time-entries/running/all`, { headers }).catch(() => null),
+      ]);
       if (response.ok) {
         const data = await response.json() as Record<string, unknown>[];
         if (Array.isArray(data)) await cacheTasks(userId, data);
         setCachedIsOffline(false);
+      }
+      if (running?.ok) {
+        const serverTimers = await running.json() as { id: string; task_id: string; started_at: string }[];
+        if (Array.isArray(serverTimers)) await cacheRunningTimers(userId, serverTimers);
       }
     } catch {
       setCachedIsOffline(true);
@@ -137,12 +175,78 @@ export default function TodayDiaryScreen() {
     setRefreshing(false);
   }, [refreshFromServer, readLocal]);
 
+  const timerFor = useCallback((taskId: string) => timers.find((t) => t.task_id === taskId) ?? null, [timers]);
+
+  /** End a running session: saved as a time entry, or dropped if it was a mis-tap. */
+  const endSession = useCallback(async (userId: string, timer: Timer) => {
+    const elapsed = Date.now() - Date.parse(timer.started_at);
+    if (timer.source === "local" && elapsed < MIN_SESSION_MS) {
+      await removeLocalTimer(userId, timer.id);
+    } else {
+      await stopTaskTimerOffline(userId, timer.id);
+    }
+  }, []);
+
   const toggle = useCallback(async (entry: DiaryEntry) => {
     triggerHaptic(entry.done ? "tap" : "complete");
     const userId = await currentUserId();
+    const running = timerFor(entry.task.id);
+    if (!entry.done && running) await endSession(userId, running); // completing stops the clock
     await updateTaskOffline(userId, entry.task.id, { status: entry.done ? "pending" : "completed" });
+    await readLocal();
     scheduleSync();
-  }, [scheduleSync]);
+  }, [endSession, readLocal, scheduleSync, timerFor]);
+
+  const startWork = useCallback(async (entry: DiaryEntry) => {
+    const userId = await currentUserId();
+    if (timerFor(entry.task.id)) return; // already running: never a second timer
+    for (const other of timers) await endSession(userId, other); // one task at a time here
+    await startTaskTimerOffline(userId, entry.task.id);
+    triggerHaptic("tap");
+    await readLocal();
+    scheduleSync();
+  }, [endSession, readLocal, scheduleSync, timerFor, timers]);
+
+  const pauseWork = useCallback(async (entry: DiaryEntry) => {
+    const userId = await currentUserId();
+    const running = timerFor(entry.task.id);
+    if (!running) return;
+    await endSession(userId, running);
+    triggerHaptic("tap");
+    await readLocal();
+    scheduleSync();
+  }, [endSession, readLocal, scheduleSync, timerFor]);
+
+  const openReschedule = useCallback((entry: DiaryEntry) => {
+    const today = startOfDay(new Date());
+    const keep = entry.dueAt ?? new Date();
+    setMoveDate(today);
+    setMoveMinutes(keep.getHours() * 60 + keep.getMinutes());
+    setMoving(entry);
+  }, []);
+
+  const saveReschedule = useCallback(async () => {
+    if (!moving || !moveDate) return;
+    const next = new Date(moveDate);
+    next.setHours(Math.floor(moveMinutes / 60), moveMinutes % 60, 0, 0);
+    const userId = await currentUserId();
+    await updateTaskOffline(userId, moving.task.id, {
+      deadline_at: next.toISOString(),
+      reschedule_count: (moving.task.reschedule_count ?? 0) + 1,
+    });
+    setMoving(null);
+    await readLocal();
+    scheduleSync();
+  }, [moveDate, moveMinutes, moving, readLocal, scheduleSync]);
+
+  const rowProps = {
+    timerFor,
+    now,
+    onToggle: (entry: DiaryEntry) => { void toggle(entry); },
+    onStart: (entry: DiaryEntry) => { void startWork(entry); },
+    onPause: (entry: DiaryEntry) => { void pauseWork(entry); },
+    onReschedule: openReschedule,
+  };
 
   const addLine = useCallback(async () => {
     const text = draft.trim();
@@ -202,7 +306,6 @@ export default function TodayDiaryScreen() {
       >
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.kicker}>{isToday ? "TODAY" : dayOffset === 1 ? "TOMORROW" : dayOffset === -1 ? "YESTERDAY" : " "}</Text>
             <Text style={styles.dayName} accessibilityRole="header">{WEEKDAYS[day.getDay()]}</Text>
             <View style={styles.dateRow}>
               <Pressable onPress={() => setDayOffset((v) => v - 1)} hitSlop={12} style={styles.dayArrow} accessibilityRole="button" accessibilityLabel="Previous day">
@@ -243,9 +346,9 @@ export default function TodayDiaryScreen() {
 
         {loading ? <ActivityIndicator color={PEN} style={{ marginTop: 24 }} /> : null}
 
-        <DiarySection title="From earlier days" tone="warn" entries={page.carried} onToggle={toggle} onOpen={openTask} labelFor={() => "late"} />
-        <DiarySection title={isToday ? "Planned" : "On this day"} entries={page.timed} onToggle={toggle} onOpen={openTask} labelFor={(entry) => timeLabel(entry.dueAt)} />
-        <DiarySection title="Anytime" entries={page.anytime} onToggle={toggle} onOpen={openTask} labelFor={() => ""} />
+        <DiarySection title="Overdue" tone="warn" entries={page.carried} onOpen={openTask} labelFor={(entry) => timeLabel(entry.dueAt)} row={rowProps} />
+        <DiarySection title={isToday ? "Planned" : "On this day"} entries={page.timed} onOpen={openTask} labelFor={(entry) => timeLabel(entry.dueAt)} row={rowProps} />
+        <DiarySection title="Anytime" entries={page.anytime} onOpen={openTask} labelFor={() => ""} row={rowProps} />
 
         {page.total === 0 && !loading ? (
           <View style={styles.empty}>
@@ -276,32 +379,58 @@ export default function TodayDiaryScreen() {
         </View>
         <Text style={styles.hint}>Tap a task to strike it out. Long-press to open it.</Text>
       </ScrollView>
+
+      <Sheet
+        visible={moving !== null}
+        title="Reschedule"
+        primaryLabel="Move task"
+        onPrimary={() => { void saveReschedule(); }}
+        onClose={() => setMoving(null)}
+        primaryDisabled={!moveDate}
+      >
+        {moving?.originalDueAt ? (
+          <Text style={styles.sheetNote}>Originally due {formatDayMonthYear(moving.originalDueAt)}. That date stays on record.</Text>
+        ) : null}
+        <FieldLabel>New date</FieldLabel>
+        <DateChooser value={moveDate} onChange={setMoveDate} />
+        <FieldLabel>Time</FieldLabel>
+        <TimeChooser minutes={moveMinutes} onChange={setMoveMinutes} />
+      </Sheet>
     </View>
   );
+}
+
+interface RowHandlers {
+  timerFor: (taskId: string) => Timer | null;
+  now: number;
+  onToggle: (entry: DiaryEntry) => void;
+  onStart: (entry: DiaryEntry) => void;
+  onPause: (entry: DiaryEntry) => void;
+  onReschedule: (entry: DiaryEntry) => void;
 }
 
 function DiarySection({
   title,
   entries,
   tone,
-  onToggle,
   onOpen,
   labelFor,
+  row,
 }: {
   title: string;
   entries: DiaryEntry[];
   tone?: "warn";
-  onToggle: (entry: DiaryEntry) => void;
   onOpen: (taskId: string) => void;
   labelFor: (entry: DiaryEntry) => string;
+  row: RowHandlers;
 }) {
   if (entries.length === 0) return null;
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, tone === "warn" && { color: "#B45309" }]}>{title}</Text>
+      <Text style={[styles.sectionTitle, tone === "warn" && { color: "#B42318" }]}>{title}</Text>
       <View style={styles.card}>
         {entries.map((entry, index) => (
-          <DiaryLine key={entry.task.id} entry={entry} label={labelFor(entry)} first={index === 0} onToggle={onToggle} onOpen={onOpen} />
+          <DiaryLine key={entry.task.id} entry={entry} label={labelFor(entry)} first={index === 0} onOpen={onOpen} row={row} />
         ))}
       </View>
     </View>
@@ -314,17 +443,21 @@ function DiaryLine({
   entry,
   label,
   first,
-  onToggle,
   onOpen,
+  row,
 }: {
   entry: DiaryEntry;
   label: string;
   first: boolean;
-  onToggle: (entry: DiaryEntry) => void;
   onOpen: (taskId: string) => void;
+  row: RowHandlers;
 }) {
   const progress = useRef(new Animated.Value(entry.done ? 1 : 0)).current;
   const [lines, setLines] = useState<TextLine[]>([]);
+  const timer = row.timerFor(entry.task.id);
+  const running = timer !== null;
+  const tracked = entry.task.actual_min ?? 0;
+  const paused = !entry.done && !running && tracked > 0;
 
   useEffect(() => {
     Animated.timing(progress, {
@@ -335,45 +468,79 @@ function DiaryLine({
     }).start();
   }, [entry.done, progress]);
 
+  let meta: string | null = null;
+  if (running && timer) meta = `Doing it · ${formatElapsed(Date.parse(timer.started_at), row.now)}`;
+  else if (entry.overdue && entry.originalDueAt) meta = `Originally due ${formatDayMonthYear(entry.originalDueAt)}`;
+  else if (paused) meta = `Paused · ${formatMinutes(tracked)} done so far`;
+  else if (entry.done && tracked > 0) meta = `${formatMinutes(tracked)} spent`;
+  else if (entry.originalDueAt) meta = `Moved from ${formatDayMonthYear(entry.originalDueAt)}`;
+
   const shown = lines.slice(0, 2);
   return (
     <Pressable
-      onPress={() => onToggle(entry)}
+      onPress={() => row.onToggle(entry)}
       onLongPress={() => onOpen(entry.task.id)}
-      style={({ pressed }) => [styles.line, !first && styles.lineDivider, pressed && { backgroundColor: "#FBF8F4" }]}
+      style={({ pressed }) => [
+        styles.line,
+        !first && styles.lineDivider,
+        running && styles.lineRunning,
+        pressed && { backgroundColor: "#FBF8F4" },
+      ]}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: entry.done }}
-      accessibilityLabel={`${entry.task.title}${label ? `, ${label}` : ""}`}
+      accessibilityLabel={`${entry.task.title}${entry.overdue ? ", overdue" : ""}${label ? `, ${label}` : ""}${running ? ", in progress" : ""}`}
       accessibilityHint="Tap to strike out or bring back. Long-press to open."
     >
-      <Text style={[styles.time, label === "late" && styles.timeLate, entry.done && styles.timeDone]}>{label}</Text>
-      <View style={styles.titleWrap}>
-        <Text
-          style={[styles.title, entry.done && styles.titleDone]}
-          numberOfLines={2}
-          onTextLayout={(event) => setLines(event.nativeEvent.lines.map((l) => ({ x: l.x, y: l.y, width: l.width, height: l.height })))}
-        >
-          {entry.task.title}
-        </Text>
-        {shown.map((line, i) => (
-          <Animated.View
-            key={i}
-            pointerEvents="none"
-            style={[
-              styles.strike,
-              {
-                left: line.x - 3,
-                top: line.y + line.height * 0.52,
-                width: progress.interpolate({
-                  inputRange: [i / shown.length, (i + 1) / shown.length],
-                  outputRange: [0, line.width + 6],
-                  extrapolate: "clamp",
-                }),
-              },
-            ]}
-          />
-        ))}
+      <View style={styles.timeCol}>
+        {entry.overdue ? <Text style={styles.overdueBadge}>Overdue</Text> : null}
+        <Text style={[styles.time, entry.done && styles.timeDone]}>{label}</Text>
       </View>
+      <View style={styles.titleWrap}>
+        <View>
+          <Text
+            style={[styles.title, entry.done && styles.titleDone]}
+            numberOfLines={2}
+            onTextLayout={(event) => setLines(event.nativeEvent.lines.map((l) => ({ x: l.x, y: l.y, width: l.width, height: l.height })))}
+          >
+            {entry.task.title}
+          </Text>
+          {shown.map((line, i) => (
+            <Animated.View
+              key={i}
+              pointerEvents="none"
+              style={[
+                styles.strike,
+                {
+                  left: line.x - 3,
+                  top: line.y + line.height * 0.52,
+                  width: progress.interpolate({
+                    inputRange: [i / shown.length, (i + 1) / shown.length],
+                    outputRange: [0, line.width + 6],
+                    extrapolate: "clamp",
+                  }),
+                },
+              ]}
+            />
+          ))}
+        </View>
+        {meta ? <Text style={[styles.meta, running && styles.metaRunning, entry.overdue && !running && styles.metaOverdue]}>{meta}</Text> : null}
+      </View>
+      {entry.overdue && !running ? (
+        <Pressable onPress={() => row.onReschedule(entry)} style={styles.actionButton} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Reschedule ${entry.task.title}`}>
+          <CalendarClock size={16} color="#B42318" />
+        </Pressable>
+      ) : null}
+      {!entry.done ? (
+        <Pressable
+          onPress={() => (running ? row.onPause(entry) : row.onStart(entry))}
+          style={[styles.actionButton, running && styles.actionRunning]}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={running ? `Pause ${entry.task.title}` : `Start ${entry.task.title}`}
+        >
+          {running ? <Pause size={15} color="#FFFFFF" fill="#FFFFFF" /> : <Play size={15} color={PEN} fill={PEN} />}
+        </Pressable>
+      ) : null}
       <View style={[styles.circle, entry.done && styles.circleDone]}>
         {entry.done ? <Check size={13} color="#FFFFFF" strokeWidth={3} /> : null}
       </View>
@@ -385,7 +552,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: PAPER },
   scroll: { paddingHorizontal: 18, paddingBottom: 48, gap: 18 },
   header: { flexDirection: "row", alignItems: "flex-start" },
-  kicker: { fontSize: 11, fontWeight: "800", letterSpacing: 1.6, color: PEN },
   dayName: { fontFamily: SERIF, fontSize: 38, lineHeight: 46, color: INK, fontWeight: "700", letterSpacing: -0.5 },
   dateRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   dayArrow: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#EFE8DF" },
@@ -401,12 +567,20 @@ const styles = StyleSheet.create({
   progressTrack: { height: 6, borderRadius: 3, backgroundColor: "#EAE2D7", overflow: "hidden" },
   progressFill: { height: 6, borderRadius: 3, backgroundColor: PEN },
   section: { gap: 8 },
-  sectionTitle: { fontSize: 12, fontWeight: "800", letterSpacing: 1.1, color: theme.colors.text.muted, textTransform: "uppercase", marginLeft: 4 },
+  sectionTitle: { fontSize: 14, fontWeight: "800", color: theme.colors.text.secondary, marginLeft: 4 },
   card: { backgroundColor: "#FFFFFF", borderRadius: 18, borderWidth: 1, borderColor: RULE, overflow: "hidden" },
   line: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 15, minHeight: 58 },
   lineDivider: { borderTopWidth: 1, borderTopColor: "#F3EDE5" },
-  time: { width: 46, fontSize: 13, fontWeight: "700", color: INK },
-  timeLate: { color: "#B45309", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 },
+  timeCol: { width: 62, gap: 3 },
+  time: { fontSize: 12, fontWeight: "700", color: INK },
+  overdueBadge: { alignSelf: "flex-start", fontSize: 10, fontWeight: "800", color: "#B42318", backgroundColor: "#FEE4E2", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: "hidden" },
+  lineRunning: { backgroundColor: "#FFF4EC" },
+  meta: { fontSize: 12, color: theme.colors.text.secondary, marginTop: 3 },
+  metaRunning: { color: PEN, fontWeight: "700" },
+  metaOverdue: { color: "#B42318" },
+  actionButton: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: "#EADFD3", alignItems: "center", justifyContent: "center" },
+  actionRunning: { backgroundColor: PEN, borderColor: PEN },
+  sheetNote: { fontSize: 13, color: "#B42318" },
   timeDone: { color: "#B8B0A6" },
   titleWrap: { flex: 1, justifyContent: "center" },
   title: { fontSize: 16, lineHeight: 22, color: INK, fontWeight: "500" },

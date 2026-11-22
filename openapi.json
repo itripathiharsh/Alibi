@@ -2900,6 +2900,101 @@
         }
       }
     },
+    "/api/v1/analytics/time-report": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Time Report",
+        "description": "Recorded work time: totals, per task, planned vs actual, daily/weekly trends (FR-DASH-010).",
+        "operationId": "get_time_report_api_v1_analytics_time_report_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly",
+                "custom"
+              ],
+              "type": "string",
+              "description": "daily, weekly, monthly, or custom",
+              "default": "weekly",
+              "title": "Period"
+            },
+            "description": "daily, weekly, monthly, or custom"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM-DD, custom only",
+              "title": "From"
+            },
+            "description": "YYYY-MM-DD, custom only"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM-DD, custom only",
+              "title": "To"
+            },
+            "description": "YYYY-MM-DD, custom only"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeReportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/analytics/summary": {
       "get": {
         "tags": [
@@ -12276,6 +12371,18 @@
             ],
             "title": "Deadline At"
           },
+          "original_deadline_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Deadline At"
+          },
           "deadline_kind": {
             "anyOf": [
               {
@@ -12841,6 +12948,278 @@
           "created_at"
         ],
         "title": "TimeEntryResponse"
+      },
+      "TimeReportCategory": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "completed_tasks": {
+            "type": "integer",
+            "title": "Completed Tasks"
+          },
+          "average_minutes": {
+            "type": "integer",
+            "title": "Average Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "completed_tasks",
+          "average_minutes"
+        ],
+        "title": "TimeReportCategory"
+      },
+      "TimeReportDay": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "minutes": {
+            "type": "integer",
+            "title": "Minutes"
+          },
+          "tasks_completed": {
+            "type": "integer",
+            "title": "Tasks Completed"
+          },
+          "tasks_worked": {
+            "type": "integer",
+            "title": "Tasks Worked"
+          },
+          "average_minutes_per_task": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Minutes Per Task"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "minutes",
+          "tasks_completed",
+          "tasks_worked"
+        ],
+        "title": "TimeReportDay"
+      },
+      "TimeReportResponse": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "custom"
+            ],
+            "title": "Period"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "End Date"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "total_minutes": {
+            "type": "integer",
+            "title": "Total Minutes"
+          },
+          "today_minutes": {
+            "type": "integer",
+            "title": "Today Minutes"
+          },
+          "this_week_minutes": {
+            "type": "integer",
+            "title": "This Week Minutes"
+          },
+          "days_counted": {
+            "type": "integer",
+            "title": "Days Counted"
+          },
+          "daily_average_minutes": {
+            "type": "integer",
+            "title": "Daily Average Minutes"
+          },
+          "tasks_completed": {
+            "type": "integer",
+            "title": "Tasks Completed"
+          },
+          "average_completion_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Completion Minutes"
+          },
+          "completed_with_time": {
+            "type": "integer",
+            "title": "Completed With Time"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TimeReportTask"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/TimeReportDay"
+            },
+            "type": "array",
+            "title": "Days"
+          },
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/TimeReportWeek"
+            },
+            "type": "array",
+            "title": "Weeks"
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/TimeReportCategory"
+            },
+            "type": "array",
+            "title": "Categories"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "start_date",
+          "end_date",
+          "timezone",
+          "total_minutes",
+          "today_minutes",
+          "this_week_minutes",
+          "days_counted",
+          "daily_average_minutes",
+          "tasks_completed",
+          "completed_with_time",
+          "tasks",
+          "days",
+          "weeks",
+          "categories"
+        ],
+        "title": "TimeReportResponse"
+      },
+      "TimeReportTask": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "minutes": {
+            "type": "integer",
+            "title": "Minutes"
+          },
+          "sessions": {
+            "type": "integer",
+            "title": "Sessions"
+          },
+          "total_minutes": {
+            "type": "integer",
+            "title": "Total Minutes"
+          },
+          "planned_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Minutes"
+          },
+          "difference_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "title",
+          "status",
+          "minutes",
+          "sessions",
+          "total_minutes"
+        ],
+        "title": "TimeReportTask"
+      },
+      "TimeReportWeek": {
+        "properties": {
+          "week_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Week Start"
+          },
+          "minutes": {
+            "type": "integer",
+            "title": "Minutes"
+          },
+          "tasks_completed": {
+            "type": "integer",
+            "title": "Tasks Completed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "week_start",
+          "minutes",
+          "tasks_completed"
+        ],
+        "title": "TimeReportWeek"
       },
       "TimerStartRequest": {
         "properties": {

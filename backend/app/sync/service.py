@@ -1038,6 +1038,9 @@ class ServerSyncService:
             "status": task.status,
             "priority": task.priority,
             "deadline_at": task.deadline_at.isoformat() if task.deadline_at else None,
+            "original_deadline_at": (
+                task.original_deadline_at.isoformat() if task.original_deadline_at else None
+            ),
             "estimate_user_min": task.estimate_user_min,
             "estimate_final_min": task.estimate_final_min,
             "actual_min": task.actual_min,

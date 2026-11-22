@@ -936,6 +936,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analytics/time-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Time Report
+         * @description Recorded work time: totals, per task, planned vs actual, daily/weekly trends (FR-DASH-010).
+         */
+        get: operations["get_time_report_api_v1_analytics_time_report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics/summary": {
         parameters: {
             query?: never;
@@ -4549,6 +4569,8 @@ export interface components {
             priority?: number | null;
             /** Deadline At */
             deadline_at?: string | null;
+            /** Original Deadline At */
+            original_deadline_at?: string | null;
             /** Deadline Kind */
             deadline_kind?: string | null;
             /** Deadline Source */
@@ -4711,6 +4733,108 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** TimeReportCategory */
+        TimeReportCategory: {
+            /** Category */
+            category: string;
+            /** Completed Tasks */
+            completed_tasks: number;
+            /** Average Minutes */
+            average_minutes: number;
+        };
+        /** TimeReportDay */
+        TimeReportDay: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Minutes */
+            minutes: number;
+            /** Tasks Completed */
+            tasks_completed: number;
+            /** Tasks Worked */
+            tasks_worked: number;
+            /** Average Minutes Per Task */
+            average_minutes_per_task?: number | null;
+        };
+        /** TimeReportResponse */
+        TimeReportResponse: {
+            /**
+             * Period
+             * @enum {string}
+             */
+            period: "daily" | "weekly" | "monthly" | "custom";
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** Timezone */
+            timezone: string;
+            /** Total Minutes */
+            total_minutes: number;
+            /** Today Minutes */
+            today_minutes: number;
+            /** This Week Minutes */
+            this_week_minutes: number;
+            /** Days Counted */
+            days_counted: number;
+            /** Daily Average Minutes */
+            daily_average_minutes: number;
+            /** Tasks Completed */
+            tasks_completed: number;
+            /** Average Completion Minutes */
+            average_completion_minutes?: number | null;
+            /** Completed With Time */
+            completed_with_time: number;
+            /** Tasks */
+            tasks: components["schemas"]["TimeReportTask"][];
+            /** Days */
+            days: components["schemas"]["TimeReportDay"][];
+            /** Weeks */
+            weeks: components["schemas"]["TimeReportWeek"][];
+            /** Categories */
+            categories: components["schemas"]["TimeReportCategory"][];
+        };
+        /** TimeReportTask */
+        TimeReportTask: {
+            /** Task Id */
+            task_id: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            /** Category */
+            category?: string | null;
+            /** Minutes */
+            minutes: number;
+            /** Sessions */
+            sessions: number;
+            /** Total Minutes */
+            total_minutes: number;
+            /** Planned Minutes */
+            planned_minutes?: number | null;
+            /** Difference Minutes */
+            difference_minutes?: number | null;
+        };
+        /** TimeReportWeek */
+        TimeReportWeek: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /** Minutes */
+            minutes: number;
+            /** Tasks Completed */
+            tasks_completed: number;
         };
         /** TimerStartRequest */
         TimerStartRequest: {
@@ -6590,6 +6714,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskActivityItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_time_report_api_v1_analytics_time_report_get: {
+        parameters: {
+            query?: {
+                /** @description daily, weekly, monthly, or custom */
+                period?: "daily" | "weekly" | "monthly" | "custom";
+                /** @description YYYY-MM-DD, custom only */
+                from?: string | null;
+                /** @description YYYY-MM-DD, custom only */
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeReportResponse"];
                 };
             };
             /** @description Validation Error */

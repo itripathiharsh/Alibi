@@ -5,6 +5,7 @@ import { Calendar as CalendarIcon, Check, CheckCircle2, ChevronLeft, ChevronRigh
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
 import { ProfileAvatar } from "../../components/profile-avatar";
+import { formatClock } from "../../lib/time-format";
 import { ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
@@ -68,7 +69,7 @@ function sameDay(left: Date, right: Date): boolean {
 }
 
 function formatTime(value: string): string {
-  return new Date(value).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return formatClock(value);
 }
 
 export default function CalendarScreen() {

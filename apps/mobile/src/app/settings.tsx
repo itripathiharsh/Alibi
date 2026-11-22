@@ -13,7 +13,11 @@ import { areTaskCheckInsEnabled, setTaskCheckInsEnabled } from "../lib/task-chec
 import { setCloudAiOptIn } from "../lib/brain-dump";
 import { checkForUpdate, getInstalledVersion, isAutoUpdateCheckEnabled, setAutoUpdateCheckEnabled, type ReleaseInfo } from "../lib/app-update";
 import { UpdateDialog } from "../components/update-prompt";
+import { TimeChooser } from "../components/time-pickers";
+import { formatClock } from "../lib/time-format";
 import theme from "../lib/theme";
+
+const PEN_COLOR = "#E0612A";
 
 type WorkingDay = { enabled: boolean; start: string; end: string };
 type WorkingHours = Record<string, WorkingDay>;
@@ -50,6 +54,9 @@ export default function SettingsScreen() {
   const [smartSorting, setSmartSorting] = useState(false);
   const [smartSortingSaving, setSmartSortingSaving] = useState(false);
   const [autoUpdate, setAutoUpdate] = useState(true);
+  const [dayStart, setDayStart] = useState(9 * 60);
+  const [dayEnd, setDayEnd] = useState(21 * 60);
+  const [daySaving, setDaySaving] = useState(false);
   const [appVersion, setAppVersion] = useState<string>("");
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [foundUpdate, setFoundUpdate] = useState<ReleaseInfo | null>(null);
@@ -97,6 +104,12 @@ export default function SettingsScreen() {
             setEveningReviewEnabled(user.settings?.eod_sweep_enabled === true);
             setShowFocusTaskName(user.settings?.focus_show_task_name === true);
             setSmartSorting(user.settings?.cloud_ai_opt_in === true);
+            const parseHm = (value: unknown, fallback: number) => {
+              const match = typeof value === "string" ? /^(\d{1,2}):(\d{2})$/.exec(value) : null;
+              return match ? Number(match[1]) * 60 + Number(match[2]) : fallback;
+            };
+            setDayStart(parseHm(user.settings?.day_start, 9 * 60));
+            setDayEnd(parseHm(user.settings?.day_end, 21 * 60));
             const savedLead = user.settings?.reminder_lead_min;
             if (typeof savedLead === "number") setReminderLeadMin(savedLead);
             const savedHours = user.settings?.working_hours;
@@ -287,6 +300,36 @@ export default function SettingsScreen() {
     }
   };
 
+  const toHm = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+  /** Start Day / End Day: the window brain dump uses for suggested times (ADR-032). */
+  const saveDayWindow = async () => {
+    if (daySaving) return;
+    if (dayEnd <= dayStart + 30) {
+      Alert.alert("Check your day", "End Day has to be later than Start Day.");
+      return;
+    }
+    setDaySaving(true);
+    try {
+      const token = await ensureAuthenticated();
+      if (!token) throw new Error("Sign in to save your day.");
+      const response = await fetch(`${getServerUrl()}/api/v1/auth/me`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: { day_start: toHm(dayStart), day_end: toHm(dayEnd) } }),
+      });
+      const result = await response.json().catch(() => ({})) as MobileUserProfile & { detail?: string };
+      if (!response.ok) throw new Error(result.detail ?? "Your day could not be saved.");
+      setProfile(result);
+      await saveUserProfile(result);
+      Alert.alert("Saved", `Suggested times will stay between ${formatClock(new Date(2000, 0, 1, Math.floor(dayStart / 60), dayStart % 60))} and ${formatClock(new Date(2000, 0, 1, Math.floor(dayEnd / 60), dayEnd % 60))}.`);
+    } catch (error) {
+      Alert.alert("Could not save", error instanceof Error ? error.message : "Try again.");
+    } finally {
+      setDaySaving(false);
+    }
+  };
+
   const updateFocusProtection = async (enabled: boolean) => {
     if (focusSaving) return;
     setFocusSaving(true);
@@ -406,6 +449,18 @@ export default function SettingsScreen() {
             else void updateFocusProtection(false);
           }} trackColor={{ false: "#D3D9DF", true: "#9AD9B8" }} thumbColor={focusProtectionEnabled ? "#18A76A" : "#FFFFFF"} accessibilityLabel="Protect learned focus hours" />}
         </View>
+      </View>
+
+      <View style={styles.sectionHeader}><Clock3 size={18} color={PEN_COLOR} /><Text style={styles.sectionTitle}>Your day</Text></View>
+      <View style={[styles.preferenceCard, { padding: 16, gap: 12 }]}>
+        <Text style={styles.preferenceDescription}>Brain dump only suggests times between these.</Text>
+        <Text style={styles.preferenceTitle}>Start Day</Text>
+        <TimeChooser minutes={dayStart} onChange={setDayStart} />
+        <Text style={styles.preferenceTitle}>End Day</Text>
+        <TimeChooser minutes={dayEnd} onChange={setDayEnd} />
+        <Pressable onPress={() => { void saveDayWindow(); }} disabled={daySaving} style={({ pressed }) => [styles.testButton, { alignSelf: "flex-start", paddingHorizontal: 18 }, pressed && { opacity: 0.7 }]} accessibilityRole="button">
+          {daySaving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.testButtonText}>Save my day</Text>}
+        </Pressable>
       </View>
 
       <View style={styles.sectionHeader}><Clock3 size={18} color={theme.colors.accent.blue} /><Text style={styles.sectionTitle}>Work schedule</Text></View>

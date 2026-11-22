@@ -13,6 +13,7 @@ import re
 import zoneinfo
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from difflib import SequenceMatcher
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -33,7 +34,8 @@ AIStatus = Literal["used", "not_opted_in", "server_disabled", "unavailable"]
 TimeSource = Literal["said", "suggested"]
 CATEGORIES = ("personal", "professional", "academic", "learning")
 
-# Planner settings for suggested times.
+# Planner defaults for suggested times; users override them with Start Day / End Day
+# (users.settings.day_start / day_end, "HH:MM", ADR-032).
 DAY_START_HOUR = 9
 DAY_END_HOUR = 21
 DEFAULT_TASK_MINUTES = 30
@@ -68,10 +70,14 @@ Think it through before answering:
    "uske baad", "then", "I have to", "mujhe" usually start a new task. One action per item.
    Drop filler and chit-chat. Never invent a task and never merge two tasks.
 2. "text": copy the exact words from the input for this item (keep their spelling).
-3. "title": a short, clear action of 2 to 7 words that starts with the verb, e.g.
-   "Install the new APK", "Test notifications", "Check the progress review", "Mandir jana".
-   Use the person's own words and language (do not translate Hinglish). Fix a misheard
-   word only when the intended word is obvious from context. Add nothing that wasn't said.
+3. "title": the task as one clean, correctly spelled and grammatical sentence of at most
+   about 10 words, ending with a full stop. Correct spelling, grammar and misheard words,
+   and tidy the structure, but keep the person's meaning, names, numbers and time words.
+   Keep Hinglish as Hinglish and English as English; never translate between them.
+   Examples: "mandir jana hai shaam ko" -> "Shaam ko mandir jaana hai."
+   "sabzi lena" -> "Sabzi leni hai." "assignment kal tak dena hai" ->
+   "Assignment kal tak submit karna hai." "I have to check the progress review today" ->
+   "Check the progress review today." Add nothing that wasn't said.
 4. "when": copy the exact time words said for this item, e.g. "shaam ko", "kal subah",
    "5 baje", "by friday", "today". null if none was said. Never guess a time.
 5. "minutes": a duration only if one was said for this item ("5 minute ke liye" -> 5,
@@ -114,11 +120,22 @@ def _tokens(text: str) -> set[str]:
     return {_stem(t) for t in re.findall(r"\w+", text.lower())}
 
 
+def _similar(a: str, b: str) -> bool:
+    """Same word allowing spelling fixes: "jana"/"jaana", "lena"/"leni", "minut"/"minute"."""
+    if a == b:
+        return True
+    if min(len(a), len(b)) >= 3 and a[:3] == b[:3]:
+        return True
+    return len(a) >= 4 and len(b) >= 4 and SequenceMatcher(None, a, b).ratio() >= 0.75
+
+
 def _overlap(candidate: str, source: str) -> float:
+    """Share of the candidate's words that appear (allowing spelling fixes) in the source."""
     cand = _tokens(candidate)
     if not cand:
         return 0.0
-    return len(cand & _tokens(source)) / len(cand)
+    src = _tokens(source)
+    return sum(1 for token in cand if any(_similar(token, s) for s in src)) / len(cand)
 
 
 # Where one spoken or typed task ends and the next begins. Plain "and" is left out on
@@ -137,6 +154,24 @@ _LEADING_FILLER = re.compile(
     re.IGNORECASE,
 )
 _TRAILING_FILLER = re.compile(r"\s+(?:and|aur|or|to|toh|bhi|also|that)$", re.IGNORECASE)
+
+
+def parse_day_window(settings_dict: dict[str, object] | None) -> tuple[int, int]:
+    """The user's Start Day / End Day in minutes after midnight (defaults 09:00-21:00)."""
+
+    def minutes(value: object, default: int) -> int:
+        if isinstance(value, str):
+            match = re.fullmatch(r"(\d{1,2}):(\d{2})", value.strip())
+            if match and int(match.group(1)) < 24 and int(match.group(2)) < 60:
+                return int(match.group(1)) * 60 + int(match.group(2))
+        return default
+
+    data = settings_dict or {}
+    start = minutes(data.get("day_start"), DAY_START_HOUR * 60)
+    end = minutes(data.get("day_end"), DAY_END_HOUR * 60)
+    if end <= start + 30:  # nonsense or too short: fall back to the defaults
+        return DAY_START_HOUR * 60, DAY_END_HOUR * 60
+    return start, end
 
 
 def tidy_title(text: str) -> str:
@@ -310,9 +345,16 @@ class BrainDumpService:
     def _plan_times(self, items: list[BrainDumpItem], local_now: datetime) -> None:
         """Suggest a slot for each task without a spoken time, in the order it was said.
 
-        Slots sit inside working hours, start after now, never overlap a time the user said
-        or each other, and spill into the next day when today is full.
+        Slots sit inside the user's Start Day / End Day window, start after now, never overlap
+        a time the user said or each other, and spill into the next day when today is full.
         """
+        day_start, day_end = parse_day_window(self.user.settings)
+
+        def at(moment: datetime, minute_of_day: int) -> datetime:
+            return moment.replace(
+                hour=minute_of_day // 60, minute=minute_of_day % 60, second=0, microsecond=0
+            )
+
         busy: list[tuple[datetime, datetime]] = []
         for item in items:
             if item.deadline_at is not None:
@@ -325,17 +367,17 @@ class BrainDumpService:
                 )
 
         cursor = self._round_up(local_now + timedelta(minutes=GAP_MINUTES))
-        if cursor.hour < DAY_START_HOUR:
-            cursor = cursor.replace(hour=DAY_START_HOUR, minute=0)
+        if cursor < at(cursor, day_start):
+            cursor = at(cursor, day_start)
 
         for item in items:
             if item.deadline_at is not None:
                 continue
             length = timedelta(minutes=item.estimate_minutes or DEFAULT_TASK_MINUTES)
             for _ in range(200):
-                day_end = cursor.replace(hour=DAY_END_HOUR, minute=0)
-                if cursor + length > day_end:
-                    cursor = (cursor + timedelta(days=1)).replace(hour=DAY_START_HOUR, minute=0)
+                if cursor + length > at(cursor, day_end):
+                    # Doesn't fit today: first slot of the next day, never outside the window.
+                    cursor = at(cursor + timedelta(days=1), day_start)
                     continue
                 clash = next((b for b in busy if cursor < b[1] and cursor + length > b[0]), None)
                 if clash is None:
