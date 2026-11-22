@@ -141,7 +141,9 @@ async def test_ac_m1_7_backup_and_restore_drill(db_session: AsyncSession) -> Non
         # 2. Execute backup
         res = subprocess.run(backup_cmd, env=cmd_env, capture_output=True, text=True)
         if res.returncode != 0:
-            raise RuntimeError(f"Backup failed (rc={res.returncode}):\nstdout: {res.stdout}\nstderr: {res.stderr}")
+            raise RuntimeError(
+                f"Backup failed (rc={res.returncode}):\nstdout: {res.stdout}\nstderr: {res.stderr}"
+            )
         assert dump_file.exists() and dump_file.stat().st_size > 0
 
         # 3. Wipe database tables
@@ -160,7 +162,9 @@ async def test_ac_m1_7_backup_and_restore_drill(db_session: AsyncSession) -> Non
         # 4. Execute restore
         res = subprocess.run(restore_cmd, env=cmd_env, capture_output=True, text=True)
         if res.returncode != 0 and res.returncode != 1:
-            raise RuntimeError(f"Restore failed (rc={res.returncode}):\nstdout: {res.stdout}\nstderr: {res.stderr}")
+            raise RuntimeError(
+                f"Restore failed (rc={res.returncode}):\nstdout: {res.stdout}\nstderr: {res.stderr}"
+            )
 
         # 5. Verify restored counts and data
         async with AsyncSessionLocal() as session:
