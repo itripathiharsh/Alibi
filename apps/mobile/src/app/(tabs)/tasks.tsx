@@ -923,7 +923,7 @@ export default function TasksScreen() {
     setCaptureVisible(true);
     setIsLoadingRoutines(true);
     void (async () => {
-      const token = (await getAccessToken()) || (await ensureAuthenticated());
+      const token = await ensureAuthenticated().catch(() => null);
       const routines = token ? await loadLearnedTaskRoutines(getServerUrl(), token) : [];
       setLearnedRoutines(routines);
       setIsLoadingRoutines(false);

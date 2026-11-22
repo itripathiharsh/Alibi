@@ -23,6 +23,8 @@ export interface MobileUserProfile {
 export async function saveTokens(accessToken: string, refreshToken: string): Promise<void> {
   await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
   await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+  const profile = await getUserProfile();
+  setAccountSession(profile?.id !== "local_user");
 }
 
 export async function getAccessToken(): Promise<string | null> {
@@ -36,8 +38,10 @@ export async function getRefreshToken(): Promise<string | null> {
 export async function saveUserProfile(user: MobileUserProfile): Promise<void> {
   await SecureStore.setItemAsync(USER_PROFILE_KEY, JSON.stringify(user));
   if (user.id === "local_user") {
+    setAccountSession(false);
     setCachedIsOffline(true);
   } else {
+    if (await getRefreshToken()) setAccountSession(true);
     setCachedIsOffline(false);
   }
 }
@@ -56,6 +60,7 @@ export async function clearAuthData(): Promise<void> {
   await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
   await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
   await SecureStore.deleteItemAsync(USER_PROFILE_KEY);
+  setAccountSession(false);
 }
 
 export async function loginMobile(
@@ -255,12 +260,34 @@ export async function ensureAuthenticated(forceRefresh: boolean = false): Promis
 let _cachedIsOffline: boolean | null = null;
 const _offlineListeners = new Set<(isOffline: boolean) => void>();
 
+/**
+ * True when this phone holds a real account session (a refresh token for a non-local
+ * profile). "Offline" in the UI means "not signed in to an account" — the Offline chip and
+ * "Sign in to sync" prompts. A signed-in user whose server is slow or asleep (Render free
+ * tier wakes in ~1 minute) is NOT offline: data is shown from the phone and syncs later.
+ */
+let _accountSession: boolean | null = null;
+
+function setAccountSession(value: boolean): void {
+  _accountSession = value;
+  if (value) setCachedIsOffline(false);
+}
+
+export async function hasAccountSession(): Promise<boolean> {
+  const [refresh, profile] = await Promise.all([getRefreshToken(), getUserProfile()]);
+  const session = Boolean(refresh) && Boolean(profile) && profile?.id !== "local_user";
+  _accountSession = session;
+  return session;
+}
+
 export function getCachedIsOffline(): boolean {
   if (_cachedIsOffline !== null) return _cachedIsOffline;
   return false;
 }
 
 export function setCachedIsOffline(offline: boolean): void {
+  // A failed request while signed in is a slow server, not a signed-out user.
+  if (offline && _accountSession === true) offline = false;
   if (_cachedIsOffline !== offline) {
     _cachedIsOffline = offline;
     _offlineListeners.forEach((listener) => {
@@ -279,13 +306,7 @@ export function subscribeOfflineStatus(listener: (isOffline: boolean) => void): 
 }
 
 export async function isOfflineUser(): Promise<boolean> {
-  const token = await getAccessToken();
-  if (token && !isJwtExpired(token)) {
-    setCachedIsOffline(false);
-    return false;
-  }
-  const profile = await getUserProfile();
-  const offline = profile?.id === "local_user" || !token;
+  const offline = !(await hasAccountSession());
   setCachedIsOffline(offline);
   return offline;
 }

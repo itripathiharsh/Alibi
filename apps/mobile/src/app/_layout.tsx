@@ -6,7 +6,7 @@ import { AppState, Pressable, StyleSheet, Text, View, Image } from "react-native
 import * as Notifications from "expo-notifications";
 import { User } from "lucide-react-native";
 import theme from "../lib/theme";
-import { getAccessToken, getRefreshToken, getUserProfile, setCachedIsOffline } from "../lib/auth";
+import { getAccessToken, getRefreshToken, getUserProfile, hasAccountSession as primeAccountSession, setCachedIsOffline } from "../lib/auth";
 import FirstLaunchIntro from "../components/first-launch-intro";
 import { completeFirstLaunchIntro, shouldShowFirstLaunchIntro } from "../lib/first-launch";
 import { registerNotificationHandler, scheduleDailyWittyReminders, scheduleInactivityNudge } from "../lib/notification-witty-engine";
@@ -92,6 +92,7 @@ export default function RootLayout() {
         getUserProfile(),
       ]);
       if (cancelled) return;
+      await primeAccountSession(); // a signed-in user is never shown as "offline" while the server wakes
       const isOffline = profile?.id === "local_user" || (!accessToken && !refreshToken);
       setCachedIsOffline(isOffline);
       // A real account session (tokens, not the offline "local_user" profile) is the only

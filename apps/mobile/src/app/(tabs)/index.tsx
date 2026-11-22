@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Check, ChevronLeft, ChevronRight, CloudOff, Mic, PenLine } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { ProfileAvatar } from "../../components/profile-avatar";
-import { ensureAuthenticated, getAccessToken, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
+import { ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import {
   cacheTasks,
@@ -77,7 +77,7 @@ export default function TodayDiaryScreen() {
   const refreshFromServer = useCallback(async () => {
     const userId = await currentUserId();
     if (userId === "local_user") { setCachedIsOffline(true); return; }
-    const token = (await getAccessToken()) || (await ensureAuthenticated().catch(() => null));
+    const token = await ensureAuthenticated().catch(() => null); // refreshes an expired token
     if (!token) { setCachedIsOffline(true); return; }
     const baseUrl = getServerUrl();
     try {
@@ -124,7 +124,7 @@ export default function TodayDiaryScreen() {
     syncTimer.current = setTimeout(() => {
       void (async () => {
         const userId = await currentUserId();
-        const token = await getAccessToken();
+        const token = await ensureAuthenticated().catch(() => null);
         if (token && userId !== "local_user") await syncMobileAccount(userId, token, getServerUrl()).catch(() => undefined);
       })();
     }, 1500);

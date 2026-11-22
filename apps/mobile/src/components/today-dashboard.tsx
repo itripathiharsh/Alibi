@@ -409,7 +409,7 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
     }
 
     try {
-      const token = (await getAccessToken()) || (await ensureAuthenticated().catch(() => null));
+      const token = await ensureAuthenticated().catch(() => null); // refreshes an expired token
       if (!token) {
         offlineMode = true;
       } else {

@@ -3,14 +3,14 @@
  *
  * The Android widget cannot run JavaScript, so the app writes a small snapshot of
  * today's real counts into SharedPreferences through the native AlibiWidget module and
- * asks the widget to redraw. Counts come only from the on-device task cache:
- *   total = tasks due today (not cancelled) plus tasks completed today
- *   done  = the completed ones among them
+ * asks the widget to redraw. Counts come from the on-device task cache and use the same
+ * rule as the Today page (lib/diary-page.ts), so the widget and the page always agree.
  * The snapshot carries its date, so a stale snapshot is never shown as today's numbers.
  */
 import { NativeModules, Platform } from "react-native";
 import { getAllLocalTasks, getLocalTimers, type LocalTask } from "./offline-sync";
 import { currentUserId } from "./learning-signals";
+import { buildDiaryPage } from "./diary-page";
 
 interface AlibiWidgetNative {
   updateSnapshot(json: string): Promise<boolean>;
@@ -34,32 +34,14 @@ function localDateKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function isToday(iso: string | null | undefined, start: number, end: number): boolean {
-  if (!iso) return false;
-  const time = Date.parse(iso);
-  return Number.isFinite(time) && time >= start && time < end;
-}
-
 export function buildWidgetSnapshot(
   tasks: LocalTask[],
   timers: { task_id: string; started_at: string }[],
   now: Date = new Date(),
 ): WidgetSnapshot {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  const startMs = start.getTime();
-  const endMs = end.getTime();
-
-  const todays = new Map<string, LocalTask>();
-  for (const task of tasks) {
-    if (task.status === "cancelled") continue;
-    const dueToday = isToday(task.deadline_at, startMs, endMs);
-    const doneToday = task.status === "completed" && isToday(task.completed_at, startMs, endMs);
-    if (dueToday || doneToday) todays.set(task.id, task);
-  }
-  const done = [...todays.values()].filter((task) => task.status === "completed").length;
+  // Count exactly what the Today page shows (due today, done today, open tasks with no
+  // date, and unfinished tasks from earlier days), so the widget and the page always agree.
+  const page = buildDiaryPage(tasks, now, now);
 
   let currentTitle: string | null = null;
   let currentKind: WidgetSnapshot["current_kind"] = null;
@@ -75,22 +57,20 @@ export function buildWidgetSnapshot(
     const started = Date.parse(running.timer.started_at);
     currentStartedAt = Number.isFinite(started) ? started : null;
   } else {
-    const next = tasks
-      .filter((task) => (task.status === "pending" || task.status === "in_progress") && task.deadline_at)
-      .map((task) => ({ task, due: Date.parse(task.deadline_at as string) }))
-      .filter(({ due }) => Number.isFinite(due) && due < endMs)
-      .sort((a, b) => a.due - b.due)[0];
+    // Next = the first unfinished line on the Today page: timed tasks in time order,
+    // then tasks carried over from earlier days, then anytime tasks.
+    const next = [...page.timed, ...page.carried, ...page.anytime].find((entry) => !entry.done);
     if (next) {
       currentTitle = next.task.title;
       currentKind = "next";
-      currentDueAt = next.due;
+      currentDueAt = next.dueAt ? next.dueAt.getTime() : null;
     }
   }
 
   return {
     date: localDateKey(now),
-    done,
-    total: todays.size,
+    done: page.done,
+    total: page.total,
     current_title: currentTitle,
     current_kind: currentKind,
     current_started_at: currentStartedAt,
