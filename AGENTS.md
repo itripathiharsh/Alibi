@@ -131,6 +131,7 @@ written from `docs/templates/MILESTONE_REPORT_TEMPLATE.md` into `docs/milestones
 - API: `/api/v1`, JSON, snake_case, RFC 7807 errors, cursor pagination.
 - Python package layout per `docs/02_SYSTEM_ARCHITECTURE.md` §4; modules talk to each other only through their `service.py` public functions.
 - Frontend: no business rules in UI (no metric calculations, no conflict resolution logic outside `packages/sync-core`).
+- UI Design & Copy: Follow `.agents/skills/unslop-ui/SKILL.md` whenever writing, styling, or refactoring UI components (mobile or web). Strip out AI clutter (uppercase eyebrows, redundant subtitles, botsplaining captions, decorative fake badges/dots, artificial 01// numbering). Deleting is the default fix; keep only the copy and chrome the user needs to act.
 
 ## 8. Status reporting format (use in chat and milestone reports)
 
