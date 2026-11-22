@@ -111,6 +111,12 @@ export function refreshHomeWidget(): void {
   }, 700);
 }
 
+/** Push the snapshot right away (for background work that may end before a debounce). */
+export async function refreshHomeWidgetNow(): Promise<void> {
+  if (timer) { clearTimeout(timer); timer = null; }
+  await pushSnapshot();
+}
+
 async function pushSnapshot(): Promise<void> {
   if (!nativeWidget) return;
   try {

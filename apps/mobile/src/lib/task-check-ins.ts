@@ -236,6 +236,11 @@ export async function handleNotificationResponse(
     return true;
   }
 
+  if (kind === "voice_dump_review" && typeof data.text === "string") {
+    // Several tasks were spoken from the widget: review them in Brain dump.
+    navigate(`/capture?mode=dump&prefill=${encodeURIComponent(data.text)}`);
+    return true;
+  }
   if (kind === "daily_evening_sweep" || kind === "task_deadline") {
     navigate("/(tabs)/tasks");
     return true;

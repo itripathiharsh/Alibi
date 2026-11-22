@@ -32,13 +32,14 @@ object TodayWidgetStore {
 
     val ALL_OPTIONS = listOf(
         Option("current_task", "Current task", "▶"),
+        Option("say_task", "Say a task", "●"),
         Option("add_task", "Add task", "+"),
         Option("capture_note", "Capture note", "✎"),
         Option("tell_ai", "Brain dump", "✦"),
-        Option("voice_dump", "Say it all", "●"),
+        Option("voice_dump", "Say it all", "≋"),
         Option("open_app", "Open app", "↗"),
     )
-    val DEFAULT_OPTIONS = listOf("current_task", "add_task", "capture_note", "tell_ai", "open_app")
+    val DEFAULT_OPTIONS = listOf("current_task", "say_task", "add_task", "tell_ai", "open_app")
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 

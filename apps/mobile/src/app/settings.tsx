@@ -11,6 +11,8 @@ import { areTaskDeadlineRemindersEnabled, DEFAULT_DEADLINE_REMINDER_LEAD_MIN, se
 import { getNotificationStyle, setNotificationStyle, triggerTestNotification } from "../lib/notification-witty-engine";
 import { areTaskCheckInsEnabled, setTaskCheckInsEnabled } from "../lib/task-check-ins";
 import { setCloudAiOptIn } from "../lib/brain-dump";
+import { checkForUpdate, getInstalledVersion, isAutoUpdateCheckEnabled, setAutoUpdateCheckEnabled, type ReleaseInfo } from "../lib/app-update";
+import { UpdateDialog } from "../components/update-prompt";
 import theme from "../lib/theme";
 
 type WorkingDay = { enabled: boolean; start: string; end: string };
@@ -47,6 +49,27 @@ export default function SettingsScreen() {
   const [checkInsEnabled, setCheckInsEnabled] = useState(true);
   const [smartSorting, setSmartSorting] = useState(false);
   const [smartSortingSaving, setSmartSortingSaving] = useState(false);
+  const [autoUpdate, setAutoUpdate] = useState(true);
+  const [appVersion, setAppVersion] = useState<string>("");
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [foundUpdate, setFoundUpdate] = useState<ReleaseInfo | null>(null);
+
+  useEffect(() => {
+    void isAutoUpdateCheckEnabled().then(setAutoUpdate);
+    void getInstalledVersion().then((v) => setAppVersion(v?.versionName ?? ""));
+  }, []);
+
+  const checkUpdatesNow = async () => {
+    if (checkingUpdate) return;
+    setCheckingUpdate(true);
+    try {
+      const release = await checkForUpdate(true);
+      if (release) setFoundUpdate(release);
+      else Alert.alert("You're up to date", appVersion ? `ALIBI ${appVersion} is the latest version.` : "This is the latest version of ALIBI.");
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
 
   useEffect(() => {
     void (async () => {
@@ -399,6 +422,23 @@ export default function SettingsScreen() {
         })}
         <Pressable style={[styles.saveScheduleButton, scheduleSaving && styles.disabledButton]} disabled={scheduleSaving} onPress={() => { void saveWorkingHours(); }}><Text style={styles.saveScheduleLabel}>{scheduleSaving ? "Saving preferences…" : "Save planning preferences"}</Text></Pressable>
       </View>
+
+      <View style={styles.sectionHeader}><BellRing size={18} color={theme.colors.accent.blue} /><Text style={styles.sectionTitle}>App updates</Text></View>
+      <View style={styles.preferenceCard}>
+        <View style={styles.preferenceRow}>
+          <View style={styles.iconBox}><BellRing size={20} color={theme.colors.accent.blue} /></View>
+          <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>Tell me when an update is ready</Text><Text style={styles.preferenceDescription}>ALIBI checks for a new version a few times a day and asks before updating. Android always shows its own install confirmation.{appVersion ? ` You have version ${appVersion}.` : ""}</Text></View>
+          <Switch value={autoUpdate} onValueChange={(value) => { setAutoUpdate(value); void setAutoUpdateCheckEnabled(value); }} trackColor={{ false: "#D3D9DF", true: "#9AC8E8" }} thumbColor={autoUpdate ? theme.colors.accent.blue : "#FFFFFF"} accessibilityLabel="Tell me when an update is ready" />
+        </View>
+        <View style={[styles.preferenceRow, styles.preferenceRowBorder]}>
+          <View style={styles.iconBox}><Sparkles size={20} color={theme.colors.accent.blue} /></View>
+          <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>Check for updates</Text><Text style={styles.preferenceDescription}>Look for a newer ALIBI version now.</Text></View>
+          <Pressable style={({ pressed }) => [styles.testButton, pressed && { opacity: 0.7 }]} onPress={() => { void checkUpdatesNow(); }} disabled={checkingUpdate} accessibilityRole="button" accessibilityLabel="Check for updates now">
+            {checkingUpdate ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.testButtonText}>Check</Text>}
+          </Pressable>
+        </View>
+      </View>
+      {foundUpdate ? <UpdateDialog release={foundUpdate} onClose={() => setFoundUpdate(null)} /> : null}
 
       <View style={styles.sectionHeader}><ShieldCheck size={18} color="#18A76A" /><Text style={styles.sectionTitle}>Account & privacy</Text></View>
       <View style={styles.accountCard}>

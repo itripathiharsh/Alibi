@@ -10,6 +10,8 @@
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
   <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+  <!-- In-app updates of the sideloaded APK (ADR-031). Remove before any Play Store release. -->
+  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
@@ -21,6 +23,9 @@
     </intent>
     <intent>
       <action android:name="android.speech.RecognitionService"/>
+    </intent>
+    <intent>
+      <action android:name="android.speech.action.RECOGNIZE_SPEECH"/>
     </intent>
   </queries>
   <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="true" android:theme="@style/AppTheme" android:supportsRtl="true" android:usesCleartextTraffic="true">
@@ -76,7 +81,6 @@
       android:name=".QuickMenuActivity"
       android:exported="false"
       android:excludeFromRecents="true"
-      android:noHistory="true"
       android:taskAffinity="com.alibi.app.quickmenu"
       android:launchMode="singleTask"
       android:theme="@style/Theme.Alibi.QuickMenu" />
@@ -90,6 +94,12 @@
         <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
       </intent-filter>
     </activity>
+    <receiver
+      android:name=".UpdateInstallReceiver"
+      android:exported="false" />
+    <service
+      android:name=".QuickAddTaskService"
+      android:exported="false" />
     <service
       android:name=".QuickCaptureTileService"
       android:exported="true"

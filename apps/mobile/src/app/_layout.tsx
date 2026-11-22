@@ -15,6 +15,7 @@ import { ensureCheckInCategory, handleNotificationResponse, syncTaskCheckIns } f
 import { refreshHomeWidget } from "../lib/home-widget";
 import { flushLearningSignals } from "../lib/learning-signals";
 import { onLocalTasksChanged } from "../lib/offline-sync";
+import { UpdatePrompt } from "../components/update-prompt";
 
 // Ensure Expo notifications can play sounds and show heads-up banners across the entire app
 registerNotificationHandler();
@@ -213,6 +214,7 @@ export default function RootLayout() {
             }}
           />
         </Stack>
+        <UpdatePrompt />
       </View>
     </SafeAreaProvider>
   );
