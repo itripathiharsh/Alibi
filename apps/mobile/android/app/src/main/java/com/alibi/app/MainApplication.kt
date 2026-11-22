@@ -26,6 +26,7 @@ class MainApplication : Application(), ReactApplication {
             packages.add(SpeechRecognitionPackage())
             packages.add(FocusSessionPackage())
             packages.add(AlibiWidgetPackage())
+            packages.add(AppUpdatePackage())
             return packages
           }
 

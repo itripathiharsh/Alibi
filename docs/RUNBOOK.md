@@ -152,3 +152,14 @@ $E/pg_ctl -D ~/pgtest-data stop
 Expected: everything passes except `test_backup_restore` (needs PowerShell). A test that fails with 401 `invalid_token` is the WSL clock step in KI-030; re-run it.
 
 Never point tests at a database without pgvector and never edit applied migrations to make one work (AGENTS.md §6).
+
+## 9. Releasing an Android APK (in-app updates, ADR-031)
+
+Installed apps check `apk/latest.json` on the `main` branch and offer any release with a higher `versionCode`. A release is only seen once it is merged into `main`.
+
+1. In `apps/mobile/android/app/build.gradle` raise `versionCode` by 1 and set `versionName`; set the same `version` in `apps/mobile/app.json`.
+2. Delete `apps/mobile/android/app/build/generated/assets` and `.../intermediates/assets` so the JS bundle is rebuilt, then run `gradlew assembleRelease`.
+3. Copy `app/build/outputs/apk/release/app-release.apk` to `apk/ALIBI-0.1.0.apk` (the file name stays fixed so the download link never changes).
+4. Put the new `versionCode`, `versionName`, the APK's SHA-256 (lowercase hex) and 1–4 short notes into `apk/latest.json`. The app refuses a download whose SHA-256 differs.
+5. Every release must be signed with the same key as the installed app, or Android refuses the update.
+6. Merge to `main`. Phones offer the update within about 6 hours, or at once from Settings → Check for updates.

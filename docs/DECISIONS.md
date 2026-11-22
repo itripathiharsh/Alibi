@@ -309,3 +309,18 @@ No migration, no new dependency, no new hosted service. OpenAPI and the TS clien
   4. **Profile** is removed from the tab bar (five tabs: Today, Tasks, Calendar, Insights, Vault). The initial circle in every tab header opens Profile.
   5. Handwriting uses the platform's built-in casual typeface (Android `casual`, iOS Noteworthy); no font file or dependency is added.
 - Consequences: No backend or schema change. The done/total line on the page is counted on the device from cached tasks (same trade-off as KI-027/KI-034). Device QA pending (KI-038).
+
+## ADR-030 — "Say a task" from the widget without opening the app
+- Status: Accepted by the owner on 2026-11-22 ("Yes, build both")
+- Date: 2026-11-22
+- Requirement IDs affected: FR-PROD-012, FR-PROD-010
+- Decision: The widget's quick menu gets a "Say a task" action (in the default set). It opens Android's built-in speech popup (`RecognizerIntent`, language en-IN) over the home screen. The words go to a React Native headless task (`AlibiQuickAdd`, run by `QuickAddTaskService`) that saves one task to the on-device store, asks the server's rules parser for a due time (6 s limit, otherwise saved as spoken), syncs, refreshes the widget and check-ins, and shows "Added: …". When the words hold several tasks, nothing is saved automatically: a notification opens Brain dump with the text for review, because AI splits stay proposals (AGENTS.md §2). Typing still opens the app. The widget mark is drawn without its navy body so it blends into the navy face.
+- Consequences: No new dependency (headless JS and `RecognizerIntent` are part of React Native and Android). Phones without a speech service fall back to in-app voice capture. Needs device QA (KI-039).
+
+## ADR-031 — In-app update prompt for the sideloaded APK
+- Status: Accepted by the owner on 2026-11-22 ("add an autoupdate pop up or autoupdate option")
+- Date: 2026-11-22
+- Requirement IDs affected: FR-PROD-013
+- Decision: The app reads `apk/latest.json` from the GitHub repo (`raw.githubusercontent.com`) at most every 6 hours, and from Settings on demand. If it lists a higher `versionCode`, a popup shows the new version and its notes with Update / Later (Later hides that version for 24 h). Update downloads the APK over HTTPS, checks its SHA-256 against the manifest, and hands it to Android's PackageInstaller, which always asks the user to confirm. Settings has "Tell me when an update is ready" (on by default) and "Check for updates". The app version becomes 0.2.0 (`versionCode` 2) and release steps are in RUNBOOK §9.
+- Why not silent auto-update: Android does not allow a sideloaded app to replace itself without the user's confirmation.
+- Consequences: Adds the `REQUEST_INSTALL_PACKAGES` permission (Google Play restricts it; remove it, and this feature, before any Play Store release). No new dependency or paid service. The first install of 0.2.0 must still be done by hand. The manifest URL points at the owner's public repository.

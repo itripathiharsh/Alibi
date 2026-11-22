@@ -1,0 +1,12 @@
+{
+  "versionCode": 2,
+  "versionName": "0.2.0",
+  "url": "https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk",
+  "sha256": "77c333c0e0b93187b32a818203409c2e3a46d8e6a62b50c75ec151d73577c806",
+  "notes": [
+    "Diary-style Today page",
+    "Say a task from the home-screen widget",
+    "Update prompt when a new version is ready"
+  ],
+  "publishedAt": "2026-11-22"
+}

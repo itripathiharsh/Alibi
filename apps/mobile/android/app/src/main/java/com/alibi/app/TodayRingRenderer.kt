@@ -22,14 +22,37 @@ object TodayRingRenderer {
     private val TRACK = Color.parseColor("#33FFFFFF")
     private val SOFT_WHITE = Color.parseColor("#D9E1E8")
 
-    private val BADGE = Color.parseColor("#F6F2EE")
     private var markCache: Bitmap? = null
 
-    /** The ALIBI brand mark (same artwork as the app icon), decoded once. */
+    /**
+     * The ALIBI brand mark prepared for the navy face, decoded once.
+     *
+     * The mark's own navy body would vanish on navy, so navy pixels become transparent
+     * (the face shows through and takes their place), white stays white and the orange
+     * swoosh stays orange. Anti-aliased edges keep a matching partial alpha.
+     */
     private fun mark(context: Context): Bitmap? {
         markCache?.let { return it }
-        return BitmapFactory.decodeResource(context.resources, R.drawable.alibi_widget_mark)
-            ?.also { markCache = it }
+        val source = BitmapFactory.decodeResource(context.resources, R.drawable.alibi_widget_mark) ?: return null
+        val w = source.width
+        val h = source.height
+        val pixels = IntArray(w * h)
+        source.getPixels(pixels, 0, w, 0, 0, w, h)
+        for (i in pixels.indices) {
+            val c = pixels[i]
+            val a = Color.alpha(c)
+            if (a == 0) continue
+            val r = Color.red(c)
+            val g = Color.green(c)
+            val b = Color.blue(c)
+            val isOrange = r > g + 40 && r > b + 70
+            if (isOrange) continue
+            // 0 for the logo navy (~luma 40), 1 for white; blends in between.
+            val luma = (0.299f * r + 0.587f * g + 0.114f * b)
+            val t = ((luma - 45f) / (245f - 45f)).coerceIn(0f, 1f)
+            pixels[i] = Color.argb((a * t).toInt(), 255, 255, 255)
+        }
+        return Bitmap.createBitmap(pixels, w, h, Bitmap.Config.ARGB_8888).also { markCache = it }
     }
 
     fun render(context: Context, sizePx: Int, snapshot: TodayWidgetStore.Snapshot?): Bitmap {
@@ -86,12 +109,10 @@ object TodayRingRenderer {
             canvas.drawArc(arcRect, -90f, sweep, false, arc)
         }
 
-        // Brand mark on a light badge so its navy shape stays visible on the navy face.
+        // Brand mark drawn straight onto the face (its navy body becomes the face itself).
         val badgeCy = cy - s * 0.25f
-        val badgeR = s * 0.10f
-        canvas.drawCircle(cx, badgeCy, badgeR, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = BADGE })
         mark(context)?.let { logo ->
-            val markW = badgeR * 1.45f
+            val markW = s * 0.19f
             val markH = markW * logo.height / logo.width
             val dst = RectF(cx - markW / 2f, badgeCy - markH / 2f, cx + markW / 2f, badgeCy + markH / 2f)
             canvas.drawBitmap(

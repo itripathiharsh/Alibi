@@ -8,6 +8,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
+import android.speech.RecognizerIntent
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
@@ -18,6 +19,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 
 /**
  * Translucent quick-action menu opened from the Today ring widget (FR-PROD-010).
@@ -174,8 +176,56 @@ class QuickMenuActivity : Activity() {
     }
 
     private fun open(key: String) {
+        if (key == "say_task") {
+            startVoiceTask()
+            return
+        }
         startActivity(TodayWidgetStore.intentFor(this, key))
         finish()
+    }
+
+    /**
+     * "Say a task": Android's own voice popup appears over the home screen, and the words
+     * are saved by the app in the background (QuickAddTaskService) without opening it.
+     */
+    private fun startVoiceTask() {
+        val speech = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Say a task")
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+        if (speech.resolveActivity(packageManager) == null) {
+            // No speech service on this phone: fall back to the in-app voice capture.
+            startActivity(TodayWidgetStore.intentFor(this, "voice_dump"))
+            finish()
+            return
+        }
+        window.decorView.alpha = 0f // hide the menu while the voice popup is up
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(speech, REQUEST_SPEECH)
+        } catch (_: Exception) {
+            startActivity(TodayWidgetStore.intentFor(this, "voice_dump"))
+            finish()
+        }
+    }
+
+    @Deprecated("Activity result API is not available on android.app.Activity")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_SPEECH) return
+        val spoken = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.trim()
+        if (resultCode == RESULT_OK && !spoken.isNullOrEmpty()) {
+            QuickAddTaskService.start(this, spoken)
+            Toast.makeText(this, "Adding: $spoken", Toast.LENGTH_SHORT).show()
+        }
+        finish()
+    }
+
+    companion object {
+        private const val REQUEST_SPEECH = 4107
     }
 
     override fun finish() {
