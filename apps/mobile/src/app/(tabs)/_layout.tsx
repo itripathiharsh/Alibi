@@ -1,6 +1,6 @@
 import React from "react";
 import { Tabs } from "expo-router";
-import { Home, CheckSquare, Calendar, BarChart3, Layers, User, type LucideIcon } from "lucide-react-native";
+import { NotebookPen, CheckSquare, Calendar, BarChart3, Layers, type LucideIcon } from "lucide-react-native";
 import { View } from "react-native";
 import theme from "../../lib/theme";
 
@@ -34,8 +34,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
-          tabBarIcon: ({ color, size, focused }) => <TabIcon Icon={Home} color={color} size={size} focused={focused} />,
+          title: "Today",
+          tabBarIcon: ({ color, size, focused }) => <TabIcon Icon={NotebookPen} color={color} size={size} focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -60,7 +60,8 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen name="vault" options={{ title: "Vault", tabBarIcon: ({ color, size, focused }) => <TabIcon Icon={Layers} color={color} size={size} focused={focused} /> }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ({ color, size, focused }) => <TabIcon Icon={User} color={color} size={size} focused={focused} /> }} />
+      {/* Profile is reached from the initial circle in every header (owner request 2026-11-22). */}
+      <Tabs.Screen name="profile" options={{ title: "Profile", href: null }} />
       <Tabs.Screen name="ai" options={{ title: "Assistant", href: null }} />
     </Tabs>
   );

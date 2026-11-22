@@ -360,6 +360,23 @@ export async function getOfflineTaskView(userId: string, view: string): Promise<
     });
 }
 
+/** Store server tasks in the device cache without touching any cached list views. */
+export async function cacheTasks(userId: string, tasks: Record<string, unknown>[]): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    for (const raw of tasks) {
+      const pending = await db.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM sync_outbox WHERE user_id = ? AND entity_id = ? AND state IN ('pending', 'retry')",
+        userId,
+        String(raw.id ?? ""),
+      );
+      if ((pending?.n ?? 0) > 0) continue; // never overwrite an unsynced local edit
+      const task = normalizeTask(raw);
+      if (task) await saveTask(db, userId, { ...task, server_seq: typeof raw.server_seq === "number" ? raw.server_seq : task.server_seq });
+    }
+  });
+}
+
 export async function cacheTaskView(userId: string, view: string, tasks: LocalTask[]): Promise<void> {
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {

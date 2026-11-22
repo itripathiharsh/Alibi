@@ -26,6 +26,8 @@ import {
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
+import { ProfileAvatar } from "../../components/profile-avatar";
+import { TodayDashboard } from "../../components/today-dashboard";
 import { getAccessToken, ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { getLocalAnalyticsSummary, saveLocalNote } from "../../lib/offline-sync";
@@ -58,6 +60,7 @@ interface ReportItem {
 }
 
 export default function ReportsScreen() {
+  const [insightView, setInsightView] = useState<"today" | "trends">("today");
   const router = useRouter();
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [score, setScore] = useState<ScoreData | null>(null);
@@ -285,15 +288,36 @@ export default function ReportsScreen() {
   const heatmapWeeks = Array.from({ length: Math.ceil(heatmapCells.length / 7) }, (_, week) => heatmapCells.slice(week * 7, week * 7 + 7));
   const periodLabel = selectedPeriod === "daily" ? "today" : selectedPeriod === "weekly" ? "this week" : "this month";
 
+  const insightsHeading = (
+    <View style={{ gap: 12 }}>
+      <View style={styles.screenHeading}><Text style={styles.screenTitle}>Insights</Text><Text style={styles.screenSubtitle}>Your focus, today's plan and how your weeks are going.</Text></View>
+      <View style={styles.insightTabs} accessibilityRole="tablist">
+        {(["today", "trends"] as const).map((key) => (
+          <Pressable
+            key={key}
+            onPress={() => setInsightView(key)}
+            style={[styles.insightTab, insightView === key && styles.insightTabActive]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: insightView === key }}
+          >
+            <Text style={[styles.insightTabText, insightView === key && styles.insightTabTextActive]}>{key === "today" ? "Today" : "Trends"}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+
   return (
     <View style={styles.screen}>
       <SunriseArt height={175} />
       <BrandHeader
         showOfflineBadge={isOffline}
         onOfflineBadgePress={() => router.push("/login")}
+        right={<ProfileAvatar />}
       />
+      {insightView === "today" ? <TodayDashboard embedded header={insightsHeading} /> : (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <View style={styles.screenHeading}><Text style={styles.screenTitle}>Insights</Text><Text style={styles.screenSubtitle}>Understand your productivity, time and working patterns.</Text></View>
+        {insightsHeading}
         {isOffline && (
           <OfflineNoticeCard
             featureName="Insights"
@@ -509,6 +533,7 @@ export default function ReportsScreen() {
         ))
       )}
     </ScrollView>
+      )}
     </View>
   );
 }
@@ -523,6 +548,11 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   screenHeading: { paddingTop: 6, paddingBottom: 4 },
+  insightTabs: { flexDirection: "row", backgroundColor: "#F1F3F5", borderRadius: theme.radius.control, padding: 3 },
+  insightTab: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 6 },
+  insightTabActive: { backgroundColor: theme.colors.brand.navy },
+  insightTabText: { fontSize: 13, fontWeight: "700", color: theme.colors.text.secondary },
+  insightTabTextActive: { color: "#FFFFFF" },
   screenTitle: { fontSize: 30, lineHeight: 36, fontWeight: "800", letterSpacing: -0.6, color: theme.colors.text.primary },
   screenSubtitle: { fontSize: 14, lineHeight: 20, color: theme.colors.text.secondary, marginTop: 1 },
   insightPanel: { padding: 16, borderRadius: theme.radius.card, backgroundColor: theme.colors.surface.card, borderWidth: 1, borderColor: theme.colors.border.subtle, gap: 14, shadowColor: theme.colors.brand.navy, shadowOpacity: .04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 1 },

@@ -23,7 +23,6 @@ import {
   Sparkles,
   Tag as TagIcon,
   CalendarDays,
-  UserRound,
   X,
   CheckCircle2,
   Circle,
@@ -37,6 +36,7 @@ import {
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
+import { ProfileAvatar } from "../../components/profile-avatar";
 import { getAccessToken, ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
@@ -941,7 +941,7 @@ export default function TasksScreen() {
       <BrandHeader
         showOfflineBadge={isOffline}
         onOfflineBadgePress={() => router.push("/login")}
-        right={<><Pressable style={styles.headerAction} onPress={() => router.push("/calendar")} accessibilityLabel="Open calendar"><CalendarDays size={21} color={theme.colors.text.primary} /></Pressable><Pressable style={styles.headerAction} onPress={() => router.push("/(tabs)/profile")} accessibilityLabel="Open profile"><UserRound size={21} color={theme.colors.text.primary} /></Pressable></>}
+        right={<><Pressable style={styles.headerAction} onPress={() => router.push("/calendar")} accessibilityLabel="Open calendar"><CalendarDays size={21} color={theme.colors.text.primary} /></Pressable><ProfileAvatar /></>}
       />
       <View style={styles.screenHeading}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>

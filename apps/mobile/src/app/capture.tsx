@@ -14,13 +14,13 @@ import theme from "../lib/theme";
 
 export default function QuickCaptureScreen() {
   const router = useRouter();
-  const { mode, voice } = useLocalSearchParams<{ mode?: "task" | "idea" | "voice" | "dump"; voice?: string }>();
+  const { mode, voice, prefill } = useLocalSearchParams<{ mode?: "task" | "idea" | "voice" | "dump"; voice?: string; prefill?: string }>();
   const [captureType, setCaptureType] = useState<"task" | "dump" | "idea">(
     mode === "idea" ? "idea" : mode === "dump" ? "dump" : "task",
   );
   const [dumpResult, setDumpResult] = useState<BrainDumpResult | null>(null);
   const [enablingAi, setEnablingAi] = useState(false);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(typeof prefill === "string" ? prefill : "");
   const [saving, setSaving] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);

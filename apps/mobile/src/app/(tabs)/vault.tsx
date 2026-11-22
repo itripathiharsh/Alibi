@@ -6,6 +6,7 @@ import theme from "../../lib/theme";
 import { ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
+import { ProfileAvatar } from "../../components/profile-avatar";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { triggerHaptic } from "../../lib/focus-session-notification";
 import { deleteLocalNote, getLocalNotes, makeOfflineId, saveLocalNote, updateLocalNote } from "../../lib/offline-sync";
@@ -383,6 +384,7 @@ export default function VaultScreen() {
       <BrandHeader
         showOfflineBadge={isOffline}
         onOfflineBadgePress={() => router.push("/login")}
+        right={<ProfileAvatar />}
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.heading}><Text style={styles.title}>Vault</Text><Text style={styles.subtitle}>Your knowledge space. Save, organize and find things quickly.</Text></View>

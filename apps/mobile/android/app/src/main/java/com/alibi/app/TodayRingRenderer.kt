@@ -1,12 +1,14 @@
 package com.alibi.app
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.RadialGradient
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
@@ -20,7 +22,17 @@ object TodayRingRenderer {
     private val TRACK = Color.parseColor("#33FFFFFF")
     private val SOFT_WHITE = Color.parseColor("#D9E1E8")
 
-    fun render(sizePx: Int, snapshot: TodayWidgetStore.Snapshot?): Bitmap {
+    private val BADGE = Color.parseColor("#F6F2EE")
+    private var markCache: Bitmap? = null
+
+    /** The ALIBI brand mark (same artwork as the app icon), decoded once. */
+    private fun mark(context: Context): Bitmap? {
+        markCache?.let { return it }
+        return BitmapFactory.decodeResource(context.resources, R.drawable.alibi_widget_mark)
+            ?.also { markCache = it }
+    }
+
+    fun render(context: Context, sizePx: Int, snapshot: TodayWidgetStore.Snapshot?): Bitmap {
         val size = sizePx.coerceIn(96, 560)
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -74,25 +86,21 @@ object TodayRingRenderer {
             canvas.drawArc(arcRect, -90f, sweep, false, arc)
         }
 
-        // Mountain mark.
-        val mark = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = s * 0.018f
-            strokeJoin = Paint.Join.ROUND
-            strokeCap = Paint.Cap.ROUND
-            color = ORANGE
+        // Brand mark on a light badge so its navy shape stays visible on the navy face.
+        val badgeCy = cy - s * 0.25f
+        val badgeR = s * 0.10f
+        canvas.drawCircle(cx, badgeCy, badgeR, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = BADGE })
+        mark(context)?.let { logo ->
+            val markW = badgeR * 1.45f
+            val markH = markW * logo.height / logo.width
+            val dst = RectF(cx - markW / 2f, badgeCy - markH / 2f, cx + markW / 2f, badgeCy + markH / 2f)
+            canvas.drawBitmap(
+                logo,
+                Rect(0, 0, logo.width, logo.height),
+                dst,
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
+            )
         }
-        val mw = s * 0.15f
-        val mTop = cy - s * 0.30f
-        val mBottom = cy - s * 0.21f
-        val path = Path().apply {
-            moveTo(cx - mw / 2f, mBottom)
-            lineTo(cx - mw / 6f, mTop)
-            lineTo(cx + mw / 12f, mBottom - (mBottom - mTop) * 0.35f)
-            lineTo(cx + mw / 4f, mTop + (mBottom - mTop) * 0.15f)
-            lineTo(cx + mw / 2f, mBottom)
-        }
-        canvas.drawPath(path, mark)
 
         val brand = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
@@ -101,7 +109,7 @@ object TodayRingRenderer {
             letterSpacing = 0.18f
             textAlign = Paint.Align.CENTER
         }
-        canvas.drawText("ALIBI", cx, cy - s * 0.10f, brand)
+        canvas.drawText("ALIBI", cx, cy - s * 0.06f, brand)
 
         // Count: "2 / 10" with the done number in orange.
         val bigSize = s * 0.20f
@@ -119,7 +127,7 @@ object TodayRingRenderer {
         }
         val doneWidth = donePaint.measureText(doneText)
         val totalWidth = doneWidth + restPaint.measureText(restText)
-        val baseline = cy + s * 0.12f
+        val baseline = cy + s * 0.14f
         val startX = cx - totalWidth / 2f
         canvas.drawText(doneText, startX, baseline, donePaint)
         canvas.drawText(restText, startX + doneWidth, baseline, restPaint)
