@@ -25,12 +25,20 @@ export default function QuickCaptureScreen() {
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const voiceStarted = useRef(false);
+  // Text that was already in the box when this listening session began. Android sends the
+  // whole sentence again with every update ("hello", "hello nahin", …), so each update must
+  // replace the spoken part, not be added to it (that caused repeated words).
+  const voiceBase = useRef("");
 
   const startVoice = async () => {
     setVoiceError(null);
+    setText((current) => { voiceBase.current = current.trim(); return current; });
     const started = await startSpeechRecognition({
       onStart: () => setListening(true),
-      onResults: (transcript) => setText((current) => `${current.trim()}${current.trim() ? " " : ""}${transcript}`),
+      onResults: (transcript) => {
+        const base = voiceBase.current;
+        setText(`${base}${base && transcript ? " " : ""}${transcript}`);
+      },
       onError: (message) => { setVoiceError(message); setListening(false); },
       onEnd: () => setListening(false),
     });
