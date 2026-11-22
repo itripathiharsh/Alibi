@@ -45,6 +45,8 @@ interface UsageSummary {
 export default function AIIntelligencePage() {
   const [activeTab, setActiveTab] = useState<"settings" | "usage">("settings");
   const [masterEnabled, setMasterEnabled] = useState(false);
+  const [serverExternalEnabled, setServerExternalEnabled] = useState(false);
+  const [serverKeysAvailable, setServerKeysAvailable] = useState(false);
   const [providers, setProviders] = useState<ProviderSetting[]>([]);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,7 +69,9 @@ export default function AIIntelligencePage() {
 
       if (cfgRes.ok) {
         const cfg = await cfgRes.json();
-        setMasterEnabled(cfg.ai_external_enabled);
+        setMasterEnabled(Boolean(cfg.ai_external_enabled));
+        setServerExternalEnabled(Boolean(cfg.server_external_enabled));
+        setServerKeysAvailable(Boolean(cfg.server_keys_available));
       }
       if (provRes.ok) {
         const provs = await provRes.json();
@@ -155,7 +159,7 @@ export default function AIIntelligencePage() {
         </p>
       </div>
 
-      {/* Privacy Master Switch */}
+      {/* User Cloud AI Opt-In & Server Status */}
       <div className="p-5 rounded-card bg-surface border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
           <div className={`p-2 rounded-control mt-0.5 ${masterEnabled ? "bg-accent-emerald/10 text-accent-emerald" : "bg-accent-amber/10 text-accent-amber"}`}>
@@ -163,26 +167,48 @@ export default function AIIntelligencePage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-text text-sm">External Cloud AI Gating</span>
+              <span className="font-semibold text-text text-sm">Smart sorting / cloud AI for my account</span>
               <span className={`text-[11px] font-mono uppercase px-2 py-0.5 rounded-control ${masterEnabled ? "bg-accent-emerald/20 text-accent-emerald" : "bg-surface2 text-text-muted"}`}>
-                {masterEnabled ? "Enabled (Opt-in)" : "Blocked (Default)"}
+                {masterEnabled ? "Enabled (Your Account)" : "Disabled (Your Account)"}
               </span>
             </div>
             <p className="text-xs text-text-muted mt-1 max-w-xl leading-relaxed">
-              When disabled, ALIBI will never make outbound network requests to any external AI provider. All task parsing runs via deterministic rules and local models.
+              When enabled, your brain dumps, voice transcripts, and complex tasks can use cloud AI for smart splitting, tag inference, and time scheduling. When disabled, your account only uses deterministic parsing with zero external LLM calls.
             </p>
+
+            {/* Read-only Server Status */}
+            <div className="mt-3 pt-3 border-t border-border/60 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-text-muted">
+              <div className="flex items-center gap-1.5">
+                <span className="text-text-muted">Server cloud AI:</span>
+                <span className={`font-medium ${serverExternalEnabled ? "text-accent-emerald" : "text-text-muted"}`}>
+                  {serverExternalEnabled ? "enabled" : "disabled"}
+                </span>
+              </div>
+              <span className="text-border">•</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-text-muted">Available providers on this server:</span>
+                <span className="font-mono text-[11px] text-text">
+                  groq, gemini, openrouter
+                </span>
+                {serverKeysAvailable ? (
+                  <span className="text-[10px] text-accent-emerald font-medium">(keys active)</span>
+                ) : (
+                  <span className="text-[10px] text-text-muted">(server keys not configured)</span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
         <button
           onClick={toggleMasterSwitch}
-          className={`px-4 py-2 rounded-control text-xs font-semibold transition ${
+          className={`px-4 py-2 rounded-control text-xs font-semibold transition shrink-0 ${
             masterEnabled
               ? "bg-surface2 hover:bg-surface border border-border text-text"
               : "bg-primary text-white hover:bg-primary/90"
           }`}
         >
-          {masterEnabled ? "Disable External AI" : "Allow External AI"}
+          {masterEnabled ? "Disable for My Account" : "Enable for My Account"}
         </button>
       </div>
 
@@ -226,7 +252,7 @@ export default function AIIntelligencePage() {
                       <Cpu className="w-4 h-4 text-primary" />
                       <span className="font-semibold text-text uppercase text-sm">{p.provider}</span>
                       <span className="text-[10px] bg-surface2 text-text-muted px-2 py-0.5 rounded-control font-mono">
-                        Rank #{p.fallback_rank || (isOllama ? 4 : 1)}
+                        Rank #{p.fallback_rank || (p.provider === "groq" ? 1 : p.provider === "gemini" ? 2 : p.provider === "openrouter" ? 3 : p.provider === "nvidia" ? 4 : 5)}
                       </span>
                     </div>
 
