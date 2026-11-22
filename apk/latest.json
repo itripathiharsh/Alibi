@@ -1,32 +1,32 @@
 {
-  "versionCode": 6,
-  "versionName": "0.2.4",
+  "versionCode": 7,
+  "versionName": "0.2.5",
   "url": "https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk",
-  "sha256": "e87eba6babd47df619e3c3453dffcc4b2e79c9dcd0e21be0b0175c0e1ebf61b1",
-  "headline": "See where your time really goes, one task at a time.",
+  "sha256": "c095b3f54cd57bf3d7336ef5c9362c3863a31b262068d18cf61bf140feb0aee0",
+  "headline": "Juggle more than one thing, and answer ALIBI right from your notifications.",
   "highlights": [
     {
-      "title": "Tap play, get to work",
-      "body": "Start a task on Today, pause it, pick it up later. ALIBI keeps every session, even if you close the app."
+      "title": "Run tasks side by side",
+      "body": "Start as many tasks as you like on Today. Each keeps its own time, and your day counts overlapping time once."
+    },
+    {
+      "title": "Pause or finish from the shade",
+      "body": "Every running task sits in your notifications with Pause and Done. When its planned time is up, ALIBI asks: done, or 15 more minutes?"
+    },
+    {
+      "title": "Start right on time",
+      "body": "Up next reminders now have Start now and Snooze, and check-ins wait until your day starts."
     },
     {
       "title": "Know where your hours went",
-      "body": "Insights now shows your productive time, your biggest tasks, and planned versus actual, for any day, week or month."
-    },
-    {
-      "title": "Nothing slips past you",
-      "body": "Overdue tasks stand out with their original due date, and you can move them to a new day in two taps."
-    },
-    {
-      "title": "Plans that fit your day",
-      "body": "Set when your day starts and ends, and brain dump only suggests times inside it, with clean, spell-checked titles."
+      "body": "Insights shows your productive time, biggest tasks, and planned versus actual for any day, week or month."
     }
   ],
   "notes": [
-    "Tap play, get to work: start, pause and finish tasks with a timer",
-    "Know where your hours went: time insights for any day, week or month",
-    "Nothing slips past you: overdue tasks show their original due date",
-    "Plans that fit your day: set your day's start and end"
+    "Run tasks side by side: several tasks can run at once",
+    "Pause or finish from the shade: Pause, Done and +15 min buttons",
+    "Start right on time: Start now and Snooze on Up next",
+    "Know where your hours went: time insights for any period"
   ],
   "publishedAt": "2026-11-23"
 }
