@@ -32,6 +32,7 @@ See `16_REQUIREMENTS_TRACEABILITY.md` (status column). Summary: **124 requiremen
 ## Latest test evidence
 | Date | Commit | Suite | Result | Link |
 |------|--------|-------|--------|------|
+| 2026-11-22 | 05255d6 / 6744377 | PR #1 & PR #2 CI Pipelines & Live Render Verification | All GitHub Actions checks green: Backend CI (Alembic + Pytest), Frontend CI (Next.js 22/22 routes), Mobile CI (typecheck + Android export), Gitleaks; Live Render backend verified for health, AI config, User A/B isolation, and deterministic Hinglish brain dump splitting | PR #1, PR #2, `https://alibi-backend-ykrh.onrender.com` |
 | 2026-11-15 | Task 6 & 7 | Full CI Pipeline (Backend + Client) | 17 passed, 3 packages typechecked | `make.ps1 ci` (ruff, mypy, import-linter, openapi-staleness, pytest, tsc) |
 | 2026-11-15 | Task 8 | Next.js Dashboard Build | 8 static pages generated, TS strict clean | `pnpm --filter @alibi/web build` |
 | 2026-11-15 | Task 9 | Mobile Shell Typecheck & Android Export | 2564 modules bundled, Android JS bundle 3MB exported, 0 errors | `pnpm --filter @alibi/mobile typecheck` && `expo export` |
