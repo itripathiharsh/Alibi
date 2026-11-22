@@ -2,6 +2,7 @@ import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { DEADLINE_CHANNEL_ID, ensureNotificationChannels, getNotificationCopy } from "./notification-witty-engine";
+import { UP_NEXT_CATEGORY, ensureWorkNotificationSetup } from "./work-notifications";
 
 const ENABLED_KEY = "alibi_deadline_reminders_enabled";
 const REMINDER_KIND = "task_deadline";
@@ -32,6 +33,7 @@ export async function syncTaskDeadlineReminders(
 ): Promise<void> {
   try {
     await ensureNotificationChannels();
+    await ensureWorkNotificationSetup(); // Start now / Snooze buttons (ADR-033)
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     const deadlineNotices = scheduled.filter((request) => request.content.data?.kind === REMINDER_KIND);
     if (!(await areTaskDeadlineRemindersEnabled()) || (await Notifications.getPermissionsAsync()).status !== "granted") {
@@ -47,7 +49,8 @@ export async function syncTaskDeadlineReminders(
       }
       const deadline = Date.parse(task.deadline_at);
       const fireAt = deadline - Math.max(0, leadMinutes) * 60_000;
-      const existing = notices.find((request) => request.content.data?.fireAt === fireAt);
+      // Reminders scheduled before 0.2.5 have no buttons: replace them.
+      const existing = notices.find((request) => request.content.data?.fireAt === fireAt && request.content.data?.buttons === true);
       await Promise.all(notices.filter((request) => request !== existing).map((request) => Notifications.cancelScheduledNotificationAsync(request.identifier).catch(() => undefined)));
       if (existing || !Number.isFinite(fireAt) || fireAt <= Date.now()) continue;
 
@@ -57,7 +60,8 @@ export async function syncTaskDeadlineReminders(
         content: {
           title: copy.title,
           body: copy.body,
-          data: { kind: REMINDER_KIND, taskId: task.id, fireAt },
+          data: { kind: REMINDER_KIND, taskId: task.id, fireAt, title: task.title ?? "Task", buttons: true },
+          categoryIdentifier: UP_NEXT_CATEGORY,
           sound: true,
           priority: Notifications.AndroidNotificationPriority.MAX,
         },

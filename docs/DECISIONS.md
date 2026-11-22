@@ -334,7 +334,7 @@ No migration, no new dependency, no new hosted service. OpenAPI and the TS clien
 - Requirement IDs affected: FR-TASK-022, FR-TASK-023, FR-PROD-014, FR-PROD-015, FR-DASH-010
 - Decisions:
   1. **Execution tracking reuses `time_entries`** (no new table). A work session is one time entry: Start opens it, Pause closes it (start = resume time, end = pause time), Start again opens the next one, completing a task closes the running one. Sessions, total active minutes and session counts all come from these rows. Elapsed time is computed from stored timestamps, so it survives restarts and backgrounding. Sessions under 30 s are discarded as mis-taps.
-  2. **One running task on the Today page.** ADR-025 allows concurrent timers, and the Tasks tab still does; starting a task on Today pauses any other running one so time is never counted twice. A task never gets a second running timer (phone and server both check).
+  2. **One running task on the Today page** (superseded by ADR-033: several tasks can now run on Today). ADR-025 allows concurrent timers, and the Tasks tab still does; starting a task on Today pauses any other running one so time is never counted twice. A task never gets a second running timer (phone and server both check).
   3. **Idle time** is not detected automatically (Android gives no reliable signal). Pausing is the user's action; the existing two-hour timer check-in (FR-PROD-003) asks about long-running timers.
   4. **Original due date:** migration 0016 adds `tasks.original_deadline_at`, set once by a SQLAlchemy listener when a due date that had already passed is moved (any path: PATCH, reschedule, end-of-day review, sync). The phone sets the same value locally. A task is overdue while it is open and its due date is before today; it stays overdue until completed or rescheduled.
   5. **Start Day / End Day** are `users.settings.day_start` / `day_end` ("HH:MM", default 09:00 / 21:00), edited in Settings → Your day. The brain-dump planner never suggests a time outside them; tasks that don't fit move to the next day's Start Day.
@@ -342,3 +342,20 @@ No migration, no new dependency, no new hosted service. OpenAPI and the TS clien
   7. **12-hour times** everywhere through `lib/time-format.ts` (not `toLocaleTimeString`, whose output depends on the phone).
   8. **Time report** `GET /analytics/time-report`: totals, today/this week, daily average over elapsed days, per-task minutes and sessions, average active time of completed tasks (only those with recorded time), planned vs actual where an estimate exists, daily and weekly series, per-category averages. Numbers come only from rows (AGENTS.md §2).
 - Consequences: one additive migration; no new dependency; OpenAPI and TS client regenerated. Device QA pending (KI-047).
+
+## ADR-033 — Several running tasks, and notifications you can act on
+- Status: Accepted by the owner on 2026-11-23 (owner request: "people can do many at a time and each task are tracked individually … the notification is one way but we have to make more ways")
+- Date: 2026-11-23
+- Requirement IDs affected: FR-PROD-016, FR-NOTIF-005, FR-NOTIF-004, FR-DASH-010
+- Decisions:
+  1. **Several tasks can run at once on Today**, as ADR-025 already allowed in the Tasks tab. Starting a task no longer pauses the others. Each task keeps its own sessions and minutes. A task still never has two running timers. Today shows "N running" next to the progress line; the widget names the first running task and adds "(+N more)".
+  2. **Productive time is clock time.** In the time report, a day's minutes, today, this week and the totals merge overlapping sessions, so an hour spent on two tasks together adds one hour to the day. Per-task minutes and "average per task" still use each task's full time. No schema change.
+  3. **Notifications with buttons**, all scheduled on the phone from the local task store (offline, free; no server push):
+     - *Working on*: one ongoing, silent notification per running task with **Pause** and **Done**. It disappears when the task is paused or done anywhere in the app.
+     - *Time check*: when a running task reaches its planned time (estimate minus time already recorded), or after 60 minutes if it has no estimate: **Done / +15 min / Pause**. Tapping the notice itself means "keep going" and checks again in 30 minutes. This replaces the fixed two-hour "timer still running" reminder.
+     - *Up next*: the existing before-due-time reminder gains **Start now** (starts that task's timer) and **Snooze 10 min**.
+     - *Did it get done?* check-ins (ADR-028) are unchanged, but their quiet hours now follow Start Day / End Day: a check-in that would fire outside the user's day waits for the next Start Day. Before the user sets their day, the old 07:30–22:30 window applies.
+     Every button is an explicit user action; nothing changes a schedule silently (AGENTS.md §2.8). Buttons open ALIBI briefly so the action always runs (KI-033).
+  4. **Separate switches.** The "Tasks in progress" setting has its own stored key; it used to share one with "Did it get done?" check-ins, so turning one off turned off both.
+  5. The plain Tasks-tab timer no longer starts the single-task focus foreground notice (the per-task notice replaces it). The Insights focus timer keeps its focus notice.
+- Consequences: no migration, no new dependency, no API change. Device QA pending (KI-048).

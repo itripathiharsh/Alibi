@@ -13,6 +13,7 @@ import { registerNotificationHandler, scheduleDailyWittyReminders, scheduleInact
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ensureCheckInCategory, handleNotificationResponse, syncTaskCheckIns } from "../lib/task-check-ins";
 import { refreshHomeWidget } from "../lib/home-widget";
+import { ensureWorkNotificationSetup, syncWorkNotifications } from "../lib/work-notifications";
 import { flushLearningSignals } from "../lib/learning-signals";
 import { onLocalTasksChanged } from "../lib/offline-sync";
 import { UpdatePrompt } from "../components/update-prompt";
@@ -47,6 +48,7 @@ export default function RootLayout() {
     if (launchState !== "ready") return;
     const navigate = (path: string) => router.push(path as Parameters<typeof router.push>[0]);
     void ensureCheckInCategory();
+    void ensureWorkNotificationSetup();
     void Notifications.getLastNotificationResponseAsync()
       .then((response) => (response ? handleNotificationResponse(response, navigate) : false))
       .catch(() => false);
@@ -58,12 +60,15 @@ export default function RootLayout() {
     const onTasksChanged = () => {
       refreshHomeWidget();
       if (debounce) clearTimeout(debounce);
+      // Running tasks show up in notifications right away; check-ins can wait a moment.
+      void syncWorkNotifications();
       debounce = setTimeout(() => { void syncTaskCheckIns(); }, 1500);
     };
     const unsubscribeTasks = onLocalTasksChanged(onTasksChanged);
     const onForeground = () => {
       refreshHomeWidget();
       void syncTaskCheckIns();
+      void syncWorkNotifications();
       void flushLearningSignals();
     };
     onForeground();

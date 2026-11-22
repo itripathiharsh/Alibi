@@ -4,6 +4,10 @@ Every number is counted from finished work sessions in `time_entries` (timer ses
 manual logs) and from task rows; nothing is estimated or generated. Days are the user's
 local days. A session that crosses midnight is split by the minutes it spent in each day;
 a session stored without an end time counts on the day it started.
+
+Several tasks can run at the same time (ADR-025/033). Each task keeps its full time, but
+"productive time" for a day is clock time: overlapping sessions are merged, so two tasks
+worked on together for an hour add one hour to the day, not two.
 """
 
 import statistics
@@ -53,6 +57,39 @@ def _split_by_day(
     return shares
 
 
+def _day_intervals(
+    started: datetime, ended: datetime | None, minutes: int, tz: zoneinfo.ZoneInfo
+) -> dict[date, tuple[datetime, datetime]]:
+    """The session's clock interval cut at local midnights."""
+    end = ended if ended is not None and ended > started else started + timedelta(minutes=minutes)
+    cursor = started.astimezone(tz)
+    end_local = end.astimezone(tz)
+    pieces: dict[date, tuple[datetime, datetime]] = {}
+    while cursor < end_local:
+        next_midnight = datetime.combine(cursor.date() + timedelta(days=1), time.min, tzinfo=tz)
+        chunk_end = min(next_midnight, end_local)
+        pieces[cursor.date()] = (cursor, chunk_end)
+        cursor = chunk_end
+    return pieces
+
+
+def _union_minutes(intervals: list[tuple[datetime, datetime]]) -> float:
+    """Minutes covered by at least one interval (overlaps counted once)."""
+    total = 0.0
+    current_start: datetime | None = None
+    current_end: datetime | None = None
+    for start, end in sorted(intervals):
+        if current_end is None or start > current_end:
+            if current_start is not None and current_end is not None:
+                total += (current_end - current_start).total_seconds()
+            current_start, current_end = start, end
+        elif end > current_end:
+            current_end = end
+    if current_start is not None and current_end is not None:
+        total += (current_end - current_start).total_seconds()
+    return total / 60
+
+
 class TimeReportBuilder:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -100,27 +137,36 @@ class TimeReportBuilder:
             )
         ).all()
 
-        per_day: dict[date, float] = defaultdict(float)
+        clock: dict[date, list[tuple[datetime, datetime]]] = defaultdict(list)
+        per_day_task_sum: dict[date, float] = defaultdict(float)
         per_day_tasks: dict[date, set[uuid.UUID]] = defaultdict(set)
         task_minutes: dict[uuid.UUID, float] = defaultdict(float)
         task_sessions: dict[uuid.UUID, int] = defaultdict(int)
-        today_minutes = 0.0
-        week_minutes = 0.0
         for task_id, started, ended, session_minutes in rows:
-            shares = _split_by_day(started, ended, int(session_minutes or 0), tz)
+            minutes_int = int(session_minutes or 0)
+            for day, piece in _day_intervals(started, ended, minutes_int, tz).items():
+                clock[day].append(piece)
             in_period = False
-            for day, share in shares.items():
-                if day == today:
-                    today_minutes += share
-                if week_start <= day < week_start + timedelta(days=7):
-                    week_minutes += share
+            for day, share in _split_by_day(started, ended, minutes_int, tz).items():
                 if start_day <= day <= end_day:
-                    per_day[day] += share
+                    per_day_task_sum[day] += share
                     per_day_tasks[day].add(task_id)
                     task_minutes[task_id] += share
                     in_period = True
             if in_period:
                 task_sessions[task_id] += 1
+
+        # Productive (clock) time per day: overlapping sessions count once.
+        per_day = {
+            day: _union_minutes(pieces)
+            for day, pieces in clock.items()
+            if start_day <= day <= end_day
+        }
+        today_minutes = _union_minutes(clock.get(today, []))
+        week_minutes = sum(
+            _union_minutes(clock.get(week_start + timedelta(days=offset), []))
+            for offset in range(7)
+        )
 
         completed_rows = (
             await self.session.execute(
@@ -213,7 +259,9 @@ class TimeReportBuilder:
                     minutes=day_minutes,
                     tasks_completed=completed_per_day.get(cursor, 0),
                     tasks_worked=worked,
-                    average_minutes_per_task=round(day_minutes / worked) if worked else None,
+                    average_minutes_per_task=(
+                        round(per_day_task_sum.get(cursor, 0.0) / worked) if worked else None
+                    ),
                 )
             )
             cursor += timedelta(days=1)

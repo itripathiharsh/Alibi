@@ -15,6 +15,8 @@ import { Platform } from "react-native";
 import { ensureNotificationChannels } from "./notification-witty-engine";
 import { getAllLocalTasks, updateTaskOffline, type LocalTask } from "./offline-sync";
 import { currentUserId, recordLearningSignal } from "./learning-signals";
+import { getDayWindow, intoDay } from "./day-window";
+import { handleWorkNotification } from "./work-notifications";
 
 export const CHECKIN_CATEGORY_ID = "alibi_task_checkin";
 // Own channel so the task name is hidden on a lock screen set to hide sensitive content.
@@ -26,9 +28,6 @@ const LAST_HANDLED_KEY = "alibi_last_notification_response";
 const DELAY_AFTER_DEADLINE_MIN = 15;
 const LOOKAHEAD_HOURS = 36;
 const MAX_PER_DAY = 6;
-const QUIET_START_MIN = 22 * 60 + 30; // 22:30
-const QUIET_END_MIN = 7 * 60 + 30; // 07:30
-const MORNING_SLOT = { hour: 8, minute: 30 };
 
 export async function areTaskCheckInsEnabled(): Promise<boolean> {
   try {
@@ -69,20 +68,6 @@ export async function ensureCheckInCategory(): Promise<void> {
   } catch {
     // Without buttons the notification still opens the app.
   }
-}
-
-function minutesOfDay(date: Date): number {
-  return date.getHours() * 60 + date.getMinutes();
-}
-
-/** Move a time out of quiet hours to the next 08:30. */
-function outOfQuietHours(date: Date): Date {
-  const minutes = minutesOfDay(date);
-  if (minutes < QUIET_START_MIN && minutes >= QUIET_END_MIN) return date;
-  const next = new Date(date);
-  if (minutes >= QUIET_START_MIN) next.setDate(next.getDate() + 1);
-  next.setHours(MORNING_SLOT.hour, MORNING_SLOT.minute, 0, 0);
-  return next;
 }
 
 function dayKey(date: Date): string {
@@ -139,6 +124,8 @@ async function doSync(): Promise<void> {
     const tasks = await getAllLocalTasks(userId);
     const now = Date.now();
     const horizon = now + LOOKAHEAD_HOURS * 3_600_000;
+    // Check-ins wait for Start Day instead of arriving after End Day (ADR-033).
+    const day = await getDayWindow();
 
     const wanted = new Map<string, { task: LocalTask; fireAt: Date }>();
     const perDay = new Map<string, number>();
@@ -148,7 +135,7 @@ async function doSync(): Promise<void> {
       .filter(({ deadline }) => Number.isFinite(deadline))
       .sort((a, b) => a.deadline - b.deadline);
     for (const { task, deadline } of candidates) {
-      const fireAt = outOfQuietHours(new Date(deadline + DELAY_AFTER_DEADLINE_MIN * 60_000));
+      const fireAt = intoDay(new Date(deadline + DELAY_AFTER_DEADLINE_MIN * 60_000), day);
       if (fireAt.getTime() <= now || fireAt.getTime() > horizon) continue;
       const key = dayKey(fireAt);
       const count = perDay.get(key) ?? 0;
@@ -194,6 +181,9 @@ export async function handleNotificationResponse(
   } catch {
     // Continue; a duplicate tap at worst repeats an idempotent action.
   }
+
+  // Running task, time check and up next buttons (ADR-033).
+  if (await handleWorkNotification(response, navigate)) return true;
 
   const data = response.notification.request.content.data ?? {};
   const kind = typeof data.kind === "string" ? data.kind : "";
@@ -241,7 +231,7 @@ export async function handleNotificationResponse(
     navigate(`/capture?mode=dump&prefill=${encodeURIComponent(data.text)}`);
     return true;
   }
-  if (kind === "daily_evening_sweep" || kind === "task_deadline") {
+  if (kind === "daily_evening_sweep") {
     navigate("/(tabs)/tasks");
     return true;
   }
