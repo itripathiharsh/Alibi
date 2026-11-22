@@ -214,3 +214,71 @@ def test_hinglish_durations_are_read() -> None:
     parser = RulesParser()
     assert parser.parse("usko test karna hai 5 minut ke liye").estimate.minutes == 5  # type: ignore[union-attr]
     assert parser.parse("padhai 2 ghante").estimate.minutes == 120  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_ai_spelling_and_grammar_corrections_are_kept() -> None:
+    """Corrected titles ("Sabzi leni hai.") still match the user's words ("sabzi lena")."""
+    llm = {
+        "items": [
+            {
+                "text": "mandir jana hai shaam ko",
+                "title": "Shaam ko mandir jaana hai.",
+                "when": "shaam ko",
+            },
+            {"text": "sabzi lena", "title": "Sabzi leni hai."},
+            {
+                "text": "assignment kal tak dena hai",
+                "title": "Assignment kal tak submit karna hai.",
+                "when": "kal tak",
+            },
+        ]
+    }
+    text = "mandir jana hai shaam ko, sabzi lena, assignment kal tak dena hai"
+    result = await BrainDumpService(None, _user(), gateway=_gateway_with(llm)).split(
+        text, now=MONDAY_10AM
+    )
+    assert result.mode == "ai"
+    assert [i.title for i in result.items] == [
+        "Shaam ko mandir jaana hai.",
+        "Sabzi leni hai.",
+        "Assignment kal tak submit karna hai.",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_invented_title_is_still_rejected() -> None:
+    llm = {"items": [{"text": "sabzi lena", "title": "Book flight tickets to Goa."}]}
+    result = await BrainDumpService(None, _user(), gateway=_gateway_with(llm)).split(
+        "sabzi lena", now=MONDAY_10AM
+    )
+    assert [i.title for i in result.items] == ["Sabzi lena"]
+
+
+@pytest.mark.asyncio
+async def test_planner_respects_the_users_start_and_end_of_day() -> None:
+    user = _user()
+    user.settings = {"cloud_ai_opt_in": True, "day_start": "07:30", "day_end": "11:00"}
+    llm = {
+        "items": [
+            {"text": "gym", "title": "Gym jaana hai.", "minutes": None},
+            {"text": "padhai 2 ghante", "title": "Padhai karni hai.", "minutes": 120},
+        ]
+    }
+    early = datetime(2026, 11, 23, 6, 0, tzinfo=IST)
+    result = await BrainDumpService(None, user, gateway=_gateway_with(llm)).split(
+        "gym, padhai 2 ghante", now=early
+    )
+    gym, study = result.items
+    assert gym.suggested_at == datetime(2026, 11, 23, 7, 30, tzinfo=IST)  # Start Day, not 09:00
+    # 08:15 + 120 min ends 10:15, inside the 11:00 End Day.
+    assert study.suggested_at == datetime(2026, 11, 23, 8, 15, tzinfo=IST)
+
+
+def test_day_window_falls_back_on_bad_values() -> None:
+    from app.services.brain_dump import parse_day_window
+
+    assert parse_day_window({"day_start": "08:00", "day_end": "23:00"}) == (480, 1380)
+    assert parse_day_window({"day_start": "25:00", "day_end": "nope"}) == (540, 1260)
+    assert parse_day_window({"day_start": "22:00", "day_end": "08:00"}) == (540, 1260)
+    assert parse_day_window(None) == (540, 1260)

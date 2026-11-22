@@ -28,6 +28,7 @@ import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
 import { ProfileAvatar } from "../../components/profile-avatar";
 import { TodayDashboard } from "../../components/today-dashboard";
+import { TimeReportSection } from "../../components/time-report";
 import { getAccessToken, ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { getLocalAnalyticsSummary, saveLocalNote } from "../../lib/offline-sync";
@@ -318,6 +319,7 @@ export default function ReportsScreen() {
       {insightView === "today" ? <TodayDashboard embedded header={insightsHeading} /> : (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {insightsHeading}
+        <TimeReportSection />
         {isOffline && (
           <OfflineNoticeCard
             featureName="Insights"

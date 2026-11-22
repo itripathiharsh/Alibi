@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { Check, Clock3, Sparkles, Timer, X } from "lucide-react-native";
+import { Check, Clock3, Pencil, Sparkles, Timer, X } from "lucide-react-native";
 import theme from "../lib/theme";
+import { formatWhen } from "../lib/time-format";
+import { DateChooser, FieldLabel, Sheet, TimeChooser } from "./time-pickers";
 import type { BrainDumpBucket, BrainDumpResult, ReviewedItem } from "../lib/brain-dump";
 
 const BUCKET_LABELS: Record<BrainDumpBucket, string> = {
@@ -25,27 +27,15 @@ interface Row {
   minutes: number | null;
 }
 
-function formatWhen(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  if (date.toDateString() === today.toDateString()) return time;
-  if (date.toDateString() === tomorrow.toDateString()) return `Tomorrow ${time}`;
-  return `${date.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })} ${time}`;
-}
-
 function statusLine(result: BrainDumpResult): { text: string; tone: "good" | "warn" } {
-  if (result.mode === "ai") return { text: "Sorted by AI. Check the titles and times, then add.", tone: "good" };
+  if (result.mode === "ai") return { text: "AI fixed the spelling and grammar. Check the tasks, then add them.", tone: "good" };
   if (result.ai_status === "server_disabled") {
-    return { text: "AI sorting is switched off on the ALIBI server, so this was split with basic rules. Titles may be rough.", tone: "warn" };
+    return { text: "AI spelling and grammar correction is off on the ALIBI server. These titles are your own words, split by basic rules.", tone: "warn" };
   }
   if (result.ai_status === "not_opted_in") {
-    return { text: "Split with basic rules. Turn on smart sorting so AI can clean up titles and split voice typing properly.", tone: "warn" };
+    return { text: "AI correction is off. Turn on smart sorting to fix spelling and grammar. These titles are your own words.", tone: "warn" };
   }
-  return { text: "AI didn't answer in time, so this was split with basic rules. Try again for a cleaner list.", tone: "warn" };
+  return { text: "AI correction didn't answer in time. These titles are your own words, split by basic rules.", tone: "warn" };
 }
 
 export default function BrainDumpReview({
@@ -84,6 +74,38 @@ export default function BrainDumpReview({
     [rows],
   );
   const status = statusLine(result);
+  const [editing, setEditing] = useState<Row | null>(null);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftDate, setDraftDate] = useState<Date | null>(null);
+  const [draftMinutes, setDraftMinutes] = useState(18 * 60);
+
+  const openEditor = (row: Row) => {
+    const when = row.saidAt ?? (row.keepSuggestion ? row.suggestedAt : null);
+    const date = when ? new Date(when) : null;
+    setDraftTitle(row.title);
+    setDraftDate(date);
+    setDraftMinutes(date ? date.getHours() * 60 + date.getMinutes() : 18 * 60);
+    setEditing(row);
+  };
+
+  const saveEditor = () => {
+    if (!editing || !draftTitle.trim()) return;
+    let iso: string | null = null;
+    let bucket: BrainDumpBucket = "anytime";
+    if (draftDate) {
+      const when = new Date(draftDate);
+      when.setHours(Math.floor(draftMinutes / 60), draftMinutes % 60, 0, 0);
+      iso = when.toISOString();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const days = Math.round((new Date(when).setHours(0, 0, 0, 0) - today.getTime()) / 86_400_000);
+      const endOfWeek = 6 - ((today.getDay() + 6) % 7); // days until Sunday
+      bucket = days <= 0 ? "today" : days <= endOfWeek ? "this_week" : "later";
+    }
+    // A time the user picks here counts as their own ("said"), not a suggestion.
+    update(editing.key, { title: draftTitle.trim(), saidAt: iso, saidPhrase: null, suggestedAt: null, bucket });
+    setEditing(null);
+  };
 
   const update = (key: string, patch: Partial<Row>) => {
     setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -140,6 +162,10 @@ export default function BrainDumpReview({
                     accessibilityLabel="Task title"
                   />
                   <View style={styles.chips}>
+                    <Pressable onPress={() => openEditor(row)} disabled={!row.keep} style={styles.editChip} accessibilityRole="button" accessibilityLabel={`Edit ${row.title}`} hitSlop={6}>
+                      <Pencil size={12} color={theme.colors.brand.navy} />
+                      <Text style={styles.chipText}>Edit</Text>
+                    </Pressable>
                     {row.saidAt ? (
                       <View style={styles.chip}>
                         <Clock3 size={12} color={theme.colors.brand.navy} />
@@ -184,6 +210,26 @@ export default function BrainDumpReview({
       <Pressable onPress={onBack} style={styles.backLink} accessibilityRole="button">
         <Text style={styles.backLabel}>Back to edit text</Text>
       </Pressable>
+
+      <Sheet
+        visible={editing !== null}
+        title="Edit task"
+        primaryLabel="Save"
+        onPrimary={saveEditor}
+        onClose={() => setEditing(null)}
+        primaryDisabled={!draftTitle.trim()}
+      >
+        <FieldLabel>Title</FieldLabel>
+        <TextInput value={draftTitle} onChangeText={setDraftTitle} style={styles.editInput} multiline accessibilityLabel="Task title" />
+        <FieldLabel>Due date</FieldLabel>
+        <DateChooser value={draftDate} onChange={setDraftDate} allowNone />
+        {draftDate ? (
+          <>
+            <FieldLabel>Due time</FieldLabel>
+            <TimeChooser minutes={draftMinutes} onChange={setDraftMinutes} />
+          </>
+        ) : null}
+      </Sheet>
     </View>
   );
 }
@@ -212,6 +258,8 @@ const styles = StyleSheet.create({
   chip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, backgroundColor: "#EEF2F6" },
   chipSuggested: { backgroundColor: "#FEF3C7" },
   chipText: { fontSize: 12, fontWeight: "600", color: theme.colors.brand.navy },
+  editChip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: theme.colors.border.subtle },
+  editInput: { borderWidth: 1, borderColor: theme.colors.border.subtle, borderRadius: 12, padding: 12, fontSize: 16, color: theme.colors.text.primary, minHeight: 48, textAlignVertical: "top" },
   chipGhost: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: "#E2E8F0", borderStyle: "dashed" },
   chipGhostText: { fontSize: 12, fontWeight: "600", color: theme.colors.text.secondary },
   saveButton: { minHeight: 52, borderRadius: theme.radius.control, backgroundColor: theme.colors.accent.primary, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, marginTop: 4 },

@@ -56,6 +56,7 @@ import { CaptureReviewSheet } from "./capture-review-sheet";
 import { decideTaskExtraction, type TaskExtractionProposal } from "../lib/task-extraction";
 import { ChiefOfStaffCard } from "./chief-of-staff-card";
 import { RecommendationsCard } from "./recommendations-card";
+import { formatClock } from "../lib/time-format";
 import { OnboardingModal } from "./onboarding-modal";
 import { ProjectManagerSheet } from "./project-manager-sheet";
 import {
@@ -864,10 +865,7 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
       .filter((t) => t.deadline_at)
       .slice(0, 4)
       .map((t, idx) => {
-        const timeStr = new Date(t.deadline_at!).toLocaleTimeString("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-        });
+        const timeStr = formatClock(t.deadline_at!);
         const colors = ["#F97316", "#0EA5E9", "#10B981", "#8B5CF6"];
         return {
           id: t.id,

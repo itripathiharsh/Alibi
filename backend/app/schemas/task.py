@@ -225,6 +225,7 @@ class TaskResponse(BaseModel):
     status: str
     priority: int | None = None
     deadline_at: datetime | None = None
+    original_deadline_at: datetime | None = None
     deadline_kind: str | None = None
     deadline_source: str | None = None
     estimate_user_min: int | None = None

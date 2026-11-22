@@ -103,3 +103,57 @@ class CategoryWorkloadItem(BaseModel):
     completed_count: int
     open_count: int
     total_min: int
+
+
+# --- Time report: where the user's recorded work time goes (FR-DASH-010, ADR-032) ---
+
+
+class TimeReportTask(BaseModel):
+    task_id: str
+    title: str
+    status: str
+    category: str | None = None
+    minutes: int  # recorded active minutes inside the selected period
+    sessions: int  # work sessions inside the selected period
+    total_minutes: int  # all recorded minutes on this task, any date
+    planned_minutes: int | None = None  # the task's estimate, when one exists
+    difference_minutes: int | None = None  # total_minutes - planned_minutes
+
+
+class TimeReportDay(BaseModel):
+    date: date
+    minutes: int
+    tasks_completed: int
+    tasks_worked: int
+    average_minutes_per_task: int | None = None
+
+
+class TimeReportWeek(BaseModel):
+    week_start: date
+    minutes: int
+    tasks_completed: int
+
+
+class TimeReportCategory(BaseModel):
+    category: str
+    completed_tasks: int
+    average_minutes: int
+
+
+class TimeReportResponse(BaseModel):
+    period: PeriodType
+    start_date: date
+    end_date: date  # inclusive
+    timezone: str
+    total_minutes: int
+    today_minutes: int
+    this_week_minutes: int
+    days_counted: int  # days of the period up to today, used for the daily average
+    daily_average_minutes: int
+    tasks_completed: int
+    average_completion_minutes: int | None = None  # over completed tasks with recorded time
+    completed_with_time: int
+    tasks: list[TimeReportTask]
+    days: list[TimeReportDay]
+    weeks: list[TimeReportWeek]
+    categories: list[TimeReportCategory]

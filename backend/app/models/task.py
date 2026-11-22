@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import date, datetime
+from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
@@ -13,11 +14,13 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    event,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.time import utc_now
 from app.core.uuid import generate_uuid7
 from app.database.base import Base, SyncableMixin
 
@@ -132,6 +135,12 @@ class Task(Base, SyncableMixin):
         DateTime(timezone=True),
         nullable=True,
     )
+    # First due date that had already passed when the task was moved (ADR-032). Set once
+    # by the attribute listener below, whichever path moves the date.
+    original_deadline_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     deadline_kind: Mapped[str | None] = mapped_column(
         String(10),
         nullable=True,
@@ -211,3 +220,16 @@ class Task(Base, SyncableMixin):
     @estimate_min.setter
     def estimate_min(self, value: int | None) -> None:
         self.estimate_final_min = value
+
+
+@event.listens_for(Task.deadline_at, "set")
+def _keep_original_deadline(target: Task, value: Any, oldvalue: Any, _initiator: Any) -> None:
+    """Remember the passed due date the first time an overdue task is moved."""
+    if (
+        isinstance(oldvalue, datetime)
+        and target.original_deadline_at is None
+        and value != oldvalue
+        and oldvalue.tzinfo is not None
+        and oldvalue < utc_now()
+    ):
+        target.original_deadline_at = oldvalue

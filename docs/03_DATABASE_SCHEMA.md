@@ -83,6 +83,7 @@ UNIQUE `(user_id, slug) WHERE deleted_at IS NULL`. System categories cannot be d
 | status | text NOT NULL DEFAULT 'pending' | pending/in_progress/completed/cancelled |
 | priority | smallint NULL | 1 (urgent) – 4 (low); NULL = unset |
 | deadline_at | timestamptz NULL | |
+| original_deadline_at | timestamptz NULL | Migration 0016 (ADR-032): the first due date that had already passed when the task was moved; set once by a model listener, kept after rescheduling |
 | deadline_kind | text NULL | hard/soft |
 | deadline_source | text NULL | user/extraction/recurrence |
 | estimate_user_min / estimate_ai_min | int NULL | |
