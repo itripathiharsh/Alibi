@@ -52,7 +52,7 @@ class TodayRingWidget : AppWidgetProvider() {
 
             val snapshot = TodayWidgetStore.readSnapshot(context)
             val views = RemoteViews(context.packageName, R.layout.today_ring_widget)
-            views.setImageViewBitmap(R.id.today_ring_image, TodayRingRenderer.render(sizePx, snapshot))
+            views.setImageViewBitmap(R.id.today_ring_image, TodayRingRenderer.render(context, sizePx, snapshot))
             val description = if (snapshot == null) {
                 "ALIBI. Open the app to load today's tasks."
             } else {

@@ -93,11 +93,15 @@ export default function RootLayout() {
       if (cancelled) return;
       const isOffline = profile?.id === "local_user" || (!accessToken && !refreshToken);
       setCachedIsOffline(isOffline);
-      const isAuthenticated = Boolean(accessToken || refreshToken || profile);
-      if (isAuthenticated) {
+      // A real account session (tokens, not the offline "local_user" profile) is the only
+      // thing that should push someone away from the sign-in screen. Offline users must be
+      // able to open Login/Signup from "Sign in to sync" without being bounced back.
+      const hasAccountSession = Boolean(accessToken || refreshToken) && profile?.id !== "local_user";
+      const canUseApp = hasAccountSession || Boolean(profile);
+      if (canUseApp) {
         void scheduleDailyWittyReminders();
         void scheduleInactivityNudge();
-        if (isAuthRoute && !isNavigatingRef.current) {
+        if (hasAccountSession && isAuthRoute && !isNavigatingRef.current) {
           isNavigatingRef.current = true;
           router.replace("/(tabs)");
           setTimeout(() => { isNavigatingRef.current = false; }, 400);

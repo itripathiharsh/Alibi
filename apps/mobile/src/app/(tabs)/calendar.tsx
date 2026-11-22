@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Calendar as CalendarIcon, Check, CheckCircle2, ChevronLeft, ChevronRight, Circle, Clock, Plus, Sparkles, UserRound, X } from "lucide-react-native";
+import { Calendar as CalendarIcon, Check, CheckCircle2, ChevronLeft, ChevronRight, Circle, Clock, Plus, Sparkles, X } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
+import { ProfileAvatar } from "../../components/profile-avatar";
 import { ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
@@ -281,15 +282,7 @@ export default function CalendarScreen() {
       <BrandHeader
         showOfflineBadge={isOffline}
         onOfflineBadgePress={() => router.push("/login")}
-        right={
-          <Pressable
-            style={styles.headerAction}
-            onPress={() => router.push("/(tabs)/profile")}
-            accessibilityLabel="Open profile"
-          >
-            <UserRound size={21} color={theme.colors.text.primary} />
-          </Pressable>
-        }
+        right={<ProfileAvatar />}
       />
       <View style={styles.header}>
         <View style={styles.headingCopy}>

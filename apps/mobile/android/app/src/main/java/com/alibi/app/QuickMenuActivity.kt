@@ -59,7 +59,7 @@ class QuickMenuActivity : Activity() {
 
         val ringSize = dp(132)
         val ring = ImageView(this).apply {
-            setImageBitmap(TodayRingRenderer.render(ringSize, snapshot))
+            setImageBitmap(TodayRingRenderer.render(this@QuickMenuActivity, ringSize, snapshot))
             contentDescription = if (snapshot == null) "ALIBI" else "${snapshot.done} of ${snapshot.total} done today"
             setOnClickListener { open("open_app") }
         }

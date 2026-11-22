@@ -296,3 +296,16 @@ The owner asked for (1) a brain dump on the Add Task screen that understands Hin
 
 ### Consequences
 No migration, no new dependency, no new hosted service. OpenAPI and the TS client are regenerated. Cloud AI stays off for everyone until both the owner and the user turn it on. Widget counts and check-in scheduling are computed on the device from cached tasks (same trade-off as KI-027). Device QA is still required for the widget, menu, blur and notification buttons.
+
+## ADR-029 — Diary-style Today page; Profile leaves the tab bar
+- Status: Accepted by the owner on 2026-11-22 ("Yes, build it" after reviewing the diary mockup)
+- Date: 2026-11-22
+- Requirement IDs affected: FR-PROD-011; supersedes the navigation part of ADR-022
+- Context: The owner wants ALIBI to replace a paper diary. The old Home showed greeting, Chief of Staff, quick actions, kickoff, focus timer and plan at once, which felt crowded for a page people open many times a day.
+- Decision:
+  1. The first tab is **Today**: one page per local day with the weekday and date at the top, tasks in time order, finished tasks struck out with an animated pen line (they stay on the page), unfinished tasks from earlier days under "From earlier days", open undated tasks under "Anytime", and one "write a task…" line. Tap strikes or un-strikes; long-press opens the task. Arrows move to other days. The page reads and writes the on-device task store, so it works offline.
+  2. A written line is sent to the brain-dump endpoint (4 s limit) so time words like "shaam ko" become a due time; if the server is slow or offline the line is saved exactly as written. Text listing several things opens Brain dump prefilled.
+  3. The previous Home dashboard moves unchanged into **Insights → Today**; the existing charts and reports are **Insights → Trends**.
+  4. **Profile** is removed from the tab bar (five tabs: Today, Tasks, Calendar, Insights, Vault). The initial circle in every tab header opens Profile.
+  5. Handwriting uses the platform's built-in casual typeface (Android `casual`, iOS Noteworthy); no font file or dependency is added.
+- Consequences: No backend or schema change. The done/total line on the page is counted on the device from cached tasks (same trade-off as KI-027/KI-034). Device QA pending (KI-038).
