@@ -8,7 +8,7 @@
  */
 import * as Notifications from "expo-notifications";
 import { Platform, ToastAndroid } from "react-native";
-import { getAccessToken } from "./auth";
+import { ensureAuthenticated } from "./auth";
 import { getServerUrl } from "./config";
 import { createTaskOffline, syncMobileAccount } from "./offline-sync";
 import { currentUserId } from "./learning-signals";
@@ -79,7 +79,7 @@ export async function quickAddFromVoice(data: { text?: string } | undefined): Pr
     refreshHomeWidgetNow(),
     syncTaskCheckIns(),
     (async () => {
-      const token = await getAccessToken();
+      const token = await ensureAuthenticated().catch(() => null);
       if (token && userId !== "local_user") await syncMobileAccount(userId, token, getServerUrl());
     })(),
   ]);

@@ -1,32 +1,27 @@
 {
-  "versionCode": 4,
-  "versionName": "0.2.2",
+  "versionCode": 5,
+  "versionName": "0.2.3",
   "url": "https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk",
-  "sha256": "3fe90682cff398fad91fc86870396793198ec4f0592c91ee4ce52c70cc347915",
-  "headline": "Say everything on your mind. ALIBI turns it into a planned day.",
+  "sha256": "b67e2a0c264f42c1ee0e42344bc46385feeda6968bb67ae69e6583519dd04ebf",
+  "headline": "Everything you write now shows up everywhere, right away.",
   "highlights": [
     {
-      "title": "Brain dump that plans your day",
-      "body": "Every task you mention gets its own line and a time slot. Keep the suggestion or drop it with one tap."
+      "title": "Your tasks, in sync everywhere",
+      "body": "Tasks from your Today page, brain dump and voice now reach Tasks and Insights reliably, even after a while away."
     },
     {
-      "title": "A calmer Today page",
-      "body": "Your day reads like a clean diary page: times on the left, a tick on the right, and a pen stroke through what's done."
+      "title": "A widget that matches your day",
+      "body": "The home-screen ring now counts exactly what's on your Today page, and shows your next unfinished task."
     },
     {
-      "title": "Voice typing that gets you right",
-      "body": "Talk naturally in English or Hinglish. Every word lands once, and ALIBI keeps listening while you think."
-    },
-    {
-      "title": "Never miss what's new",
-      "body": "New versions now show up right here with a one-tap download."
+      "title": "Opens straight into your day",
+      "body": "No more sign-in prompts while ALIBI wakes up. Your tasks are there instantly and sync in the background."
     }
   ],
   "notes": [
-    "Brain dump that plans your day: every task gets its own line and a time slot",
-    "A calmer Today page: a clean diary with a pen stroke through what's done",
-    "Voice typing that gets you right: every word lands once",
-    "Never miss what's new: updates show up with a one-tap download"
+    "Your tasks, in sync everywhere: Today, Tasks and Insights now always agree",
+    "A widget that matches your day: the ring counts exactly what's on your Today page",
+    "Opens straight into your day: no more sign-in prompts while ALIBI wakes up"
   ],
   "publishedAt": "2026-11-22"
 }
