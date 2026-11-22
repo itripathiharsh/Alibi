@@ -9,6 +9,8 @@ import { getServerUrl } from "../lib/config";
 import { areTaskTimerRemindersEnabled, setTaskTimerRemindersEnabled } from "../lib/timer-reminders";
 import { areTaskDeadlineRemindersEnabled, DEFAULT_DEADLINE_REMINDER_LEAD_MIN, setTaskDeadlineRemindersEnabled, syncTaskDeadlineReminders } from "../lib/task-deadline-reminders";
 import { getNotificationStyle, setNotificationStyle, triggerTestNotification } from "../lib/notification-witty-engine";
+import { areTaskCheckInsEnabled, setTaskCheckInsEnabled } from "../lib/task-check-ins";
+import { setCloudAiOptIn } from "../lib/brain-dump";
 import theme from "../lib/theme";
 
 type WorkingDay = { enabled: boolean; start: string; end: string };
@@ -42,15 +44,21 @@ export default function SettingsScreen() {
   const [workflowSaving, setWorkflowSaving] = useState(false);
   const [profile, setProfile] = useState<MobileUserProfile | null>(null);
   const [workingHours, setWorkingHours] = useState<WorkingHours>(DEFAULT_WORKING_HOURS);
+  const [checkInsEnabled, setCheckInsEnabled] = useState(true);
+  const [smartSorting, setSmartSorting] = useState(false);
+  const [smartSortingSaving, setSmartSortingSaving] = useState(false);
 
   useEffect(() => {
     void (async () => {
-      const [enabled, deadlineEnabled, style, cachedUser] = await Promise.all([
+      const [enabled, deadlineEnabled, style, cachedUser, checkIns] = await Promise.all([
         areTaskTimerRemindersEnabled(),
         areTaskDeadlineRemindersEnabled(),
         getNotificationStyle(),
         getUserProfile(),
+        areTaskCheckInsEnabled(),
       ]);
+      setCheckInsEnabled(checkIns);
+      setSmartSorting(cachedUser?.settings?.cloud_ai_opt_in === true);
       setRemindersEnabled(enabled);
       setDeadlineRemindersEnabled(deadlineEnabled);
       setWittyTone(style === "witty");
@@ -65,6 +73,7 @@ export default function SettingsScreen() {
             setFocusProtectionEnabled(user.settings?.focus_protection_enabled === true);
             setEveningReviewEnabled(user.settings?.eod_sweep_enabled === true);
             setShowFocusTaskName(user.settings?.focus_show_task_name === true);
+            setSmartSorting(user.settings?.cloud_ai_opt_in === true);
             const savedLead = user.settings?.reminder_lead_min;
             if (typeof savedLead === "number") setReminderLeadMin(savedLead);
             const savedHours = user.settings?.working_hours;
@@ -106,6 +115,38 @@ export default function SettingsScreen() {
       Alert.alert("Could not update setting", "Please try again.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const updateCheckIns = async (enabled: boolean) => {
+    if (enabled) {
+      const current = await Notifications.getPermissionsAsync();
+      const permission = current.status === "granted" ? current : await Notifications.requestPermissionsAsync();
+      if (permission.status !== "granted") {
+        Alert.alert("Notifications are off", "Allow notifications in Android settings to get check-ins.", [
+          { text: "Not now", style: "cancel" },
+          { text: "Open settings", onPress: () => { void Linking.openSettings(); } },
+        ]);
+        return;
+      }
+    }
+    await setTaskCheckInsEnabled(enabled);
+    setCheckInsEnabled(enabled);
+  };
+
+  const updateSmartSorting = async (enabled: boolean) => {
+    if (smartSortingSaving) return;
+    setSmartSortingSaving(true);
+    try {
+      const config = await setCloudAiOptIn(enabled);
+      setSmartSorting(config.ai_external_enabled);
+      if (enabled && !config.server_keys_available) {
+        Alert.alert("Saved", "Smart sorting is on for your account, but this ALIBI server has no AI keys set up yet. Brain dump will use basic rules until it does.");
+      }
+    } catch {
+      Alert.alert("Could not update setting", "Check your connection and try again.");
+    } finally {
+      setSmartSortingSaving(false);
     }
   };
 
@@ -280,6 +321,11 @@ export default function SettingsScreen() {
           {loading || saving ? <ActivityIndicator size="small" color={theme.colors.accent.amber} /> : <Switch value={deadlineRemindersEnabled} onValueChange={updateDeadlineReminders} trackColor={{ false: "#D3D9DF", true: "#F5B27E" }} thumbColor={deadlineRemindersEnabled ? theme.colors.accent.amber : theme.colors.surface.card} accessibilityLabel="Deadline reminders" />}
         </View>
         <View style={[styles.preferenceRow, styles.preferenceRowBorder]}>
+          <View style={styles.iconBox}><BellRing size={20} color="#F47B25" /></View>
+          <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>"Did it get done?" check-ins</Text><Text style={styles.preferenceDescription}>15 minutes after a task's due time, answer Done, +1 hour or Tomorrow right from the notification. At most 6 a day, none between 22:30 and 07:30. Android hides the task name on the lock screen if you set it to hide sensitive content.</Text></View>
+          <Switch value={checkInsEnabled} onValueChange={(value) => { void updateCheckIns(value); }} trackColor={{ false: "#D3D9DF", true: "#F5B27E" }} thumbColor={checkInsEnabled ? "#F47B25" : "#FFFFFF"} accessibilityLabel="Did it get done check-ins" />
+        </View>
+        <View style={[styles.preferenceRow, styles.preferenceRowBorder]}>
           <View style={styles.iconBox}><Sparkles size={20} color="#F47B25" /></View>
           <View style={styles.preferenceCopy}>
             <Text style={styles.preferenceTitle}>Pop-culture & Zomato-style humor</Text>
@@ -312,6 +358,11 @@ export default function SettingsScreen() {
       <View style={styles.sectionHeader}><Sparkles size={18} color="#8759E8" /><Text style={styles.sectionTitle}>Personal productivity</Text></View>
       <View style={styles.preferenceCard}>
         <View style={styles.preferenceRow}>
+          <View style={styles.iconBox}><Sparkles size={20} color="#8759E8" /></View>
+          <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>Smart sorting for brain dump</Text><Text style={styles.preferenceDescription}>Off by default. When on, brain dump sends the text you type to a free cloud AI (Gemini, Groq or OpenRouter) to split it into tasks. Dates are always checked against your own words. Google may use free-tier Gemini prompts to improve its products.</Text></View>
+          {smartSortingSaving ? <ActivityIndicator size="small" color="#8759E8" /> : <Switch value={smartSorting} onValueChange={(value) => { void updateSmartSorting(value); }} trackColor={{ false: "#D3D9DF", true: "#D6C4FA" }} thumbColor={smartSorting ? "#8759E8" : "#FFFFFF"} accessibilityLabel="Smart sorting for brain dump" />}
+        </View>
+        <View style={[styles.preferenceRow, styles.preferenceRowBorder]}>
           <View style={styles.iconBox}><CalendarDays size={20} color="#8759E8" /></View>
           <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>Evening task review</Text><Text style={styles.preferenceDescription}>After your configured workday, review today’s completed and unfinished tasks. ALIBI will never reschedule or cancel them without your choice.</Text></View>
           {loading || workflowSaving ? <ActivityIndicator size="small" color="#8759E8" /> : <Switch value={eveningReviewEnabled} onValueChange={(value) => { void saveWorkflowPreferences(value, showFocusTaskName); }} trackColor={{ false: "#D3D9DF", true: "#D6C4FA" }} thumbColor={eveningReviewEnabled ? "#8759E8" : "#FFFFFF"} accessibilityLabel="Evening task review" />}

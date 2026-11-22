@@ -11,6 +11,8 @@ from app.ai.adapters.gemini import GeminiProviderAdapter
 from app.ai.adapters.groq import GroqProviderAdapter
 from app.ai.adapters.nvidia import NvidiaProviderAdapter
 from app.ai.adapters.ollama import OllamaProviderAdapter
+from app.ai.adapters.openrouter import OpenRouterProviderAdapter
+from app.ai.gateway import CLOUD_AI_OPT_IN_KEY, server_provider_key, user_cloud_ai_opt_in
 from app.api.deps import AuthContext, get_auth_context, get_db
 from app.core.config import settings
 from app.core.crypto import decrypt_api_key, encrypt_api_key
@@ -28,25 +30,45 @@ from app.schemas.ai import (
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
-SUPPORTED_PROVIDERS = ["groq", "gemini", "nvidia", "ollama"]
+SUPPORTED_PROVIDERS = ["groq", "gemini", "nvidia", "openrouter", "ollama"]
+
+
+def _config_read(user_settings: dict[str, Any] | None) -> AIGlobalConfigRead:
+    keys_available = settings.ai_external_enabled and any(
+        server_provider_key(p) for p in ("gemini", "groq", "openrouter")
+    )
+    return AIGlobalConfigRead(
+        ai_external_enabled=user_cloud_ai_opt_in(user_settings),
+        server_external_enabled=settings.ai_external_enabled,
+        server_keys_available=bool(keys_available),
+    )
 
 
 @router.get("/config", response_model=AIGlobalConfigRead)
 async def get_ai_config(
-    _auth: Annotated[AuthContext, Depends(get_auth_context)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
 ) -> AIGlobalConfigRead:
-    """Get the current global AI external permission state (default False)."""
-    return AIGlobalConfigRead(ai_external_enabled=settings.ai_external_enabled)
+    """Get this user's cloud-AI consent and whether the server allows cloud AI (ADR-028)."""
+    return _config_read(auth.user.settings)
 
 
 @router.put("/config", response_model=AIGlobalConfigRead)
 async def update_ai_config(
     body: AIGlobalConfigUpdate,
-    _auth: Annotated[AuthContext, Depends(get_auth_context)],
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> AIGlobalConfigRead:
-    """Toggle external AI outbound calls master switch."""
-    settings.ai_external_enabled = body.ai_external_enabled
-    return AIGlobalConfigRead(ai_external_enabled=settings.ai_external_enabled)
+    """Turn cloud AI on or off for the signed-in user only (ADR-028).
+
+    The server-wide AI_EXTERNAL_ENABLED switch is deployment configuration. It used to be
+    writable here, which let any signed-in user change it for every account.
+    """
+    merged = dict(auth.user.settings or {})
+    merged[CLOUD_AI_OPT_IN_KEY] = body.ai_external_enabled
+    auth.user.settings = merged
+    auth.user.updated_at = utc_now()
+    await db.commit()
+    return _config_read(merged)
 
 
 @router.get("/providers", response_model=list[AIProviderSettingRead])
@@ -217,6 +239,8 @@ async def test_provider_connection(
         adapter = GeminiProviderAdapter(api_key=api_key, base_url=base_url)
     elif provider == "nvidia":
         adapter = NvidiaProviderAdapter(api_key=api_key, base_url=base_url)
+    elif provider == "openrouter":
+        adapter = OpenRouterProviderAdapter(api_key=api_key, base_url=base_url)
     elif provider == "ollama":
         adapter = OllamaProviderAdapter(base_url=base_url)
     else:

@@ -52,6 +52,7 @@ async def pull_sync_changes(
         server_epoch=data["server_epoch"],
         since_seq=data["since_seq"],
         next_seq=data["next_seq"],
+        has_more=data["has_more"],
         changes=data["changes"],
     )
 
@@ -70,6 +71,7 @@ async def bootstrap_sync(
         categories=data["categories"],
         projects=data["projects"],
         tags=data["tags"],
+        notes=data["notes"],
     )
 
 

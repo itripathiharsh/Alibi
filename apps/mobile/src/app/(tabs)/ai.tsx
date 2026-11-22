@@ -29,9 +29,10 @@ import {
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
-import { getAccessToken, ensureAuthenticated, isOfflineUser } from "../../lib/auth";
+import { getAccessToken, ensureAuthenticated, getUserProfile, isOfflineUser, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
+import { createTaskOffline } from "../../lib/offline-sync";
 
 interface Message {
   id: string;
@@ -39,6 +40,13 @@ interface Message {
   content: string;
   sources?: Array<{ title?: string; type?: string }>;
   toolCalls?: Array<{ tool?: string; summary?: string; count?: number }>;
+  proposal?: {
+    type: "create_task" | "reschedule" | "note";
+    title: string;
+    details?: string;
+    approved?: boolean;
+    dismissed?: boolean;
+  };
   createdAt: string;
 }
 
@@ -64,12 +72,42 @@ export default function AIScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [isVoiceMode, setIsVoiceMode] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
+  const { isOffline } = useOfflineStatus();
   const scrollViewRef = useRef<ScrollView>(null);
+  const [userId, setUserId] = useState<string>("local_user");
 
   useEffect(() => {
-    void isOfflineUser().then(setIsOffline);
+    getUserProfile().then((p) => setUserId(p?.id || "local_user"));
   }, []);
+
+  const handleApproveProposal = async (msgId: string, proposal: NonNullable<Message["proposal"]>) => {
+    try {
+      await createTaskOffline(userId, {
+        title: proposal.title,
+        status: "pending",
+      });
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === msgId && m.proposal
+            ? { ...m, proposal: { ...m.proposal, approved: true } }
+            : m
+        )
+      );
+      Alert.alert("Task Created", `"${proposal.title}" has been added to your tasks.`);
+    } catch {
+      Alert.alert("Error", "Could not create task.");
+    }
+  };
+
+  const handleDismissProposal = (msgId: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === msgId && m.proposal
+          ? { ...m, proposal: { ...m.proposal, dismissed: true } }
+          : m
+      )
+    );
+  };
 
   const handleVoiceDictation = async () => {
     if (isVoiceMode) {
@@ -128,7 +166,7 @@ export default function AIScreen() {
     try {
       let token = await ensureAuthenticated();
       if (!token) {
-        setIsOffline(true);
+        setCachedIsOffline(true);
         const offlineNotice: Message = {
           id: `offline-${Date.now()}`,
           role: "assistant",
@@ -178,12 +216,24 @@ export default function AIScreen() {
           setThreadId(data.thread_id);
         }
 
+        let proposal: Message["proposal"] = undefined;
+        const taskMatch = data.content?.match(/(?:create|scheduled?|added?|recommend)\s+(?:task|todo):\s*["']?([^"'\n.]+)/i);
+        if (taskMatch && taskMatch[1]) {
+          proposal = {
+            type: "create_task",
+            title: taskMatch[1].trim(),
+            approved: false,
+            dismissed: false,
+          };
+        }
+
         const assistantMsg: Message = {
           id: data.id || `asst-${Date.now()}`,
           role: "assistant",
           content: data.content || "I have reviewed your records.",
           sources: data.sources || [],
           toolCalls: data.tool_calls || [],
+          proposal,
           createdAt: data.created_at || new Date().toISOString(),
         };
 
@@ -320,6 +370,39 @@ export default function AIScreen() {
                     <Text style={styles.sourcesText}>
                       Grounded in: {msg.sources.map((s) => s.title || s.type).join(", ")}
                     </Text>
+                  </View>
+                )}
+
+                {/* Action Proposal Card */}
+                {msg.proposal && !msg.proposal.dismissed && (
+                  <View style={styles.proposalBox}>
+                    <View style={styles.proposalHeader}>
+                      <Sparkles size={13} color="#FF741F" />
+                      <Text style={styles.proposalTitle}>Action Proposal</Text>
+                    </View>
+                    <Text style={styles.proposalDesc}>{msg.proposal.title}</Text>
+                    {msg.proposal.approved ? (
+                      <View style={styles.proposalApprovedBadge}>
+                        <CheckCircle2 size={12} color="#16A34A" />
+                        <Text style={styles.proposalApprovedText}>Approved & created in tasks</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.proposalBtnRow}>
+                        <Pressable
+                          style={styles.proposalApproveBtn}
+                          onPress={() => handleApproveProposal(msg.id, msg.proposal!)}
+                        >
+                          <CheckCircle2 size={13} color="#FFFFFF" />
+                          <Text style={styles.proposalApproveText}>Approve & Create</Text>
+                        </Pressable>
+                        <Pressable
+                          style={styles.proposalDismissBtn}
+                          onPress={() => handleDismissProposal(msg.id)}
+                        >
+                          <Text style={styles.proposalDismissText}>Dismiss</Text>
+                        </Pressable>
+                      </View>
+                    )}
                   </View>
                 )}
               </View>
@@ -583,7 +666,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface.card,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: theme.radius.cardSecondary,
     borderWidth: 1,
     borderColor: theme.colors.border.subtle,
   },
@@ -596,15 +679,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(245, 158, 11, 0.15)",
+    backgroundColor: "rgba(255, 116, 31, 0.12)",
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderTopWidth: 1,
-    borderTopColor: "rgba(245, 158, 11, 0.3)",
+    borderTopColor: "rgba(255, 116, 31, 0.25)",
   },
   voiceModeText: {
     fontSize: 11,
-    color: theme.colors.accent.amber,
+    color: theme.colors.accent.primary,
     fontWeight: "600",
   },
   inputContainer: {
@@ -618,9 +701,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   voiceBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: theme.colors.background.base,
     alignItems: "center",
     justifyContent: "center",
@@ -628,15 +711,15 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.subtle,
   },
   voiceBtnActive: {
-    backgroundColor: "rgba(245, 158, 11, 0.2)",
-    borderColor: theme.colors.accent.amber,
+    backgroundColor: theme.colors.brand.navy,
+    borderColor: theme.colors.brand.navy,
   },
   input: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 44,
     maxHeight: 100,
     backgroundColor: theme.colors.background.base,
-    borderRadius: 20,
+    borderRadius: theme.radius.cardSecondary,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 14,
@@ -645,14 +728,81 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.subtle,
   },
   sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.accent.amber,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.accent.primary,
     alignItems: "center",
     justifyContent: "center",
   },
   sendBtnDisabled: {
-    backgroundColor: theme.colors.surface.elevated,
+    backgroundColor: theme.colors.surface.surface2,
+  },
+  proposalBox: {
+    marginTop: 10,
+    backgroundColor: "#FFF7ED",
+    borderRadius: theme.radius.cardSecondary,
+    borderWidth: 1,
+    borderColor: "#FFD8B3",
+    padding: 10,
+    gap: 6,
+  },
+  proposalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  proposalTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#C2410C",
+  },
+  proposalDesc: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.colors.text.primary,
+  },
+  proposalBtnRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+  },
+  proposalApproveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: theme.colors.accent.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.radius.control,
+  },
+  proposalApproveText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  proposalDismissBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.radius.control,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  proposalDismissText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: theme.colors.text.secondary,
+  },
+  proposalApprovedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 2,
+  },
+  proposalApprovedText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#16A34A",
   },
 });

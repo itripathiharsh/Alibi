@@ -6,8 +6,9 @@ The LLM never writes raw SQL; tools execute via SQLAlchemy ORM / Core.
 
 import uuid
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -137,8 +138,9 @@ class AssistantSQLTools:
         )
 
     async def pending_overdue(self, as_of: date | None = None) -> ToolResult:
-        """Query pending and overdue tasks."""
-        ref_date = as_of or date.today()
+        """Query pending and overdue tasks. Dates are compared in the user's timezone."""
+        local_tz = ZoneInfo(self.tz_name)
+        ref_date = as_of or datetime.now(local_tz).date()
         stmt = (
             select(Task)
             .where(
@@ -170,7 +172,7 @@ class AssistantSQLTools:
             if estimate_min:
                 numbers.append(estimate_min)
 
-            if t.deadline_at and t.deadline_at.date() < ref_date:
+            if t.deadline_at and t.deadline_at.astimezone(local_tz).date() < ref_date:
                 overdue.append(item)
             else:
                 pending.append(item)

@@ -8,14 +8,21 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AuthContext, get_auth_context, get_db
+from app.core.time import utc_now
+from app.learning.collector import PLECollector
 from app.learning.duration import PLEDurationPredictor
 from app.learning.profile import PLEProfileCompiler
+from app.learning.recommendations import RecommendationEngine
 from app.models.learning import LearnedPattern
+from app.models.task import Task
 from app.schemas.learning import (
     DurationPredictionRequest,
     DurationPredictionResponse,
     LearnedPatternResponse,
+    LearningSignalBatch,
+    LearningSignalBatchResponse,
     MemoryProfileResponse,
+    RecommendationsResponse,
     ResetLearningResponse,
 )
 
@@ -88,6 +95,52 @@ async def list_learned_patterns(
         )
         for r in records
     ]
+
+
+@router.post("/signals", response_model=LearningSignalBatchResponse)
+async def record_learning_signals(
+    body: LearningSignalBatch,
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> LearningSignalBatchResponse:
+    """Store check-in answers, brain-dump review counts and recommendation feedback.
+
+    FR-LEARN-012. Signals carry ids and counts only (never task text). Task ids that do
+    not belong to the user are dropped. Nothing is stored while learning is paused.
+    """
+    if (auth.user.settings or {}).get("learning_paused") is True:
+        return LearningSignalBatchResponse(accepted=0)
+
+    task_ids = {s.task_id for s in body.signals if s.task_id is not None}
+    owned: set[uuid.UUID] = set()
+    if task_ids:
+        res = await db.execute(
+            select(Task.id).where(Task.user_id == auth.user.id, Task.id.in_(task_ids))
+        )
+        owned = set(res.scalars().all())
+
+    collector = PLECollector(db)
+    now = utc_now()
+    for signal in body.signals:
+        occurred = signal.occurred_at if signal.occurred_at <= now else now
+        await collector.record(
+            auth.user.id,
+            signal.type,
+            dict(signal.data),
+            task_id=signal.task_id if signal.task_id in owned else None,
+            observed_at=occurred,
+        )
+    await db.commit()
+    return LearningSignalBatchResponse(accepted=len(body.signals))
+
+
+@router.get("/recommendations", response_model=RecommendationsResponse)
+async def get_recommendations(
+    auth: Annotated[AuthContext, Depends(get_auth_context)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> RecommendationsResponse:
+    """Up to three recommendations counted from the user's own history (FR-LEARN-013)."""
+    return await RecommendationEngine(db).build(auth.user.id, auth.user.timezone)
 
 
 @router.post("/reset", response_model=ResetLearningResponse)

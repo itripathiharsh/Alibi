@@ -1,5 +1,5 @@
 import React from "react";
-import { Image, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { Image, Platform, Pressable, StatusBar, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from "react-native-svg";
 import { CloudOff } from "lucide-react-native";
@@ -17,8 +17,11 @@ export function BrandHeader({
   style?: ViewStyle;
 }) {
   const insets = useSafeAreaInsets();
+  const topInset = Platform.OS === "android"
+    ? Math.max(insets.top, StatusBar.currentHeight ?? 0)
+    : insets.top;
   return (
-    <View style={[styles.header, { paddingTop: insets.top, minHeight: 48 + insets.top }, style]}>
+    <View style={[styles.header, { paddingTop: topInset, minHeight: 48 + topInset }, style]}>
       <View style={styles.brand}>
         <Image
           source={require("../../assets/logo_full_light.png")}

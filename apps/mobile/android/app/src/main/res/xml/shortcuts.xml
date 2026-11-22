@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+  <shortcut
+    android:shortcutId="add_task"
+    android:enabled="true"
+    android:icon="@mipmap/ic_launcher"
+    android:shortcutShortLabel="@string/shortcut_add_task_short"
+    android:shortcutLongLabel="@string/shortcut_add_task_long">
+    <intent
+      android:action="android.intent.action.VIEW"
+      android:targetPackage="com.alibi.app"
+      android:targetClass="com.alibi.app.MainActivity"
+      android:data="alibi://capture?mode=task" />
+  </shortcut>
+
+  <shortcut
+    android:shortcutId="capture_idea"
+    android:enabled="true"
+    android:icon="@mipmap/ic_launcher"
+    android:shortcutShortLabel="@string/shortcut_capture_idea_short"
+    android:shortcutLongLabel="@string/shortcut_capture_idea_long">
+    <intent
+      android:action="android.intent.action.VIEW"
+      android:targetPackage="com.alibi.app"
+      android:targetClass="com.alibi.app.MainActivity"
+      android:data="alibi://capture?mode=idea" />
+  </shortcut>
+
+  <shortcut
+    android:shortcutId="voice_capture"
+    android:enabled="true"
+    android:icon="@mipmap/ic_launcher"
+    android:shortcutShortLabel="@string/shortcut_voice_capture_short"
+    android:shortcutLongLabel="@string/shortcut_voice_capture_long">
+    <intent
+      android:action="android.intent.action.VIEW"
+      android:targetPackage="com.alibi.app"
+      android:targetClass="com.alibi.app.MainActivity"
+      android:data="alibi://capture?mode=voice" />
+  </shortcut>
+
+  <shortcut
+    android:shortcutId="open_calendar"
+    android:enabled="true"
+    android:icon="@mipmap/ic_launcher"
+    android:shortcutShortLabel="@string/shortcut_calendar_short"
+    android:shortcutLongLabel="@string/shortcut_calendar_long">
+    <intent
+      android:action="android.intent.action.VIEW"
+      android:targetPackage="com.alibi.app"
+      android:targetClass="com.alibi.app.MainActivity"
+      android:data="alibi://calendar" />
+  </shortcut>
+</shortcuts>

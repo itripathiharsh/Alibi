@@ -1,0 +1,625 @@
+import React, { useState } from "react";
+import {
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Brain,
+  CheckCircle2,
+  Clock,
+  HelpCircle,
+  Play,
+  RotateCcw,
+  ShieldCheck,
+  Sparkles,
+  X,
+} from "lucide-react-native";
+import theme from "../lib/theme";
+import { LocalUserPreferences } from "../lib/offline-sync";
+
+export interface ChiefOfStaffProps {
+  todayTasks: Array<{
+    id: string;
+    title: string;
+    status: string;
+    priority?: string | number | null;
+    deadline_at?: string | null;
+    estimate_user_min?: number | null;
+  }>;
+  overdueTasks: Array<{
+    id: string;
+    title: string;
+    deadline_at?: string | null;
+  }>;
+  preferences: LocalUserPreferences;
+  calendarBusyMinutes: number;
+  onStartFocus: (taskId: string, title: string) => void;
+  onRescheduleOverdue: (taskIds: string[]) => void;
+  onOpenTask?: (taskId: string) => void;
+}
+
+export function ChiefOfStaffCard({
+  todayTasks,
+  overdueTasks,
+  preferences,
+  calendarBusyMinutes,
+  onStartFocus,
+  onRescheduleOverdue,
+  onOpenTask,
+}: ChiefOfStaffProps) {
+  const [explainVisible, setExplainVisible] = useState(false);
+  const [briefingVisible, setBriefingVisible] = useState(false);
+  const [briefingText, setBriefingText] = useState<string | null>(null);
+
+  // 1. Pending tasks for today
+  const pendingTasks = todayTasks.filter((t) => t.status !== "completed");
+  const completedTasks = todayTasks.filter((t) => t.status === "completed");
+
+  // 2. Working window from the user's own settings, minus fixed calendar commitments.
+  const [startHour, startMin] = (preferences.work_start_time || "09:00").split(":").map(Number);
+  const [endHour, endMin] = (preferences.work_end_time || "18:00").split(":").map(Number);
+  const totalWorkMin = Math.max(0, (endHour * 60 + (endMin || 0)) - (startHour * 60 + (startMin || 0)));
+  const availableMin = Math.max(0, totalWorkMin - calendarBusyMinutes);
+
+  // 3. Planned time counts only estimates the user actually entered; unestimated tasks are
+  //    reported as a count instead of being given an invented duration.
+  const estimatedTasks = pendingTasks.filter((t) => typeof t.estimate_user_min === "number" && t.estimate_user_min > 0);
+  const unestimatedCount = pendingTasks.length - estimatedTasks.length;
+  const estimatedMin = estimatedTasks.reduce((acc, t) => acc + (t.estimate_user_min ?? 0), 0);
+  const isWorkloadOverloaded = estimatedMin > availableMin && availableMin > 0;
+
+  // 4. Recommended next action: highest priority (P1 is highest), then list order.
+  const recommendedTask =
+    [...pendingTasks].sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority))[0] ?? null;
+
+  const handleRequestBriefing = () => {
+    // The briefing is assembled from the same counts shown on the card. No language model
+    // is involved, so every number in it comes from the user's own records (AGENTS.md §2).
+    const lines = [
+      `• Workload: ${pendingTasks.length} pending ${pendingTasks.length === 1 ? "task" : "tasks"}` +
+        (estimatedTasks.length > 0 ? `, ${formatMinutes(estimatedMin)} estimated` : "") +
+        (unestimatedCount > 0 ? ` (${unestimatedCount} without an estimate)` : "") +
+        `, against ${formatMinutes(availableMin)} of working time outside calendar events.`,
+      isWorkloadOverloaded
+        ? `• Capacity: your estimated work is more than today's working window. Consider moving low-priority tasks to the backlog.`
+        : `• Capacity: your estimated work fits in today's working window.`,
+      overdueTasks.length > 0
+        ? `• Overdue: ${overdueTasks.length} ${overdueTasks.length === 1 ? "task is" : "tasks are"} overdue.`
+        : `• Overdue: none.`,
+      recommendedTask
+        ? `• Suggested next: "${recommendedTask.title}"` +
+          (recommendedTask.estimate_user_min ? ` (${recommendedTask.estimate_user_min} min).` : ".")
+        : `• Nothing pending for today.`,
+    ];
+    setBriefingText(lines.join("\n\n"));
+    setBriefingVisible(true);
+  };
+
+  return (
+    <View style={styles.card}>
+      {/* Briefing Header */}
+      <View style={styles.headerRow}>
+        <View style={styles.briefingBadge}>
+          <Sparkles size={14} color={theme.colors.accent.primary} />
+          <Text style={styles.briefingBadgeText}>CHIEF OF STAFF</Text>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Pressable
+            style={styles.briefMeBtn}
+            onPress={handleRequestBriefing}
+            accessibilityRole="button"
+            accessibilityLabel="Show today's briefing"
+          >
+            <Sparkles size={13} color="#FFFFFF" />
+            <Text style={styles.briefMeBtnText}>Brief Me</Text>
+          </Pressable>
+          <Pressable
+            hitSlop={10}
+            onPress={() => setExplainVisible(true)}
+            style={styles.helpButton}
+            accessibilityLabel="How Chief of Staff works"
+          >
+            <HelpCircle size={16} color={theme.colors.text.secondary} />
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Daily Pulse Summary */}
+      <Text style={styles.headline}>
+        {pendingTasks.length === 0 && completedTasks.length > 0
+          ? "You've cleared your plan for today! 🎉"
+          : pendingTasks.length === 0
+            ? "Your schedule is clear. Plan ahead or capture an idea."
+            : `${pendingTasks.length} ${pendingTasks.length === 1 ? "priority task" : "priority tasks"} need your attention.`}
+      </Text>
+
+      {/* Metrics Row: Available Time & Commitment */}
+      <View style={styles.statsStrip}>
+        <View style={styles.statCol}>
+          <Text style={styles.statLabel}>Available Work</Text>
+          <Text style={styles.statVal}>{formatMinutes(availableMin)}</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statCol}>
+          <Text style={styles.statLabel}>Planned Time</Text>
+          <Text style={styles.statVal}>{formatMinutes(estimatedMin)}{unestimatedCount > 0 ? ` + unestimated` : ""}</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statCol}>
+          <Text style={styles.statLabel}>Calendar Busy</Text>
+          <Text style={styles.statVal}>{calendarBusyMinutes}m</Text>
+        </View>
+      </View>
+
+      {/* Workload Warning if Overloaded */}
+      {isWorkloadOverloaded && (
+        <View style={styles.warningBox}>
+          <AlertTriangle size={15} color="#D97706" />
+          <Text style={styles.warningText}>
+            Workload warning: estimated work ({formatMinutes(estimatedMin)}) is more than today's working window ({formatMinutes(availableMin)}). Consider moving low priority tasks to backlog.
+          </Text>
+        </View>
+      )}
+
+      {/* Overdue Task Banner */}
+      {overdueTasks.length > 0 && (
+        <View style={styles.overdueBox}>
+          <View style={styles.overdueCopy}>
+            <Text style={styles.overdueTitle}>
+              {overdueTasks.length} {overdueTasks.length === 1 ? "task is overdue" : "tasks are overdue"}
+            </Text>
+            <Text style={styles.overdueSubtitle}>
+              {overdueTasks.map((t) => t.title).slice(0, 2).join(", ")}
+              {overdueTasks.length > 2 ? ` +${overdueTasks.length - 2} more` : ""}
+            </Text>
+          </View>
+          <Pressable
+            style={styles.rescheduleBtn}
+            onPress={() => onRescheduleOverdue(overdueTasks.map((t) => t.id))}
+            accessibilityRole="button"
+          >
+            <RotateCcw size={12} color="#FFFFFF" />
+            <Text style={styles.rescheduleBtnText}>Push to Today</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Recommended Next Action */}
+      {recommendedTask && (
+        <View style={styles.recommendationContainer}>
+          <Text style={styles.sectionHeader}>RECOMMENDED NEXT ACTION</Text>
+          <View style={styles.recommendationCard}>
+            <View style={styles.recIconWrap}>
+              <Clock size={16} color={theme.colors.accent.primary} />
+            </View>
+            <Pressable
+              style={styles.recCopy}
+              onPress={() => onOpenTask?.(recommendedTask.id)}
+            >
+              <Text style={styles.recTitle} numberOfLines={1}>
+                {recommendedTask.title}
+              </Text>
+              <Text style={styles.recMeta}>
+                {recommendedTask.estimate_user_min ? `${recommendedTask.estimate_user_min} min` : "No estimate"} · {typeof recommendedTask.priority === "number" ? `P${recommendedTask.priority}` : "No priority"}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.startFocusBtn}
+              onPress={() => onStartFocus(recommendedTask.id, recommendedTask.title)}
+              accessibilityRole="button"
+              accessibilityLabel={`Start focus timer on ${recommendedTask.title}`}
+            >
+              <Play size={14} color="#FFFFFF" fill="#FFFFFF" />
+              <Text style={styles.startFocusBtnText}>Focus</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {/* AI Daily Chief of Staff Briefing Modal */}
+      <Modal
+        visible={briefingVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setBriefingVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <Sparkles size={18} color={theme.colors.accent.primary} />
+                <Text style={styles.modalTitle}>Daily Chief of Staff Briefing</Text>
+              </View>
+              <Pressable onPress={() => setBriefingVisible(false)} hitSlop={10}>
+                <X size={20} color={theme.colors.text.secondary} />
+              </Pressable>
+            </View>
+
+            <View style={styles.briefingSourcePill}>
+              <ShieldCheck size={13} color={theme.colors.accent.emerald} />
+              <Text style={styles.briefingSourceText}>Calculated from your tasks, settings and calendar</Text>
+            </View>
+
+            <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+              <Text style={styles.briefingBodyText}>{briefingText}</Text>
+            </ScrollView>
+
+            <Pressable
+              style={styles.modalCloseBtn}
+              onPress={() => setBriefingVisible(false)}
+            >
+              <Text style={styles.modalCloseBtnText}>Done</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Explainability Modal */}
+      <Modal
+        visible={explainVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setExplainVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <Brain size={18} color={theme.colors.accent.primary} />
+                <Text style={styles.modalTitle}>Chief of Staff Intelligence</Text>
+              </View>
+              <Pressable onPress={() => setExplainVisible(false)} hitSlop={10}>
+                <X size={20} color={theme.colors.text.secondary} />
+              </Pressable>
+            </View>
+
+            <Text style={styles.modalBody}>
+              ALIBI analyzes your fixed calendar commitments, task deadlines, priority tags, and duration estimates to calculate realistic work blocks without human bias.
+            </Text>
+
+            <View style={styles.ruleList}>
+              <View style={styles.ruleItem}>
+                <CheckCircle2 size={15} color={theme.colors.accent.emerald} />
+                <Text style={styles.ruleText}>
+                  <Text style={styles.bold}>Zero Fabricated Data:</Text> All time windows and priorities are derived from your actual database records.
+                </Text>
+              </View>
+              <View style={styles.ruleItem}>
+                <CheckCircle2 size={15} color={theme.colors.accent.emerald} />
+                <Text style={styles.ruleText}>
+                  <Text style={styles.bold}>Working Window:</Text> Configured from {preferences.work_start_time} to {preferences.work_end_time} ({preferences.timezone}).
+                </Text>
+              </View>
+              <View style={styles.ruleItem}>
+                <CheckCircle2 size={15} color={theme.colors.accent.emerald} />
+                <Text style={styles.ruleText}>
+                  <Text style={styles.bold}>Adaptive Learning:</Text> Task duration estimates calibrate automatically as your focus sessions are completed.
+                </Text>
+              </View>
+            </View>
+
+            <Pressable
+              style={styles.modalCloseBtn}
+              onPress={() => setExplainVisible(false)}
+            >
+              <Text style={styles.modalCloseBtnText}>Understood</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: theme.colors.surface.card,
+    borderRadius: theme.radius.card,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+    gap: 12,
+    shadowColor: theme.colors.brand.navy,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  briefingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.colors.brand.peachLight,
+    borderWidth: 1,
+    borderColor: theme.colors.brand.peachBorder,
+  },
+  briefingBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: theme.colors.brand.peachText,
+    letterSpacing: 0.6,
+  },
+  helpButton: {
+    padding: 4,
+  },
+  headline: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "800",
+    color: theme.colors.text.primary,
+    letterSpacing: -0.3,
+  },
+  statsStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: theme.colors.surface.surface2,
+    borderRadius: theme.radius.cardSecondary,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  statCol: {
+    flex: 1,
+    alignItems: "center",
+    gap: 2,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: theme.colors.text.secondary,
+    textTransform: "uppercase",
+  },
+  statVal: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: theme.colors.text.primary,
+  },
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: theme.colors.border.subtle,
+  },
+  warningBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FEF3C7",
+    padding: 10,
+    borderRadius: theme.radius.control,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 11,
+    lineHeight: 16,
+    color: "#92400E",
+    fontWeight: "600",
+  },
+  overdueBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FEF2F2",
+    borderRadius: theme.radius.cardSecondary,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    gap: 8,
+  },
+  overdueCopy: {
+    flex: 1,
+  },
+  overdueTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#991B1B",
+  },
+  overdueSubtitle: {
+    fontSize: 10.5,
+    color: "#B91C1C",
+    marginTop: 2,
+  },
+  rescheduleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#DC2626",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: theme.radius.control,
+    minHeight: 36,
+  },
+  rescheduleBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  recommendationContainer: {
+    gap: 6,
+    marginTop: 2,
+  },
+  sectionHeader: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: theme.colors.text.muted,
+    letterSpacing: 0.8,
+  },
+  recommendationCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: theme.colors.background.base,
+    borderRadius: theme.radius.cardSecondary,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+  },
+  recIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: theme.colors.brand.peach,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recCopy: {
+    flex: 1,
+  },
+  recTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.colors.text.primary,
+  },
+  recMeta: {
+    fontSize: 10.5,
+    color: theme.colors.text.secondary,
+    marginTop: 1,
+  },
+  startFocusBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: theme.colors.accent.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: theme.radius.control,
+    minHeight: 36,
+  },
+  startFocusBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(11,32,48,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: theme.radius.card,
+    padding: 22,
+    width: "100%",
+    maxWidth: 420,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  modalTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: theme.colors.text.primary,
+  },
+  modalBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: theme.colors.text.secondary,
+  },
+  ruleList: {
+    gap: 10,
+    backgroundColor: theme.colors.surface.surface2,
+    padding: 12,
+    borderRadius: theme.radius.cardSecondary,
+  },
+  ruleItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  ruleText: {
+    flex: 1,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: theme.colors.text.primary,
+  },
+  bold: {
+    fontWeight: "700",
+  },
+  modalCloseBtn: {
+    backgroundColor: theme.colors.brand.navy,
+    borderRadius: theme.radius.control,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCloseBtnText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  briefMeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: theme.colors.brand.orange,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 7,
+  },
+  briefMeBtnText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  briefingSourcePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(16, 185, 129, 0.1)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+  },
+  briefingSourceText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#065F46",
+  },
+  briefingBodyText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: theme.colors.text.primary,
+  },
+});
+
+/** Format whole minutes as "Xh Ym" (floor, so 90 min is "1h 30m"). */
+function formatMinutes(totalMin: number): string {
+  const safe = Math.max(0, Math.round(totalMin));
+  return `${Math.floor(safe / 60)}h ${safe % 60}m`;
+}
+
+/** Task priority is 1 (highest) to 4; unprioritised tasks sort last. */
+function priorityRank(priority: string | number | null | undefined): number {
+  return typeof priority === "number" && priority >= 1 && priority <= 4 ? priority : 5;
+}

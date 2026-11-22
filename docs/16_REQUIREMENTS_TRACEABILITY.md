@@ -135,6 +135,12 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-PROD-007 | SQL-backed weekly reflection saved in private Vault | M | M13 | 01§2.13, 04§4.14 | Android Insights; Vault notes API | ◐ |
 | FR-PROD-008 | Haptics and multi-select task actions on Android | M | M13 | 01§2.13 | Android Tasks; device QA | ◐ |
 | FR-PROD-009 | Optional offline ambient audio generated on device | M | M13 | 01§2.13, ADR-027 | Android focus audio; device QA | ◐ |
+| FR-PROD-010 | Round "Today" home-screen widget (done/total today) with a user-configurable quick-action menu | M | M13 | ADR-028 | apps/mobile/src/lib/home-widget.ts; Android widget; device QA | ◐ |
+| FR-TASK-022 | Brain dump: split one multi-item (incl. Hinglish) text into reviewable, day/week-bucketed task proposals; dates grounded by the rules parser | M | M13 | 04§4.4, 06§4, ADR-028 | backend/tests/unit/test_brain_dump_service.py; backend/tests/unit/test_hinglish_rules.py; backend/tests/integration/test_brain_dump_and_recommendations_api.py | ◐ |
+| FR-AI-012 | Per-user cloud-AI consent (default off); server-held free-tier key pools with rotation and per-key failover; OpenRouter provider | M | M13 | 04§4.12, 06§11a, ADR-028 | backend/tests/unit/test_ai_key_rotation.py; backend/tests/integration/test_brain_dump_and_recommendations_api.py; backend/tests/integration/test_ai_settings_api.py | ◐ |
+| FR-LEARN-012 | Store check-in, brain-dump review and recommendation feedback signals (ids and counts only) | M | M13 | 04§4.11, ADR-028 | backend/tests/integration/test_brain_dump_and_recommendations_api.py | ◐ |
+| FR-LEARN-013 | Recommendations after 7 active days, counted from the user's own history, dismissable | M | M13 | 04§4.11, ADR-028 | backend/tests/integration/test_brain_dump_and_recommendations_api.py | ◐ |
+| FR-NOTIF-004 | On-device "Did it get done?" check-ins with Done / +1 hour / Tomorrow actions, daily cap and quiet hours | M | M13 | ADR-028 | apps/mobile/src/lib/task-check-ins.ts; device QA | ◐ |
 | NFR-PERF-001 | Task create (text, no AI) API p95 | M | M2–M12 | 14 | tests/perf/ | ☑ |
 | NFR-PERF-002 | Task appears in list after save (optimistic) | M | M2–M12 | 14 | tests/perf/ | ☑ |
 | NFR-PERF-003 | Extraction with local LLM p95 | M | M2–M12 | 14 | tests/perf/ | ☑ |

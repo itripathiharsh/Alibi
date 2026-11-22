@@ -19,6 +19,7 @@ from app.repositories.ai_extraction_repo import AIExtractionRepository
 from app.repositories.subtask_repo import SubtaskRepository
 from app.repositories.tag_repo import TagRepository
 from app.repositories.task_repo import TaskRepository
+from app.schemas.brain_dump import BrainDumpItemResponse, BrainDumpRequest, BrainDumpResponse
 from app.schemas.productivity import (
     DailyKickoffResponse,
     EndOfDayActionRequest,
@@ -42,6 +43,7 @@ from app.schemas.task import (
     TaskStatusUpdateRequest,
     TaskUpdateRequest,
 )
+from app.services.brain_dump import BrainDumpService
 from app.services.dependency_service import DependencyService
 from app.services.productivity_workflow import ProductivityWorkflowService
 from app.services.task_service import TaskService
@@ -126,6 +128,36 @@ async def capture_task(
         task=enriched,
         extraction=extraction_dto,
         extraction_status=task.parse_status,
+    )
+
+
+@router.post("/brain-dump", response_model=BrainDumpResponse)
+async def split_brain_dump(
+    data: BrainDumpRequest,
+    auth: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+) -> BrainDumpResponse:
+    """Split a free-text dump into task proposals; saves nothing (FR-TASK-022, ADR-028)."""
+    result = await BrainDumpService(db, auth.user).split(data.text)
+    await db.commit()  # persist AI usage metadata only
+    return BrainDumpResponse(
+        items=[
+            BrainDumpItemResponse(
+                title=item.title,
+                source_text=item.source_text,
+                deadline_at=item.deadline_at,
+                deadline_phrase=item.deadline_phrase,
+                deadline_kind=item.deadline_kind,
+                bucket=item.bucket,
+                priority=item.priority,
+                estimate_minutes=item.estimate_minutes,
+                category=item.category,
+            )
+            for item in result.items
+        ],
+        mode=result.mode,
+        ai_status=result.ai_status,
+        provider=result.provider,
     )
 
 

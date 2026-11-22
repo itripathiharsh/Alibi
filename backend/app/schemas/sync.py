@@ -30,6 +30,7 @@ class SyncPullResponse(BaseModel):
     server_epoch: str
     since_seq: int
     next_seq: int
+    has_more: bool = False
     changes: list[dict[str, Any]]
 
 
@@ -39,6 +40,7 @@ class SyncBootstrapResponse(BaseModel):
     categories: list[dict[str, Any]]
     projects: list[dict[str, Any]]
     tags: list[dict[str, Any]]
+    notes: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class SyncConflictResponse(BaseModel):

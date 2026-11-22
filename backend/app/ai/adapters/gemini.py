@@ -13,7 +13,8 @@ class GeminiProviderAdapter(ProviderAdapter):
 
     name: str = "gemini"
     DEFAULT_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
-    DEFAULT_MODEL: str = "gemini-1.5-flash"
+    # gemini-1.5-* models were retired by Google; 2.5 Flash is on the free tier.
+    DEFAULT_MODEL: str = "gemini-2.5-flash"
 
     def __init__(self, api_key: str | None = None, base_url: str | None = None) -> None:
         self.api_key = api_key

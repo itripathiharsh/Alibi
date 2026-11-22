@@ -53,7 +53,9 @@ class AIUsageSummaryResponse(BaseModel):
 
 
 class AIGlobalConfigRead(BaseModel):
-    ai_external_enabled: bool
+    ai_external_enabled: bool  # this user's cloud-AI consent (ADR-028)
+    server_external_enabled: bool = False
+    server_keys_available: bool = False
 
 
 class AIGlobalConfigUpdate(BaseModel):

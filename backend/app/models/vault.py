@@ -20,10 +20,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.time import utc_now
 from app.core.uuid import generate_uuid7
-from app.database.base import Base
+from app.database.base import Base, SyncableMixin
 
 
-class Note(Base):
+class Note(Base, SyncableMixin):
     """Knowledge Vault note / ingested item (doc 03 §3.5, doc 08 §1)."""
 
     __tablename__ = "notes"
@@ -81,19 +81,6 @@ class Note(Base):
     storage_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     embed_status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=utc_now,
-        nullable=False,
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=utc_now,
-        onupdate=utc_now,
-        nullable=False,
-    )
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     embeddings: Mapped[list["NoteEmbedding"]] = relationship(
         "NoteEmbedding",

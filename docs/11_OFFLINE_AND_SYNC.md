@@ -45,7 +45,7 @@ users.settings (pull only), workspaces, categories, projects, tags, task_tags, t
 Response returns current server entity for every touched entity so the client overwrites local with authoritative state.
 
 ### 4.3 Pull
-`GET /sync/pull?since_seq=N` → changes ordered by `server_seq`, includes tombstones. Client applies in a transaction and stores `next_seq`.
+`GET /sync/pull?since_seq=N` → changes ordered by `server_seq`, includes tombstones. Client applies in a transaction and stores `next_seq`. `next_seq` is the seq of the last change *returned* (never a row beyond the page), and the client repeats the pull while `has_more` is true.
 Pull **after** push in each cycle. Local rows with pending outbox ops: pulled values applied to fields **not** pending; pending fields keep local value until the push result arrives.
 
 **Server epoch:** `/api/v1/meta` and every pull response include `server_epoch` (UUID regenerated whenever the DB is restored from backup). If a client's stored epoch differs, it discards its cursor and re-bootstraps while **keeping its outbox**, which is then pushed (ops are idempotent by `op_id`).

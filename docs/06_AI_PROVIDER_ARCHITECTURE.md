@@ -43,7 +43,8 @@ Config (`ai_provider_settings.routing_overrides` or defaults file `app/ai/routin
 
 | Operation | Default chain (first available wins) | Timeout | Notes |
 |-----------|--------------------------------------|---------|-------|
-| TASK_EXTRACTION | groq → gemini → ollama | 8 s | rules parser always runs first |
+| TASK_EXTRACTION | groq → gemini → openrouter → nvidia → ollama | 8 s | rules parser always runs first |
+| BRAIN_DUMP | gemini → groq → openrouter → nvidia → ollama | 20 s | splits a dump into items; quotes time words only; every date re-resolved by the rules parser; rules splitter when no provider (ADR-028) |
 | TASK_CLASSIFICATION | (local ML model) → groq → ollama | 5 s | ML first once maturity ≥ L2 |
 | COMPLEX_UNDERSTANDING | gemini → nvidia → ollama | 20 s | subtasks/dependencies suggestions |
 | DAILY_PLAN_NARRATIVE | strongest configured (rank) → ollama | 20 s | solver decides, LLM explains |
@@ -120,7 +121,7 @@ Cost is an **estimate** and labelled as such.
 ## 11a. Hosting modes (ADR-018/020, owner 2026-11-13)
 | Aspect | `ALIBI_MODE=hosted` (primary runtime) | `ALIBI_MODE=local` (dev / self-host) |
 |---|---|---|
-| Chat/JSON providers | Groq → Gemini → NVIDIA, **only when `ai_external_enabled=true`** (default false) | Same chains + Ollama |
+| Chat/JSON providers | Groq / Gemini / OpenRouter / NVIDIA, **only when `ai_external_enabled=true` and the user opted in** (`users.settings.cloud_ai_opt_in`, default false; ADR-028). Keys: the user's own saved key, else the owner's server-held free-tier key pool (`GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, each comma-separated; rotated per request, 429 → next key, 401/403 → next key with 10 min cooldown, other errors → next provider) | Same chains + Ollama |
 | No provider eligible | `ai_unavailable` → rules/ML/deterministic path (FR-AI-009) | same |
 | EMBEDDINGS | none in v1 (keyword search) unless M7 shows fastembed fits the 512 MB budget | fastembed in-process |
 | STT | on-device Android recognition (client side); `/voice/transcribe` → Groq Whisper only if external enabled; audio never stored | faster-whisper → Groq |

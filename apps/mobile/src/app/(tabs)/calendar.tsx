@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { Calendar as CalendarIcon, Check, CheckCircle2, ChevronLeft, ChevronRight, Circle, Clock, Plus, Sparkles, UserRound, X } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
-import { ensureAuthenticated, getUserProfile } from "../../lib/auth";
+import { ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
 import { getLocalCalendarData, makeOfflineId, saveLocalCalendarEvent } from "../../lib/offline-sync";
@@ -77,7 +77,7 @@ export default function CalendarScreen() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
+  const { isOffline } = useOfflineStatus();
   const [loadError, setLoadError] = useState<string | null>(null);
   const [recommendation, setRecommendation] = useState<ScheduleRecommendation | null>(null);
   const [planHorizonDays, setPlanHorizonDays] = useState(1);
@@ -123,7 +123,7 @@ export default function CalendarScreen() {
           setTasks(Array.isArray(taskData) ? taskData : []);
           if (Array.isArray(taskData)) void syncTaskDeadlineReminders(taskData, reminderLeadMin);
           setEvents(Array.isArray(eventData) ? eventData : []);
-          setIsOffline(false);
+          setCachedIsOffline(false);
           setLoadError(null);
           return;
         }
@@ -134,7 +134,7 @@ export default function CalendarScreen() {
 
     // 2. Offline fallback: Read local tasks and events from SQLite
     try {
-      setIsOffline(true);
+      setCachedIsOffline(true);
       const localData = await getLocalCalendarData(
         userId,
         range.start.toISOString(),
@@ -387,7 +387,7 @@ export default function CalendarScreen() {
       </ScrollView>
 
       {/* Add Local Event Modal */}
-      <Modal visible={createEventVisible} transparent animationType="fade" onRequestClose={() => setCreateEventVisible(false)}>
+      <Modal visible={createEventVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setCreateEventVisible(false)}>
         <View style={styles.backdrop}>
           <View style={styles.eventModalContent}>
             <View style={styles.eventModalHeader}>
@@ -437,7 +437,7 @@ export default function CalendarScreen() {
         </View>
       </Modal>
 
-      <Modal visible={Boolean(recommendation)} transparent animationType="slide" onRequestClose={() => setRecommendation(null)}>
+      <Modal visible={Boolean(recommendation)} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setRecommendation(null)}>
         <View style={styles.backdrop}><View style={styles.reviewSheet}>
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeading}><View style={styles.planIcon}><Sparkles size={18} color={theme.colors.accent.amber} /></View><View style={styles.headingCopy}><Text style={styles.planTitle}>Your day plan</Text><Text style={styles.planSubtitle}>Choose which work blocks to add to your calendar.</Text></View><Pressable onPress={() => setRecommendation(null)} accessibilityLabel="Close plan"><X size={21} color={theme.colors.text.secondary} /></Pressable></View>
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "800", color: theme.colors.text.primary },
   taskCountBadge: { fontSize: 11, fontWeight: "700", color: theme.colors.text.secondary, backgroundColor: theme.colors.surface.surface2, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 9 },
   loading: { marginTop: 40 },
-  itemCard: { flexDirection: "row", alignItems: "flex-start", gap: 11, backgroundColor: theme.colors.surface.card, borderRadius: 17, padding: 14, borderWidth: 1, borderColor: theme.colors.border.subtle },
+  itemCard: { flexDirection: "row", alignItems: "flex-start", gap: 11, backgroundColor: theme.colors.surface.card, borderRadius: theme.radius.cardSecondary, padding: 14, borderWidth: 1, borderColor: theme.colors.border.subtle },
   itemCardComplete: { backgroundColor: theme.colors.surface.surface2 },
   itemMarker: { paddingTop: 1 },
   eventMarker: { paddingTop: 1 },
@@ -504,18 +504,18 @@ const styles = StyleSheet.create({
   itemTitle: { color: theme.colors.text.primary, fontSize: 14, fontWeight: "700" },
   itemTitleComplete: { color: theme.colors.text.muted, textDecorationLine: "line-through" },
   itemMeta: { color: theme.colors.text.secondary, fontSize: 11, textTransform: "capitalize" },
-  emptyCard: { backgroundColor: theme.colors.surface.card, borderRadius: 18, padding: 28, alignItems: "center", marginTop: 14, borderWidth: 1, borderColor: theme.colors.border.subtle, gap: 8 },
+  emptyCard: { backgroundColor: theme.colors.surface.card, borderRadius: theme.radius.card, padding: 28, alignItems: "center", marginTop: 14, borderWidth: 1, borderColor: theme.colors.border.subtle, gap: 8 },
   emptyTitle: { fontSize: 15, fontWeight: "800", color: theme.colors.text.primary, marginTop: 6, textAlign: "center" },
   emptySubtitle: { fontSize: 12, color: theme.colors.text.secondary, textAlign: "center", lineHeight: 18 },
-  retryButton: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 12, backgroundColor: theme.colors.text.primary, marginTop: 4 },
+  retryButton: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: theme.radius.control, backgroundColor: theme.colors.text.primary, marginTop: 4 },
   retryLabel: { color: theme.colors.surface.card, fontSize: 12, fontWeight: "800" },
   backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(8,24,37,.46)" },
-  reviewSheet: { maxHeight: "90%", paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: theme.colors.background.base },
+  reviewSheet: { maxHeight: "90%", paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26, borderTopLeftRadius: theme.radius.sheet, borderTopRightRadius: theme.radius.sheet, backgroundColor: theme.colors.background.base },
   sheetHandle: { alignSelf: "center", width: 42, height: 4, borderRadius: 99, backgroundColor: theme.colors.border.subtle, marginBottom: 16 },
   sheetHeading: { flexDirection: "row", alignItems: "center", gap: 11 },
   proposalList: { marginTop: 15, flexGrow: 0 },
   proposalContent: { gap: 9, paddingBottom: 5 },
-  proposalRow: { flexDirection: "row", alignItems: "center", gap: 11, padding: 13, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: theme.colors.surface.card },
+  proposalRow: { flexDirection: "row", alignItems: "center", gap: 11, padding: 13, borderRadius: theme.radius.cardSecondary, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: theme.colors.surface.card },
   proposalRowSelected: { borderColor: theme.colors.accent.amber, backgroundColor: "#FFFAF6" },
   checkbox: { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, borderColor: theme.colors.border.subtle, alignItems: "center", justifyContent: "center" },
   checkboxSelected: { borderColor: theme.colors.accent.amber, backgroundColor: theme.colors.accent.amber },
@@ -528,28 +528,28 @@ const styles = StyleSheet.create({
   unscheduledTitle: { color: theme.colors.text.primary, fontSize: 12, fontWeight: "800" },
   unscheduledText: { color: theme.colors.text.secondary, fontSize: 11, lineHeight: 16 },
   sheetActions: { flexDirection: "row", gap: 10, marginTop: 14 },
-  secondaryButton: { flex: 1, minHeight: 50, alignItems: "center", justifyContent: "center", borderRadius: 15, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: theme.colors.surface.card },
+  secondaryButton: { flex: 1, minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: theme.radius.control, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: theme.colors.surface.card },
   secondaryLabel: { color: theme.colors.text.secondary, fontSize: 13, fontWeight: "700" },
-  primaryButton: { flex: 1.2, minHeight: 50, alignItems: "center", justifyContent: "center", borderRadius: 15, backgroundColor: theme.colors.text.primary },
+  primaryButton: { flex: 1.2, minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: theme.radius.control, backgroundColor: theme.colors.text.primary },
   primaryLabel: { color: theme.colors.surface.card, fontSize: 13, fontWeight: "800" },
   buttonDisabled: { opacity: .55 },
   sectionHeaderActions: { flexDirection: "row", alignItems: "center", gap: 8 },
-  addEventInlineBtn: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#F47B25", paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
+  addEventInlineBtn: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: theme.colors.accent.primary, paddingHorizontal: 9, paddingVertical: 4, borderRadius: theme.radius.control },
   addEventInlineText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
   emptyActionsRow: { flexDirection: "row", gap: 10, marginTop: 12 },
-  emptyAddEventBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: "#F47B25" },
+  emptyAddEventBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, paddingVertical: 10, borderRadius: theme.radius.control, backgroundColor: theme.colors.accent.primary },
   emptyAddEventText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
-  emptyAddTaskBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: theme.colors.text.primary },
+  emptyAddTaskBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: theme.radius.control, backgroundColor: theme.colors.text.primary },
   emptyAddTaskText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
-  eventModalContent: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 20, margin: 20, gap: 12, borderWidth: 1, borderColor: theme.colors.border.subtle },
+  eventModalContent: { backgroundColor: "#FFFFFF", borderRadius: theme.radius.sheet, padding: 20, margin: 20, gap: 12, borderWidth: 1, borderColor: theme.colors.border.subtle },
   eventModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   eventModalTitle: { fontSize: 18, fontWeight: "800", color: theme.colors.text.primary },
   eventModalSubtitle: { fontSize: 12, color: theme.colors.text.secondary, marginTop: -4 },
-  eventInput: { backgroundColor: "#F8FAFC", borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border.subtle, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, color: theme.colors.text.primary },
+  eventInput: { backgroundColor: "#F8FAFC", borderRadius: theme.radius.control, borderWidth: 1, borderColor: theme.colors.border.subtle, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, color: theme.colors.text.primary },
   eventDurationRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 },
   eventDurationLabel: { fontSize: 13, color: theme.colors.text.secondary, fontWeight: "600" },
-  eventDurationInput: { width: 70, backgroundColor: "#F8FAFC", borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border.subtle, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, color: theme.colors.text.primary, textAlign: "center" },
+  eventDurationInput: { width: 70, backgroundColor: "#F8FAFC", borderRadius: theme.radius.control, borderWidth: 1, borderColor: theme.colors.border.subtle, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, color: theme.colors.text.primary, textAlign: "center" },
   eventModalActions: { marginTop: 6 },
-  saveEventBtn: { backgroundColor: "#F47B25", paddingVertical: 12, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  saveEventBtn: { backgroundColor: theme.colors.accent.primary, minHeight: 48, borderRadius: theme.radius.control, alignItems: "center", justifyContent: "center" },
   saveEventText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
 });

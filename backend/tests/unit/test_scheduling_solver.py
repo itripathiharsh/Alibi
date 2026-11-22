@@ -189,7 +189,9 @@ def test_cpsat_solver_executes_and_reports_cpsat_status() -> None:
     for p in result["proposals"]:
         start = datetime.fromisoformat(p["start_at"])
         end = datetime.fromisoformat(p["end_at"])
-        assert not (start < lunch_e and end > lunch_s), f"CP-SAT block {p} overlaps with fixed event"
+        assert not (start < lunch_e and end > lunch_s), (
+            f"CP-SAT block {p} overlaps with fixed event"
+        )
         assert len(p["reasons"]) >= 1
 
     # Hard deadline check for task-cp-1: must finish <= 12:00
@@ -214,3 +216,32 @@ def test_cpsat_solver_respects_explicit_greedy_override() -> None:
     assert result["solver_status"] == "greedy"
     assert len(result["proposals"]) == 1
 
+
+def test_regression_KI_028_cpsat_schedules_task_when_first_free_slot_is_far_away() -> None:
+    """Regression: with a Sunday-night horizon and weekends off, the first slot is Monday 09:00
+    (~1,755 minutes away). The old objective charged 1 per minute of delay but only 1,000 for
+    dropping a priority-4 task, so CP-SAT reported "optimal" while scheduling nothing."""
+    solver = SchedulingSolver()
+    snapshot = {
+        "horizon_start": "2026-11-21T22:15:00Z",  # Sunday 03:45 in Asia/Kolkata
+        "horizon_end": "2026-11-28T22:15:00Z",
+        "timezone": "Asia/Kolkata",
+        "tasks": [
+            {
+                "id": "task-far-1",
+                "title": "Finalize Q4 presentation slides",
+                "priority": 4,
+                "remaining_min": 60,
+                "deadline_at": None,
+            }
+        ],
+        "blocked_intervals": [],
+    }
+
+    result = solver.solve(snapshot)
+
+    assert result["solver_status"] in ("cpsat_optimal", "cpsat_feasible")
+    assert result["unscheduled"] == []
+    assert len(result["proposals"]) == 1
+    start = datetime.fromisoformat(result["proposals"][0]["start_at"])
+    assert start.weekday() < 5, "must land on a working weekday"

@@ -102,6 +102,26 @@ DEADLINE_PREFIX_PATTERN = re.compile(
     r"\b(?:by|before|due|until|on|at|deadline:?)\s+", re.IGNORECASE
 )
 
+# Hinglish vocabulary (FR-TASK-003, brain dump). Times follow the same workplace
+# conventions as the English rules: subah 09:00, dopahar 14:00, shaam 18:00, raat 21:00.
+_HI_DAY = r"(?:aaj|kal|parso|parson)"
+_HI_PART = r"(?:subah?|savere|dopahar|sha+m|raat)"
+_HI_HOUR = r"\d{1,2}(?::\d{2})?\s*baje"
+_HI_END = r"(?:ko|tak|se\s+pehle)"
+HINGLISH_DEADLINE_PATTERN = (
+    r"\b(?:"
+    r"(?:is\s+|iss\s+)?(?:week|hafte|hafta)\s+ke\s+(?:end|aakhir|ant)\s+(?:tak|se\s+pehle)"
+    r"|weekend\s+(?:tak|se\s+pehle)"
+    r"|agle\s+(?:hafte|week)"
+    rf"|{_HI_DAY}(?:\s+{_HI_PART})?(?:\s+{_HI_HOUR})?(?:\s+{_HI_END})?"
+    rf"|{_HI_PART}(?:\s+{_HI_HOUR})?\s+{_HI_END}"
+    rf"|{_HI_PART}\s+{_HI_HOUR}"
+    rf"|{_HI_HOUR}(?:\s+{_HI_END})?"
+    r")\b"
+)
+_HI_PART_HOURS = {"subah": 9, "suba": 9, "savere": 9, "dopahar": 14, "shaam": 18, "raat": 21}
+HARD_DEADLINE_WORDS = re.compile(r"\b(?:tak|pehle)\b", re.IGNORECASE)
+
 
 class RulesParser:
     """Deterministic, offline rules-based extractor with Indian DMY date preference."""
@@ -209,8 +229,8 @@ class RulesParser:
             r"\b(?:eod|end of day|tonight|tomorrow(?:\s+(?:morning|afternoon|evening|night|\d{1,2}(?::\d{2})?\s*(?:am|pm)?))?|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week)|(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+(?:morning|afternoon|evening|night|\d{1,2}(?::\d{2})?\s*(?:am|pm)?))\b",
             # explicit date: "15th nov", "25 dec 5pm", "15/11/2026"
             r"\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+\d{4})?(?:\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?\b",
-            # Hinglish temporal phrases
-            r"\b(?:kal\s+(?:shaam|subah|raat|dopahar)(?:\s+tak)?|agle\s+hafte|aaj\s+raat)\b",
+            # Hinglish temporal phrases ("kal shaam tak", "shaam ko", "week ke end tak")
+            HINGLISH_DEADLINE_PATTERN,
         ]
 
         for pat in patterns:
@@ -219,6 +239,7 @@ class RulesParser:
                 kind = (
                     "hard"
                     if re.match(r"^(?:by|before|due|until|deadline)", phrase, re.IGNORECASE)
+                    or HARD_DEADLINE_WORDS.search(phrase)
                     else "soft"
                 )
                 dt = self._resolve_datetime(phrase, ref_time, tz_name)
@@ -249,6 +270,10 @@ class RulesParser:
         """Parse phrase with dateparser or custom overrides."""
         lower = phrase.lower().strip()
         clean_phrase = DEADLINE_PREFIX_PATTERN.sub("", lower).strip()
+
+        hinglish = self._resolve_hinglish(clean_phrase, ref_time)
+        if hinglish is not None:
+            return hinglish
 
         # Custom overrides for Indian / standard workplace vernacular
         # Hinglish mappings
@@ -382,6 +407,63 @@ class RulesParser:
             return cast(datetime, parsed)
 
         return None
+
+    def _resolve_hinglish(self, phrase: str, ref_time: datetime) -> datetime | None:
+        """Resolve Hinglish day/part-of-day phrases. Returns None when not Hinglish."""
+        clean = re.sub(r"\s+", " ", phrase).strip()
+        if re.search(r"\bagle\s+(?:hafte|week)\b", clean):
+            return None  # handled by the "agle hafte" rule below (Monday 09:00)
+
+        def end_of_today() -> datetime:
+            return ref_time.replace(hour=23, minute=59, second=0, microsecond=0)
+
+        week_end = re.search(r"\b(?:week|hafte|hafta)\s+ke\s+(?:end|aakhir|ant)\b", clean)
+        before_weekend = re.search(r"\bweekend\s+(?:tak|se\s+pehle)\b", clean)
+        if week_end or before_weekend:
+            # "week ke end tak" = Sunday 18:00; "weekend tak" = before the weekend, Friday 18:00.
+            target_weekday = 6 if week_end else 4
+            days_ahead = (target_weekday - ref_time.weekday()) % 7
+            target = (ref_time + timedelta(days=days_ahead)).replace(
+                hour=18, minute=0, second=0, microsecond=0
+            )
+            return target if target > ref_time else end_of_today()
+
+        day_match = re.search(r"\b(aaj|kal|parso|parson)\b", clean)
+        part_match = re.search(r"\b(subah?|savere|dopahar|sha+m|raat)\b", clean)
+        hour_match = re.search(r"\b(\d{1,2})(?::(\d{2}))?\s*baje\b", clean)
+        if not (day_match or part_match or hour_match):
+            return None
+
+        offset = (
+            {"aaj": 0, "kal": 1, "parso": 2, "parson": 2}[day_match.group(1)] if day_match else 0
+        )
+        part = part_match.group(1) if part_match else None
+        if part is not None and re.fullmatch(r"sha+m", part):
+            part = "shaam"
+
+        if hour_match:
+            hour = int(hour_match.group(1))
+            minute = int(hour_match.group(2) or 0)
+            if hour > 23 or minute > 59:
+                return None
+            if part in ("dopahar", "shaam", "raat") and hour < 12:
+                hour += 12
+            elif part is None and 1 <= hour <= 7:
+                hour += 12  # "5 baje" without subah means 17:00 in everyday usage
+        else:
+            hour = _HI_PART_HOURS.get(part, 18) if part else 18
+            minute = 0
+
+        target = (ref_time + timedelta(days=offset)).replace(
+            hour=hour, minute=minute, second=0, microsecond=0
+        )
+        if target <= ref_time:
+            if day_match:
+                # "aaj" stays today even when the usual hour has passed.
+                return end_of_today() if offset == 0 else target
+            # A bare "subah ko" said in the afternoon means the next morning.
+            target += timedelta(days=1)
+        return target
 
     def _clean_title(self, raw: str, removed_spans: list[tuple[int, int]]) -> str:
         """Strip matched spans and clean punctuation and extra whitespace."""

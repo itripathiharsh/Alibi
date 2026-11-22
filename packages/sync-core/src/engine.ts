@@ -5,6 +5,9 @@ import type {
   SyncStorageAdapter,
 } from './types.js';
 
+/** Safety bound so a misbehaving server cannot keep one sync cycle running forever. */
+const MAX_PULL_PAGES_PER_CYCLE = 50;
+
 export class SyncEngine {
   private adapter: SyncStorageAdapter;
   private api: SyncApiClient;
@@ -96,6 +99,7 @@ export class SyncEngine {
         ...(bootstrapData.categories as Record<string, unknown>[]).map((item) => ({ ...item, entity_type: 'category' })),
         ...(bootstrapData.projects as Record<string, unknown>[]).map((item) => ({ ...item, entity_type: 'project' })),
         ...(bootstrapData.tags as Record<string, unknown>[]).map((item) => ({ ...item, entity_type: 'tag' })),
+        ...((bootstrapData.notes ?? []) as Record<string, unknown>[]).map((item) => ({ ...item, entity_type: 'vault_note' })),
       ]);
       await this.adapter.saveSyncState({
         server_epoch: pullResult.server_epoch,
@@ -104,16 +108,24 @@ export class SyncEngine {
       return pullResult.changes.length;
     }
 
-    if (pullResult.changes.length > 0) {
-      await this.adapter.applyRemoteChanges(pullResult.changes);
+    // Page through the server log until it reports no more rows. The cursor is saved after
+    // each page, so an interrupted cycle resumes where it stopped and never skips changes.
+    let page = pullResult;
+    let pulled = 0;
+    for (let pageCount = 0; pageCount < MAX_PULL_PAGES_PER_CYCLE; pageCount += 1) {
+      if (page.changes.length > 0) {
+        await this.adapter.applyRemoteChanges(page.changes);
+        pulled += page.changes.length;
+      }
+      await this.adapter.saveSyncState({
+        server_epoch: page.server_epoch,
+        last_seq: page.next_seq,
+      });
+      if (!page.has_more || page.next_seq <= page.since_seq) break;
+      page = await this.api.pull(page.next_seq);
     }
 
-    await this.adapter.saveSyncState({
-      server_epoch: pullResult.server_epoch,
-      last_seq: pullResult.next_seq,
-    });
-
-    return pullResult.changes.length;
+    return pulled;
   }
 }
 

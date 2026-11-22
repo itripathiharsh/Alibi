@@ -213,7 +213,9 @@ async def test_invite_lifecycle_expiry_and_revocation(
     org = await service.create_organization(owner_id, "Invite Security Org")
 
     # 1. Create and revoke an invite
-    invite, invite_url = await service.create_invite(owner_id, org.id, role="member", expires_in_days=3)
+    invite, invite_url = await service.create_invite(
+        owner_id, org.id, role="member", expires_in_days=3
+    )
     token = invite_url.rsplit("/", 1)[-1]
 
     # Preview before revocation
@@ -221,7 +223,9 @@ async def test_invite_lifecycle_expiry_and_revocation(
     assert preview[2] is True  # active
 
     # Revoke via API
-    revoke_res = await auth_client.post(f"/api/v1/organizations/{org.id}/invites/{invite.id}/revoke")
+    revoke_res = await auth_client.post(
+        f"/api/v1/organizations/{org.id}/invites/{invite.id}/revoke"
+    )
     assert revoke_res.status_code == 204
 
     # Preview after revocation
@@ -243,20 +247,26 @@ async def test_invite_lifecycle_expiry_and_revocation(
 
     accept_res = await auth_client.post(
         f"/api/v1/organization-invites/{token}/accept",
-        headers={"Authorization": f"Bearer {create_access_token(user_id=invitee_id, device_id=invitee_device_id)}"},
+        headers={
+            "Authorization": f"Bearer {create_access_token(user_id=invitee_id, device_id=invitee_device_id)}"
+        },
         json={"professional_sharing_consent": True, "consent_version": CONSENT_VERSION},
     )
     assert accept_res.status_code == 409
 
     # 2. Expired invite
-    invite_exp, exp_url = await service.create_invite(owner_id, org.id, role="member", expires_in_days=1)
+    invite_exp, exp_url = await service.create_invite(
+        owner_id, org.id, role="member", expires_in_days=1
+    )
     invite_exp.expires_at = utc_now() - timedelta(minutes=10)
     await db_session.flush()
 
     exp_token = exp_url.rsplit("/", 1)[-1]
     exp_accept_res = await auth_client.post(
         f"/api/v1/organization-invites/{exp_token}/accept",
-        headers={"Authorization": f"Bearer {create_access_token(user_id=invitee_id, device_id=invitee_device_id)}"},
+        headers={
+            "Authorization": f"Bearer {create_access_token(user_id=invitee_id, device_id=invitee_device_id)}"
+        },
         json={"professional_sharing_consent": True, "consent_version": CONSENT_VERSION},
     )
     assert exp_accept_res.status_code == 409
@@ -455,4 +465,3 @@ async def test_consent_grant_and_revocation_endpoints(
     grant_res = await auth_client.post(f"/api/v1/organizations/{org.id}/consent")
     assert grant_res.status_code == 200
     assert grant_res.json()["professional_sharing_consent"] is True
-

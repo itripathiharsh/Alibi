@@ -19,8 +19,41 @@ export interface LocalTask {
   tags: string[];
   subtasks?: { id: string; title: string; completed: boolean }[];
   created_at?: string;
+  completed_at?: string | null;
   origin?: string;
   server_seq?: number;
+}
+
+type LocalTasksListener = (userId: string) => void;
+const localTasksListeners = new Set<LocalTasksListener>();
+
+/** Subscribe to "a task in the on-device cache changed" (widget, check-ins). */
+export function onLocalTasksChanged(listener: LocalTasksListener): () => void {
+  localTasksListeners.add(listener);
+  return () => { localTasksListeners.delete(listener); };
+}
+
+function notifyLocalTasksChanged(userId: string): void {
+  for (const listener of localTasksListeners) {
+    try { listener(userId); } catch { /* a listener must never break a task write */ }
+  }
+}
+
+/** All cached tasks for the user, including completed ones. */
+export async function getAllLocalTasks(userId: string): Promise<LocalTask[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ data_json: string }>(
+    "SELECT data_json FROM local_tasks WHERE user_id = ?",
+    userId,
+  );
+  return rows.flatMap((row) => {
+    try {
+      const task = normalizeTask(JSON.parse(row.data_json) as Record<string, unknown>);
+      return task ? [task] : [];
+    } catch {
+      return [];
+    }
+  });
 }
 
 let database: SQLite.SQLiteDatabase | null = null;
@@ -122,6 +155,35 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
           resolved INTEGER NOT NULL DEFAULT 0,
           created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS local_projects (
+          user_id TEXT NOT NULL,
+          id TEXT NOT NULL,
+          data_json TEXT NOT NULL,
+          version INTEGER NOT NULL DEFAULT 1,
+          server_seq INTEGER NOT NULL DEFAULT 0,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (user_id, id)
+        );
+        CREATE TABLE IF NOT EXISTS local_user_preferences (
+          user_id TEXT PRIMARY KEY,
+          work_start_time TEXT NOT NULL DEFAULT '09:00',
+          work_end_time TEXT NOT NULL DEFAULT '18:00',
+          planning_style TEXT NOT NULL DEFAULT 'priority',
+          learning_paused INTEGER NOT NULL DEFAULT 0,
+          timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
+          primary_goal TEXT,
+          updated_at TEXT NOT NULL
+        );
+        DROP TABLE IF EXISTS local_subscriptions;
+        CREATE TABLE IF NOT EXISTS local_integrations (
+          user_id TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'disconnected',
+          account_email TEXT,
+          scopes_json TEXT,
+          last_synced_at TEXT,
+          PRIMARY KEY (user_id, provider)
+        );
         CREATE TABLE IF NOT EXISTS offline_meta (
           key TEXT PRIMARY KEY,
           value TEXT NOT NULL
@@ -205,6 +267,7 @@ function normalizeTask(value: Record<string, unknown>): LocalTask | null {
     workspace_id: typeof value.workspace_id === "string" ? value.workspace_id : null,
     version: typeof value.version === "number" ? value.version : 1,
     created_at: typeof value.created_at === "string" ? value.created_at : undefined,
+    completed_at: typeof value.completed_at === "string" ? value.completed_at : null,
   };
 }
 
@@ -222,6 +285,7 @@ async function saveTask(db: SQLite.SQLiteDatabase, userId: string, task: LocalTa
     typeof task.server_seq === "number" ? task.server_seq : 0,
     new Date().toISOString(),
   );
+  notifyLocalTasksChanged(userId);
 }
 
 async function enqueue(
@@ -317,6 +381,9 @@ export async function createTaskOffline(userId: string, input: {
   status?: LocalTask["status"];
   deadline_at?: string | null;
   origin?: string;
+  estimate_user_min?: number | null;
+  estimate_final_min?: number | null;
+  category_id?: string | null;
 }): Promise<LocalTask> {
   const db = await getDatabase();
   const task: LocalTask = {
@@ -325,10 +392,11 @@ export async function createTaskOffline(userId: string, input: {
     status: input.status ?? "pending",
     priority: null,
     deadline_at: input.deadline_at ?? null,
-    estimate_user_min: null,
-    estimate_final_min: null,
+    estimate_user_min: input.estimate_user_min ?? null,
+    estimate_final_min: input.estimate_final_min ?? null,
     actual_min: 0,
     reschedule_count: 0,
+    category_id: input.category_id ?? null,
     tags: [],
     subtasks: [],
     origin: input.origin ?? "manual",
@@ -342,6 +410,9 @@ export async function createTaskOffline(userId: string, input: {
       status: task.status,
       deadline_at: task.deadline_at,
       origin: task.origin,
+      estimate_user_min: task.estimate_user_min,
+      estimate_final_min: task.estimate_final_min,
+      category_id: task.category_id,
     }, null);
     await updateTaskViews(db, userId, task.id, task, true);
   });
@@ -365,6 +436,11 @@ export async function updateTaskOffline(
     const current = normalizeTask(JSON.parse(row.data_json) as Record<string, unknown>);
     if (!current) return;
     updated = { ...current, ...patch };
+    if (patch.status === "completed" && current.status !== "completed" && patch.completed_at === undefined) {
+      updated.completed_at = new Date().toISOString();
+    } else if (patch.status !== undefined && patch.status !== "completed") {
+      updated.completed_at = null;
+    }
     await saveTask(db, userId, updated);
     const payload: Record<string, unknown> = {};
     if (patch.status !== undefined) payload.status = patch.status;
@@ -441,12 +517,14 @@ export async function cacheRunningTimers(
       );
     }
   });
+  notifyLocalTasksChanged(userId);
   return getLocalTimers(userId);
 }
 
 export async function removeLocalTimer(userId: string, timerId: string): Promise<void> {
   const db = await getDatabase();
   await db.runAsync("DELETE FROM local_timers WHERE user_id = ? AND id = ?", userId, timerId);
+  notifyLocalTasksChanged(userId);
 }
 
 export async function cacheTaskTimeEntries(
@@ -523,6 +601,7 @@ export async function stopTaskTimerOffline(userId: string, timerId: string): Pro
     if (task) await updateTaskOffline(userId, timer.task_id, { actual_min: task.actual_min + duration });
   }
   await db.runAsync("DELETE FROM local_timers WHERE user_id = ? AND id = ?", userId, timerId);
+  notifyLocalTasksChanged(userId);
 }
 
 class ExpoSyncAdapter implements SyncStorageAdapter {
@@ -638,7 +717,29 @@ class ExpoSyncAdapter implements SyncStorageAdapter {
           continue;
         }
 
-        // 3. Tasks
+        // 3. Projects
+        if (entityType === "project") {
+          const id = String(value.id);
+          if (value.deleted === true) {
+            await db.runAsync("DELETE FROM local_projects WHERE user_id=? AND id=?", this.userId, id);
+          } else {
+            await db.runAsync(
+              `INSERT INTO local_projects(user_id, id, data_json, version, server_seq, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(user_id, id) DO UPDATE SET
+               data_json=excluded.data_json, version=excluded.version, server_seq=excluded.server_seq, updated_at=excluded.updated_at`,
+              this.userId,
+              id,
+              JSON.stringify(value),
+              Number(value.version || 1),
+              Number(value.server_seq || 0),
+              new Date().toISOString(),
+            );
+          }
+          continue;
+        }
+
+        // 4. Tasks
         if (value.entity_type && value.entity_type !== "task") continue;
         const task = normalizeTask(value);
         if (!task) continue;
@@ -650,6 +751,7 @@ class ExpoSyncAdapter implements SyncStorageAdapter {
         if (pending) continue;
         if (value.deleted === true) {
           await db.runAsync("DELETE FROM local_tasks WHERE user_id=? AND id=?", this.userId, task.id);
+          notifyLocalTasksChanged(this.userId);
           continue;
         }
         await saveTask(db, this.userId, task);
@@ -779,6 +881,7 @@ export async function deleteTaskOffline(userId: string, taskId: string): Promise
       taskId,
     );
     await db.runAsync("DELETE FROM local_tasks WHERE user_id = ? AND id = ?", userId, taskId);
+    notifyLocalTasksChanged(userId);
     await enqueue(db, userId, taskId, "delete", {}, row?.version ?? null, "task");
     const rows = await db.getAllAsync<{ view_key: string; data_json: string }>(
       "SELECT view_key, data_json FROM task_views WHERE user_id = ?",
@@ -1030,10 +1133,40 @@ export async function migrateOfflineUserToAccount(newUserId: string): Promise<vo
     await db.runAsync("UPDATE local_timers SET user_id = ? WHERE user_id = 'local_user'", newUserId);
     await db.runAsync("UPDATE local_time_entries SET user_id = ? WHERE user_id = 'local_user'", newUserId);
 
-    // 6. Sync Outbox - update user_id so pending items get pushed for the new user!
+    // 6. Projects
+    const localProjects = await db.getAllAsync<{ id: string; data_json: string; version: number; server_seq: number; updated_at: string }>(
+      "SELECT id, data_json, version, server_seq, updated_at FROM local_projects WHERE user_id = 'local_user'",
+    );
+    for (const proj of localProjects) {
+      await db.runAsync(
+        `INSERT INTO local_projects(user_id, id, data_json, version, server_seq, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, id) DO UPDATE SET
+           data_json = excluded.data_json, version = excluded.version, updated_at = excluded.updated_at`,
+        newUserId, proj.id, proj.data_json, proj.version, proj.server_seq, proj.updated_at,
+      );
+    }
+    await db.runAsync("DELETE FROM local_projects WHERE user_id = 'local_user'");
+
+    // 7. User Preferences & Integrations
+    await db.runAsync(
+      `INSERT INTO local_user_preferences(user_id, work_start_time, work_end_time, planning_style, learning_paused, timezone, primary_goal, updated_at)
+       SELECT ?, work_start_time, work_end_time, planning_style, learning_paused, timezone, primary_goal, updated_at
+       FROM local_user_preferences WHERE user_id = 'local_user'
+       ON CONFLICT(user_id) DO UPDATE SET
+         work_start_time = excluded.work_start_time, work_end_time = excluded.work_end_time,
+         planning_style = excluded.planning_style, learning_paused = excluded.learning_paused,
+         timezone = excluded.timezone, primary_goal = excluded.primary_goal, updated_at = excluded.updated_at`,
+      newUserId,
+    );
+    await db.runAsync("DELETE FROM local_user_preferences WHERE user_id = 'local_user'");
+
+    await db.runAsync("UPDATE local_integrations SET user_id = ? WHERE user_id = 'local_user'", newUserId);
+
+    // 8. Sync Outbox - update user_id so pending items get pushed for the new user!
     await db.runAsync("UPDATE sync_outbox SET user_id = ? WHERE user_id = 'local_user'", newUserId);
 
-    // 7. Sync Conflicts
+    // 9. Sync Conflicts
     await db.runAsync("UPDATE sync_conflicts SET user_id = ? WHERE user_id = 'local_user'", newUserId);
   });
 }
@@ -1069,4 +1202,319 @@ export async function resolveSyncConflict(userId: string, conflictId: string, re
     );
   }
   await db.runAsync("UPDATE sync_conflicts SET resolved=1 WHERE user_id=? AND id=?", userId, conflictId);
+}
+
+// -------------------------------------------------------------
+// MODULE D: Project Intelligence Helpers (Offline-First)
+// -------------------------------------------------------------
+
+export interface LocalProjectRecord {
+  id: string;
+  name: string;
+  description?: string;
+  objective?: string;
+  status: "active" | "paused" | "done" | "archived";
+  color: string;
+  target_date?: string | null;
+  tasks_count?: number;
+  completed_tasks_count?: number;
+  health_status?: "on_track" | "at_risk" | "needs_attention" | "completed";
+  version?: number;
+  server_seq?: number;
+  updated_at?: string;
+}
+
+export async function getLocalProjects(userId: string): Promise<LocalProjectRecord[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ data_json: string }>(
+    "SELECT data_json FROM local_projects WHERE user_id=? ORDER BY updated_at DESC",
+    userId,
+  );
+  const projects = rows.map((r) => JSON.parse(r.data_json) as LocalProjectRecord);
+
+  // Calculate project task counts & health indicators dynamically from local_tasks
+  const taskRows = await db.getAllAsync<{ data_json: string }>(
+    "SELECT data_json FROM local_tasks WHERE user_id=?",
+    userId,
+  );
+  const tasks = taskRows.map((r) => {
+    try {
+      return JSON.parse(r.data_json) as { project_id?: string; status?: string; deadline_at?: string };
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+
+  const nowMs = Date.now();
+  return projects.map((p) => {
+    const projectTasks = tasks.filter((t) => t?.project_id === p.id);
+    const total = projectTasks.length;
+    const completed = projectTasks.filter((t) => t?.status === "completed").length;
+    const overdue = projectTasks.filter((t) => t?.status !== "completed" && t?.deadline_at && Date.parse(t.deadline_at) < nowMs).length;
+
+    let health: "on_track" | "at_risk" | "needs_attention" | "completed" = "on_track";
+    if (p.status === "done" || (total > 0 && completed === total)) {
+      health = "completed";
+    } else if (overdue > 0) {
+      health = "needs_attention";
+    } else if (p.target_date && Date.parse(p.target_date) < nowMs && completed < total) {
+      health = "at_risk";
+    }
+
+    return {
+      ...p,
+      tasks_count: total,
+      completed_tasks_count: completed,
+      health_status: health,
+    };
+  });
+}
+
+export async function saveLocalProject(
+  userId: string,
+  project: Partial<LocalProjectRecord> & { name: string; id?: string },
+): Promise<LocalProjectRecord> {
+  const db = await getDatabase();
+  const id = String(project.id || makeOfflineId());
+  const now = new Date().toISOString();
+  const full: LocalProjectRecord = {
+    id,
+    name: project.name.trim(),
+    description: project.description?.trim(),
+    objective: project.objective?.trim(),
+    status: project.status || "active",
+    color: project.color || "#FF741F",
+    target_date: project.target_date || null,
+    version: Number(project.version || 1),
+    server_seq: Number(project.server_seq || 0),
+    updated_at: now,
+  };
+
+  await db.runAsync(
+    `INSERT INTO local_projects(user_id, id, data_json, version, server_seq, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, id) DO UPDATE SET
+     data_json=excluded.data_json, version=excluded.version, updated_at=excluded.updated_at`,
+    userId,
+    id,
+    JSON.stringify(full),
+    full.version || 1,
+    full.server_seq || 0,
+    now,
+  );
+
+  await enqueue(
+    db,
+    userId,
+    id,
+    "create",
+    full as unknown as Record<string, unknown>,
+    full.version || 1,
+    "project",
+  );
+
+  return full;
+}
+
+export async function deleteLocalProject(userId: string, projectId: string): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    const row = await db.getFirstAsync<{ version: number }>(
+      "SELECT version FROM local_projects WHERE user_id = ? AND id = ?",
+      userId,
+      projectId,
+    );
+    await db.runAsync("DELETE FROM local_projects WHERE user_id = ? AND id = ?", userId, projectId);
+    await enqueue(db, userId, projectId, "delete", {}, row?.version ?? null, "project");
+  });
+}
+
+// -------------------------------------------------------------
+// MODULE C: Vault Note Updating & Pinning
+// -------------------------------------------------------------
+
+export async function updateLocalNote(
+  userId: string,
+  noteId: string,
+  updates: Record<string, unknown>,
+): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    const existing = await db.getFirstAsync<{ data_json: string; version: number }>(
+      "SELECT data_json, version FROM local_notes WHERE user_id = ? AND id = ?",
+      userId,
+      noteId,
+    );
+    if (!existing) return;
+    const current = JSON.parse(existing.data_json) as Record<string, unknown>;
+    const updated = {
+      ...current,
+      ...updates,
+      version: (existing.version || 1) + 1,
+      updated_at: new Date().toISOString(),
+    };
+
+    await db.runAsync(
+      "UPDATE local_notes SET data_json = ?, version = ?, updated_at = ? WHERE user_id = ? AND id = ?",
+      JSON.stringify(updated),
+      updated.version,
+      updated.updated_at,
+      userId,
+      noteId,
+    );
+
+    await enqueue(db, userId, noteId, "update", updated, updated.version, "vault_note");
+  });
+}
+
+// -------------------------------------------------------------
+// MODULE I: Onboarding & User Preferences
+// -------------------------------------------------------------
+
+export interface LocalUserPreferences {
+  work_start_time: string;
+  work_end_time: string;
+  planning_style: "priority" | "time_blocking";
+  learning_paused: boolean;
+  timezone: string;
+  primary_goal: string | null;
+}
+
+export async function getLocalUserPreferences(userId: string): Promise<LocalUserPreferences> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{
+    work_start_time: string;
+    work_end_time: string;
+    planning_style: string;
+    learning_paused: number;
+    timezone: string;
+    primary_goal: string | null;
+  }>("SELECT * FROM local_user_preferences WHERE user_id = ?", userId);
+
+  if (!row) {
+    return {
+      work_start_time: "09:00",
+      work_end_time: "18:00",
+      planning_style: "priority",
+      learning_paused: false,
+      timezone: "Asia/Kolkata",
+      primary_goal: null,
+    };
+  }
+
+  return {
+    work_start_time: row.work_start_time || "09:00",
+    work_end_time: row.work_end_time || "18:00",
+    planning_style: (row.planning_style === "time_blocking" ? "time_blocking" : "priority"),
+    learning_paused: Boolean(row.learning_paused),
+    timezone: row.timezone || "Asia/Kolkata",
+    primary_goal: row.primary_goal,
+  };
+}
+
+export async function saveLocalUserPreferences(
+  userId: string,
+  prefs: Partial<LocalUserPreferences>,
+): Promise<void> {
+  const db = await getDatabase();
+  const current = await getLocalUserPreferences(userId);
+  const next = { ...current, ...prefs };
+  const now = new Date().toISOString();
+
+  await db.runAsync(
+    `INSERT INTO local_user_preferences(user_id, work_start_time, work_end_time, planning_style, learning_paused, timezone, primary_goal, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET
+       work_start_time = excluded.work_start_time,
+       work_end_time = excluded.work_end_time,
+       planning_style = excluded.planning_style,
+       learning_paused = excluded.learning_paused,
+       timezone = excluded.timezone,
+       primary_goal = excluded.primary_goal,
+       updated_at = excluded.updated_at`,
+    userId,
+    next.work_start_time,
+    next.work_end_time,
+    next.planning_style,
+    next.learning_paused ? 1 : 0,
+    next.timezone,
+    next.primary_goal,
+    now,
+  );
+}
+
+// -------------------------------------------------------------
+// MODULE G: Connected ALIBI (Integrations Hub)
+// -------------------------------------------------------------
+
+export interface LocalIntegrationRecord {
+  provider: "google_calendar" | "gmail" | "google_drive" | "github";
+  status: "connected" | "disconnected" | "needs_credentials" | "syncing" | "error";
+  account_email?: string;
+  scopes?: string[];
+  last_synced_at?: string;
+}
+
+export async function getLocalIntegrations(userId: string): Promise<LocalIntegrationRecord[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{
+    provider: string;
+    status: string;
+    account_email: string | null;
+    scopes_json: string | null;
+    last_synced_at: string | null;
+  }>("SELECT * FROM local_integrations WHERE user_id = ?", userId);
+
+  const existingMap = new Map(rows.map((r) => [r.provider, r]));
+  const providers: Array<"google_calendar" | "gmail" | "google_drive" | "github"> = [
+    "google_calendar",
+    "gmail",
+    "google_drive",
+    "github",
+  ];
+
+  return providers.map((p) => {
+    const record = existingMap.get(p);
+    return {
+      provider: p,
+      status: (record?.status as LocalIntegrationRecord["status"]) || "disconnected",
+      account_email: record?.account_email || undefined,
+      scopes: record?.scopes_json ? JSON.parse(record.scopes_json) : [],
+      last_synced_at: record?.last_synced_at || undefined,
+    };
+  });
+}
+
+export async function saveLocalIntegration(
+  userId: string,
+  integration: LocalIntegrationRecord,
+): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `INSERT INTO local_integrations(user_id, provider, status, account_email, scopes_json, last_synced_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, provider) DO UPDATE SET
+       status = excluded.status,
+       account_email = excluded.account_email,
+       scopes_json = excluded.scopes_json,
+       last_synced_at = excluded.last_synced_at`,
+    userId,
+    integration.provider,
+    integration.status,
+    integration.account_email || null,
+    JSON.stringify(integration.scopes || []),
+    integration.last_synced_at || new Date().toISOString(),
+  );
+}
+
+export async function disconnectLocalIntegration(
+  userId: string,
+  provider: string,
+): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    "UPDATE local_integrations SET status='disconnected', account_email=NULL, last_synced_at=NULL WHERE user_id=? AND provider=?",
+    userId,
+    provider,
+  );
 }

@@ -16,7 +16,7 @@ import {
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { Check, CheckCircle2, CloudOff, Info, Square, CheckSquare, X } from "lucide-react-native";
-import { loginMobile, saveUserProfile } from "../lib/auth";
+import { loginMobile, saveUserProfile, setCachedIsOffline } from "../lib/auth";
 import theme from "../lib/theme";
 
 const SKIP_OFFLINE_INTRO_KEY = "alibi_skip_offline_intro_v1";
@@ -38,6 +38,7 @@ export default function MobileLoginScreen() {
         // Storage fail should not block offline usage
       }
     }
+    setCachedIsOffline(true);
     await saveUserProfile({
       id: "local_user",
       email: "local@device.user",

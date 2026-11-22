@@ -3,4 +3,13 @@
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
   <string name="quick_capture_widget_description">Capture a task quickly by typing or voice.</string>
+  <string name="today_ring_widget_description">Progress for today. Tap for quick actions.</string>
+  <string name="shortcut_add_task_short">Add Task</string>
+  <string name="shortcut_add_task_long">Add a new task</string>
+  <string name="shortcut_capture_idea_short">Capture Idea</string>
+  <string name="shortcut_capture_idea_long">Capture an idea into Vault</string>
+  <string name="shortcut_voice_capture_short">Voice Capture</string>
+  <string name="shortcut_voice_capture_long">Record and transcribe voice note or task</string>
+  <string name="shortcut_calendar_short">Calendar</string>
+  <string name="shortcut_calendar_long">Open your calendar schedule</string>
 </resources>

@@ -7,15 +7,99 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **File**: [`ALIBI-0.1.0.apk`](./ALIBI-0.1.0.apk)
 - **Direct Download Link**: [Download ALIBI-0.1.0.apk (Raw)](https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk)
 - **Version**: `0.1.0`
-- **Build Date**: November 21, 2026
+- **Build Date**: November 22, 2026 (built from the uncommitted working tree with ADR-028)
 - **Variant**: Android release APK, Hermes Bytecode Engine (React Native 0.76 New Architecture)
-- **Signing**: Signed with the repository's current Android debug keystore. This is installable for direct distribution/testing, but it is not a Play Store production signature.
-- **SHA-256**: `60252CB36B32F152E6366027532A0FEF09B3169A6FC35A2506F53895EA9AFB82`
-- **Build verification**: `assembleRelease` succeeded; verified Hermes Bytecode (`C6 1F BC 03` header, 69.1 MB); APK v2 signature verified; includes Phase 1 Step 1 (Design Tokens Foundation) & Step 2 (Header & Canvas Unification) across all 6 tabs (`Home`, `Tasks`, `Calendar`, `Insights`, `Vault`, `Profile`), Complete Offline Mode Implementation (true offline-first operations for Tasks, Calendar, Vault, Reports, Focus, and Profile; local SQLite schema wiring; offline event & note CRUD; voice dictation; SQL-driven analytics without metrics fabrication; seamless `local_user` to cloud migration on login; "Welcome to ALIBI Offline Mode" introductory modal; offline badge & notice cards), critical Android startup crash fix (eliminated FragmentManager transaction race conditions, prevented dashboard background mounting, resolved SQLite connection pool closure), resilient offline task capture fallback for unauthenticated/offline sessions, First-Launch Intro & Feature Tour modal, Android 13+ POST_NOTIFICATIONS runtime prompt, high-importance heads-up notification channels (v2), and 125+ Short & Crunchy Zomato-style pop-culture notifications.
+- **File Size**: `69,218,793 bytes` (66.01 MB)
+- **Signing**: Signed with the repository's debug keystore, not an owner-managed release key.
+- **SHA-256**: `8B66C19DF8FF1FE4FBD46046C7E297EE6677A9F40925AB6DB044437C2FF836CE`
+
+> Includes the 2026-11-22 review fixes and ADR-028: brain dump on the Add screen, "Did it get done?" check-ins, recommendations card, and the round "ALIBI Today" home-screen widget with a quick-action menu. Not yet tested on a physical device (KI-032).
+>
+> Old build backups are no longer kept in Git (`apk/*-backup-*.apk` is ignored).
+
+---
+
+## What's New in This Build (Personal Operating System & Commercialization Master Mission)
+
+1. **Module A — AI Daily Chief of Staff Briefing**:
+   - Integrated `<ChiefOfStaffCard>` directly on the Home dashboard right beneath the greeting and habit summary banner.
+   - Computes daily workload commitments: available working window (from user habit preferences) vs. total scheduled task duration and calendar busy time.
+   - Highlights overdue task counts with a 1-tap "Reschedule to 6 PM" action.
+   - Recommends the highest-leverage next action grounded in priority and deadlines, with a direct 1-tap "Focus" button to trigger the timer.
+   - Explainability modal providing transparency into why each action was selected, adhering to the zero-hallucination contract.
+
+2. **Module B — Personal Productivity Intelligence & Onboarding Preferences**:
+   - Created `<OnboardingModal>` allowing users to configure work start/end times (default 09:00–18:00), planning style (Priorities vs Time-Blocking), primary productivity goal, and timezone.
+   - Persisted preferences to SQLite (`local_user_preferences`) and outbox for cloud sync.
+   - Added Adaptive Learning Controls to the Profile screen: users can Pause/Resume productivity learning and Reset learning profile data without affecting task history.
+
+3. **Module C — Work Memory / Second Brain (Knowledge Vault)**:
+   - Added horizontal collections filtering chips: `All Items`, `Ideas 💡`, `Meetings 📝`, `Decisions ⚖️`, `Projects 📁`.
+   - Added persistent note pinning (`is_pinned`): pinned notes automatically sort to the top of the vault list and show an orange pin badge.
+   - Added in-place note editing in the note detail modal: edit title and body, saving changes to local SQLite and the sync outbox with haptic feedback.
+   - Added category classification during note creation.
+
+4. **Module D — Project Intelligence**:
+   - Created `<ProjectManagerSheet>` and added a dedicated "Projects" shortcut tile on Home.
+   - Allows creating and managing projects with title, objective, color coding, target deadline date, and dynamic health status (`on_track`, `needs_attention`, `at_risk`, `completed`).
+   - Persisted projects to SQLite table `local_projects` with full offline support and outbox synchronization.
+
+5. **Module G — Connected ALIBI (Integrations Hub)**:
+   - Lists Google Calendar, Gmail, Google Drive and GitHub as **not available yet**. No connector, OAuth flow or sync worker exists (KI-022). The "Join Beta" waitlist button was removed on 2026-11-22 because it recorded nothing.
+
+6. **Module H — AI Assistant & Action Proposal Guardrails**:
+   - Action Proposals in Ask ALIBI: when the assistant suggests a task, a card offers `[Approve & Create]` and `[Dismiss]`. Nothing is written until the user approves.
+
+7. **Paid plans — removed 2026-11-22**: the Free/Pro/Ultra tiers, the 15-query daily AI limit and the upgrade screen were removed from the source. ALIBI is free with no paid plan; any future pricing needs an owner-approved ADR first (KI-021).
+
+---
+
+## What's New in This Build (Full Roadmap Phases 1 → 5)
+
+1. **Phase 1: Complete UI & Component Consistency Across All 6 Tabs**:
+   - **Unified Card Radii & Elevation**: Aligned all primary cards across the application to `theme.radius.card` (20px) — `todayCard`, `focusCard`, `planCard`, `progressCard`, `miniCalendarCard`, `pleCard`, `insightPanel`, `retrospectiveCard`, `summaryCard`, `identityCard`, `metricCard`, `learningCard`, `settingsCard`, `emptyCard`.
+   - **Unified Secondary Cards**: Aligned secondary content cards to `theme.radius.cardSecondary` (14px) — `taskCard`, `itemCard`, `noteCard`, `askCard`, `reportCard`, `emptyReports`, `aboutCard`.
+   - **Unified Controls & Inputs**: Aligned buttons, inputs, chips, and segmented pills to `theme.radius.control` (8px) with a minimum 48dp touch target height — `cancelBtn`, `confirmBtn`, `saveEventBtn`, `generateBtn`, `saveButton`, `eventInput`, `titleInput`, `bodyInput`, `voiceButton`, `logoutButton`, and segmented capture selectors.
+   - **Unified Bottom Sheet & Modal Radii**: Aligned all bottom sheets to `theme.radius.sheet` (24px) — `modalContent`, `detailContent`, `reviewSheet`, `eventModalContent`, `detailModal`.
+   - **Unified Brand Palette**: Completely replaced non-standard slates and oranges (`#F97316`, `#F47B25`, `#0F172A`, `#102E42`, `#64748B`, `#F1F5F9`) with canonical design tokens: Primary Orange (`#FF741F`), Primary Navy (`#0B2030`), Muted Navy (`#53657A`), Subtle Borders (`#E7EAF0`), and Canvas (`#FBF9F8`).
+
+2. **Phase 2: Quick Capture & Android App Shortcuts**:
+   - **Dual Task & Idea Capture**: `apps/mobile/src/app/capture.tsx` features an interactive segmented control (`[Task]` vs `[Idea / Note]`). Ideas route directly into the local SQLite Vault Notes system (`saveLocalNote`) with full review before saving and one-tap conversion to actionable tasks in the Vault tab.
+   - **Voice Capture Auto-Start & Dictation**: Supported query parameters `voice=1` and `mode=voice` to automatically launch speech recognition with real-time transcription, live editing, and audio cleanup.
+   - **Native Android App Shortcuts**: Configured native Android App Shortcuts in `shortcuts.xml` and `AndroidManifest.xml` accessible by long-pressing the ALIBI app icon on the home screen:
+     - **Add Task** (`alibi://capture?mode=task`)
+     - **Capture Idea** (`alibi://capture?mode=idea`)
+     - **Voice Capture** (`alibi://capture?mode=voice`)
+     - **Calendar** (`alibi://calendar`)
+
+3. **Phase 3: Core Functionality & Local SQLite Persistence**:
+   - **Local Tasks Management**: Full local CRUD with priority flags, deadlines, tags, subtasks, status toggle (`pending` ↔ `completed`), and automatic queueing into `sync_outbox`.
+   - **Offline Calendar**: Month navigation, week strip, day selection, event creation with duration, and local SQLite event storage (`local_calendar_events`).
+   - **Persistent Focus Timer**: Active focus timer state safely persisted in `local_timers` table across app restarts and process recreation. Foreground notification service and tactile haptic feedback.
+   - **Knowledge Vault**: SQLite note management (`local_notes`), search by title and body, and one-tap checklist item conversion to linked tasks (`convertNoteToTask`).
+   - **Sync Outbox & Resilience**: Coalesced operations, exponential backoff with jitter, retry safety on network reconnect, and automated migration on login (`migrateOfflineUserToAccount`).
+
+4. **Phase 4: Intelligence & Honest Grounding**:
+   - **Grounded Ask ALIBI**: Strict RAG answering grounded in user's saved SQLite tasks and notes with zero hallucination guarantee. Clear offline indicator explaining cloud model requirements while local data remains 100% accessible.
+   - **OR-Tools Scheduling Proposals**: Day plan optimization presents proposals as interactive review sheets; scheduling is never auto-applied without explicit user selection and approval.
+   - **Zero Fabricated Metrics**: Adheres strictly to AGENTS.md contract. Metrics (completion rate, time tracked, task counts) are computed directly by SQL (`getLocalAnalyticsSummary`). No LLM hallucinated numbers.
+
+5. **Phase 5: Release Verification & Quality Gates**:
+   - Monorepo typecheck passed across 6 workspace packages (`tsc --noEmit`: 0 errors).
+   - Monorepo unit tests passed (7/7 tests passed).
+   - Expo production export bundled 2929 modules into Hermes bytecode (`5.93 MB`).
+   - Gradle release assembly succeeded (`assembleRelease`: 741 tasks executed/up-to-date, BUILD SUCCESSFUL in 2m 52s).
+   - Output release APK validated: `69,150,585 bytes`, SHA-256 verified.
 
 ---
 
 ## What's New in This Build
+
+1. **Stage 1 Runtime UI Fixes (Offline State Synchronization & Modal Stability)**:
+   - **Application-Level Offline Source of Truth**: Centralized offline state management in `apps/mobile/src/lib/auth.ts` with an in-memory cached state (`_cachedIsOffline`), pub/sub event listener (`subscribeOfflineStatus`), and synchronous `useOfflineStatus()` hook. All six primary tabs (`Home`, `Tasks`, `Calendar`, `Insights`, `Vault`, `Profile`) now resolve `isOffline` synchronously on the very first frame with zero flicker, zero keystore read latency, and no temporary badge disappearance during tab navigation or Insights period changes (`Today` / `This Week` / `This Month`).
+   - **Stabilized Android Safe-Area Insets**: Guarded `BrandHeader` on Android with `Math.max(insets.top, StatusBar.currentHeight ?? 0)`, preventing header height collapse during Android dialog window destruction.
+   - **Translucent Native Window Flags on Modals**: Added `statusBarTranslucent` and `onRequestClose` to all `<Modal>` components (Quick Capture, Morning Kickoff, Evening Sunset Sweep, Event Creation, Note Detail, Tag Modal). This prevents Android from altering the activity window's system UI visibility flags, eliminating the brief clipping/jumping of Home's `OfflineNoticeCard` beneath the header.
+   - **Profile Tab Offline Support**: Extended offline coverage to `profile.tsx` with `<BrandHeader showOfflineBadge={isOffline} />` and an `<OfflineNoticeCard featureName="Profile" />`.
 
 1. **Design System Foundation & Mobile UI Unification (Phase 1, Steps 1 & 2)**:
    - **Unified Design Tokens**: Synchronized `packages/design-tokens/tokens.json` and `apps/mobile/src/lib/theme.ts`. Standardized primary brand colors: Primary Orange (`#FF741F`), Primary Navy (`#0B2030`), Warm Off-White Canvas (`#FBF9F8`), and brand peach tones (`#FFF0E6`, `#FFE2D1`).

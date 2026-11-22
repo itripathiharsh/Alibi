@@ -45,7 +45,7 @@ import {
 import * as SecureStore from "expo-secure-store";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
-import { getAccessToken, ensureAuthenticated, getUserProfile, saveUserProfile } from "../../lib/auth";
+import { getAccessToken, ensureAuthenticated, getUserProfile, saveUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder, scheduleTaskTimerReminder } from "../../lib/timer-reminders";
@@ -54,7 +54,28 @@ import { triggerHaptic, startFocusNotification, stopFocusNotification } from "..
 import { filterLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
 import { CaptureReviewSheet } from "../../components/capture-review-sheet";
 import { decideTaskExtraction, type TaskExtractionProposal } from "../../lib/task-extraction";
-import { cacheRunningTimers, cacheTaskView, createTaskOffline, getCachedTaskView, getLocalAnalyticsSummary, getLocalTimers, makeOfflineId, removeLocalTimer, startTaskTimerOffline, stopTaskTimerOffline, syncMobileAccount, updateTaskOffline } from "../../lib/offline-sync";
+import { ChiefOfStaffCard } from "../../components/chief-of-staff-card";
+import { RecommendationsCard } from "../../components/recommendations-card";
+import { OnboardingModal } from "../../components/onboarding-modal";
+import { ProjectManagerSheet } from "../../components/project-manager-sheet";
+import {
+  cacheRunningTimers,
+  cacheTaskView,
+  createTaskOffline,
+  getCachedTaskView,
+  getLocalAnalyticsSummary,
+  getLocalProjects,
+  getLocalTimers,
+  getLocalUserPreferences,
+  LocalProjectRecord,
+  LocalUserPreferences,
+  makeOfflineId,
+  removeLocalTimer,
+  startTaskTimerOffline,
+  stopTaskTimerOffline,
+  syncMobileAccount,
+  updateTaskOffline,
+} from "../../lib/offline-sync";
 
 interface TaskItem {
   id: string;
@@ -174,7 +195,7 @@ export default function DashboardScreen() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
+  const { isOffline } = useOfflineStatus();
 
   // Quick Capture Modal State
   const [captureVisible, setCaptureVisible] = useState(false);
@@ -194,6 +215,19 @@ export default function DashboardScreen() {
   const [top3TaskIds, setTop3TaskIds] = useState<string[]>([]);
   const [kickoffVisible, setKickoffVisible] = useState(false);
   const [sweepVisible, setSweepVisible] = useState(false);
+
+  // Chief of Staff & Onboarding Preferences & Projects State
+  const [preferences, setPreferences] = useState<LocalUserPreferences>({
+    work_start_time: "09:00",
+    work_end_time: "18:00",
+    planning_style: "priority",
+    learning_paused: false,
+    timezone: "Asia/Kolkata",
+    primary_goal: null,
+  });
+  const [onboardingVisible, setOnboardingVisible] = useState(false);
+  const [projects, setProjects] = useState<LocalProjectRecord[]>([]);
+  const [projectsVisible, setProjectsVisible] = useState(false);
 
   const todayDateKey = useMemo(() => {
     const d = new Date();
@@ -260,6 +294,31 @@ export default function DashboardScreen() {
     } finally {
       fetchDashboardData();
     }
+  };
+
+  const overdueTasks = useMemo(() => {
+    const now = Date.now();
+    return todayTasks.filter((t) => t.status !== "completed" && t.deadline_at && Date.parse(t.deadline_at) < now);
+  }, [todayTasks]);
+
+  const calendarBusyMinutes = useMemo(() => {
+    return runningTimers.reduce((acc, _) => acc + 30, 0);
+  }, [runningTimers]);
+
+  const handleRescheduleOverdue = async (taskIds: string[]) => {
+    triggerHaptic("tap");
+    const today = new Date();
+    today.setHours(18, 0, 0, 0);
+    const deadlineIso = today.toISOString();
+    setTodayTasks((prev) =>
+      prev.map((t) => (taskIds.includes(t.id) ? { ...t, deadline_at: deadlineIso } : t)),
+    );
+    const profile = await getUserProfile();
+    const userId = profile?.id ?? "local_user";
+    for (const id of taskIds) {
+      await updateTaskOffline(userId, id, { deadline_at: deadlineIso });
+    }
+    Alert.alert("Tasks Rescheduled", `${taskIds.length} ${taskIds.length === 1 ? "task" : "tasks"} scheduled for completion today by 6:00 PM.`);
   };
 
   const sortedTodayTasks = useMemo(() => {
@@ -419,7 +478,13 @@ export default function DashboardScreen() {
     } catch {
       offlineMode = true;
     } finally {
-      setIsOffline(offlineMode);
+      setCachedIsOffline(offlineMode);
+      try {
+        const prefs = await getLocalUserPreferences(effectiveUserId);
+        setPreferences(prefs);
+        const projs = await getLocalProjects(effectiveUserId);
+        setProjects(projs);
+      } catch {}
       if (offlineMode) {
         try {
           const cachedTasks = await getCachedTaskView(effectiveUserId, "today");
@@ -894,6 +959,7 @@ export default function DashboardScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        overScrollMode="never"
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -919,11 +985,42 @@ export default function DashboardScreen() {
             <Text style={styles.heroSubtitleText}>
               Plan, focus and get more done today.
             </Text>
+            <Pressable
+              style={styles.heroHabitsChip}
+              onPress={() => setOnboardingVisible(true)}
+              accessibilityLabel="Work window and habits"
+            >
+              <Clock size={12} color="#C2410C" />
+              <Text style={styles.heroHabitsText}>
+                Work: {preferences.work_start_time || "09:00"}–{preferences.work_end_time || "18:00"} · {preferences.planning_style === "time_blocking" ? "Time-Blocked" : "Priorities"}
+              </Text>
+              <ChevronRight size={12} color="#C2410C" />
+            </Pressable>
           </View>
           {/* Subtle warm sunset art element */}
           <View style={styles.heroArtDune} />
           <View style={styles.heroArtSun} />
         </View>
+
+        {/* AI Chief of Staff Briefing */}
+        <ChiefOfStaffCard
+          todayTasks={todayTasks}
+          overdueTasks={overdueTasks}
+          preferences={preferences}
+          calendarBusyMinutes={calendarBusyMinutes}
+          onStartFocus={(taskId) => {
+            const active = runningTimers.find((t) => t.task_id === taskId);
+            if (!active) {
+              void handleStartFocusTimer(taskId);
+            }
+          }}
+          onRescheduleOverdue={(taskIds) => {
+            void handleRescheduleOverdue(taskIds);
+          }}
+        />
+
+        {/* One tip counted from the user's own history (FR-LEARN-013) */}
+        <RecommendationsCard />
 
         {/* Elevated Quick Capture Pill */}
         <Pressable
@@ -970,12 +1067,12 @@ export default function DashboardScreen() {
 
           <Pressable
             style={styles.actionTile}
-            onPress={() => router.push("/vault")}
+            onPress={() => setProjectsVisible(true)}
           >
             <View style={[styles.actionIconBox, { backgroundColor: "#FAF5FF" }]}>
               <Layers size={20} color="#8B5CF6" />
             </View>
-            <Text style={styles.actionTileLabel}>Notes</Text>
+            <Text style={styles.actionTileLabel}>Projects</Text>
           </Pressable>
 
           <Pressable
@@ -1364,7 +1461,7 @@ export default function DashboardScreen() {
       </ScrollView>
 
       {/* Quick Capture Modal (with Real-time Voice, Status & Aligned Date/Time) */}
-      <Modal visible={captureVisible} transparent animationType="fade">
+      <Modal visible={captureVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setCaptureVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -1621,7 +1718,7 @@ export default function DashboardScreen() {
       </Modal>
 
       {/* Morning Kickoff Modal */}
-      <Modal visible={kickoffVisible} transparent animationType="fade">
+      <Modal visible={kickoffVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setKickoffVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -1673,7 +1770,7 @@ export default function DashboardScreen() {
       </Modal>
 
       {/* Evening Sunset Sweep Modal */}
-      <Modal visible={sweepVisible} transparent animationType="fade">
+      <Modal visible={sweepVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSweepVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -1722,6 +1819,24 @@ export default function DashboardScreen() {
         busy={isReviewingExtraction}
         onApply={(fields, rejectedFields) => { void submitExtractionDecision(fields, rejectedFields); }}
         onKeepOriginal={(rejectedFields) => { void submitExtractionDecision({}, rejectedFields); }}
+      />
+      <OnboardingModal
+        visible={onboardingVisible}
+        userId={user?.id || "local_user"}
+        initialPreferences={preferences}
+        onClose={() => setOnboardingVisible(false)}
+        onSave={(newPrefs: LocalUserPreferences) => {
+          setPreferences(newPrefs);
+        }}
+      />
+      <ProjectManagerSheet
+        visible={projectsVisible}
+        userId={user?.id || "local_user"}
+        projects={projects}
+        onClose={() => setProjectsVisible(false)}
+        onRefreshProjects={() => {
+          void fetchDashboardData();
+        }}
       />
     </View>
   );
@@ -1813,6 +1928,22 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontWeight: "400",
   },
+  heroHabitsChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "#FFEDD5",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 6,
+    marginTop: 8,
+  },
+  heroHabitsText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#C2410C",
+  },
   heroArtDune: {
     position: "absolute",
     right: -20,
@@ -1899,12 +2030,12 @@ const styles = StyleSheet.create({
   },
   todayCard: {
     flex: 1.1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    backgroundColor: theme.colors.surface.card,
+    borderRadius: theme.radius.card,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
-    shadowColor: "#000",
+    borderColor: theme.colors.border.subtle,
+    shadowColor: theme.colors.brand.navy,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
@@ -1997,13 +2128,13 @@ const styles = StyleSheet.create({
   },
   focusCard: {
     position: "relative",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    backgroundColor: theme.colors.surface.card,
+    borderRadius: theme.radius.card,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: theme.colors.border.subtle,
     overflow: "hidden",
-    shadowColor: "#000",
+    shadowColor: theme.colors.brand.navy,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
@@ -2017,37 +2148,37 @@ const styles = StyleSheet.create({
   focusTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#0F172A",
+    color: theme.colors.text.primary,
   },
   playBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "#F97316",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.accent.primary,
     alignItems: "center",
     justifyContent: "center",
   },
   focusTimerText: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     marginTop: 6,
   },
   focusSubtitle: {
     fontSize: 11,
-    color: "#64748B",
+    color: theme.colors.text.secondary,
     fontWeight: "500",
     marginBottom: 8,
   },
   focusProgressBarTrack: {
     height: 4,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: theme.colors.surface.surface2,
     borderRadius: 2,
     overflow: "hidden",
   },
   focusProgressBarFill: {
     height: "100%",
-    backgroundColor: "#F97316",
+    backgroundColor: theme.colors.accent.primary,
     borderRadius: 2,
   },
   focusCardWave: {
@@ -2061,12 +2192,12 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   planCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    backgroundColor: theme.colors.surface.card,
+    borderRadius: theme.radius.card,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
-    shadowColor: "#000",
+    borderColor: theme.colors.border.subtle,
+    shadowColor: theme.colors.brand.navy,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
@@ -2119,12 +2250,12 @@ const styles = StyleSheet.create({
   },
   progressCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    backgroundColor: theme.colors.surface.card,
+    borderRadius: theme.radius.card,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
-    shadowColor: "#000",
+    borderColor: theme.colors.border.subtle,
+    shadowColor: theme.colors.brand.navy,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
@@ -2139,17 +2270,17 @@ const styles = StyleSheet.create({
   progressTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#0F172A",
+    color: theme.colors.text.primary,
   },
   progressSubtitle: {
     fontSize: 10,
-    color: "#64748B",
+    color: theme.colors.text.secondary,
   },
   progressBadgePill: {
     backgroundColor: "#ECFDF5",
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: theme.radius.control,
   },
   progressBadgeText: {
     fontSize: 11,
@@ -2158,13 +2289,13 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     height: 5,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: theme.colors.surface.surface2,
     borderRadius: 2.5,
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
-    backgroundColor: "#F97316",
+    backgroundColor: theme.colors.accent.primary,
     borderRadius: 2.5,
   },
   progressStatsRow: {
@@ -2179,21 +2310,21 @@ const styles = StyleSheet.create({
   statVal: {
     fontSize: 11.5,
     fontWeight: "700",
-    color: "#0F172A",
+    color: theme.colors.text.primary,
   },
   statLbl: {
     fontSize: 9.5,
-    color: "#64748B",
+    color: theme.colors.text.secondary,
     fontWeight: "500",
   },
   miniCalendarCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    backgroundColor: theme.colors.surface.card,
+    borderRadius: theme.radius.card,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
-    shadowColor: "#000",
+    borderColor: theme.colors.border.subtle,
+    shadowColor: theme.colors.brand.navy,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
@@ -2208,7 +2339,7 @@ const styles = StyleSheet.create({
   miniCalTitle: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#0F172A",
+    color: theme.colors.text.primary,
   },
   calNavArrow: {
     padding: 2,
@@ -2220,7 +2351,7 @@ const styles = StyleSheet.create({
   miniCalDayLabel: {
     fontSize: 9,
     fontWeight: "600",
-    color: "#94A3B8",
+    color: theme.colors.text.muted,
     width: 22,
     textAlign: "center",
   },
@@ -2240,12 +2371,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   miniCalNumBoxToday: {
-    backgroundColor: "#0F172A",
+    backgroundColor: theme.colors.brand.navy,
   },
   miniCalNumText: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#0F172A",
+    color: theme.colors.text.primary,
   },
   miniCalNumTextToday: {
     color: "#FFFFFF",
@@ -2259,13 +2390,13 @@ const styles = StyleSheet.create({
   pleCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    backgroundColor: theme.colors.surface.card,
+    borderRadius: theme.radius.card,
     padding: 14,
     borderWidth: 1,
     borderColor: "#EDE9FE",
     gap: 12,
-    shadowColor: "#8B5CF6",
+    shadowColor: theme.colors.brand.navy,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 6,
@@ -2286,11 +2417,11 @@ const styles = StyleSheet.create({
   pleTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#0F172A",
+    color: theme.colors.text.primary,
   },
   pleSubtitle: {
     fontSize: 11.5,
-    color: "#64748B",
+    color: theme.colors.text.secondary,
     lineHeight: 16,
   },
 
@@ -2303,9 +2434,9 @@ const styles = StyleSheet.create({
     paddingTop: 22,
   },
   modalContent: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    backgroundColor: theme.colors.surface.card,
+    borderTopLeftRadius: theme.radius.sheet,
+    borderTopRightRadius: theme.radius.sheet,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     padding: 20,
@@ -2343,14 +2474,14 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   captureInput: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 12,
+    backgroundColor: theme.colors.surface.card,
+    borderRadius: theme.radius.cardSecondary,
     padding: 12,
     paddingRight: 44,
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 14,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: theme.colors.border.subtle,
     minHeight: 74,
     textAlignVertical: "top",
   },
@@ -2506,21 +2637,27 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   cancelBtn: {
+    minHeight: 48,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: "#F1F5F9",
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.colors.surface.surface2,
+    alignItems: "center",
+    justifyContent: "center",
   },
   cancelBtnText: {
-    color: "#64748B",
+    color: theme.colors.text.secondary,
     fontSize: 13.5,
     fontWeight: "600",
   },
   confirmBtn: {
+    minHeight: 48,
     paddingVertical: 10,
     paddingHorizontal: 18,
-    borderRadius: 10,
-    backgroundColor: "#F97316",
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.colors.accent.primary,
+    alignItems: "center",
+    justifyContent: "center",
   },
   confirmBtnText: {
     color: "#FFFFFF",

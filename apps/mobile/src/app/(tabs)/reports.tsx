@@ -26,7 +26,7 @@ import {
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
-import { getAccessToken, ensureAuthenticated, getUserProfile } from "../../lib/auth";
+import { getAccessToken, ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { getLocalAnalyticsSummary, saveLocalNote } from "../../lib/offline-sync";
 
@@ -69,7 +69,7 @@ export default function ReportsScreen() {
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
+  const { isOffline } = useOfflineStatus();
   const [selectedPeriod, setSelectedPeriod] = useState<"daily" | "weekly" | "monthly">("daily");
   const [includePersonal, setIncludePersonal] = useState(false);
   const [reviewWorked, setReviewWorked] = useState("");
@@ -114,7 +114,7 @@ export default function ReportsScreen() {
           if (responses[5]?.ok) setHeatmap(await responses[5].json());
           if (responses[6]?.ok) setLearning(await responses[6].json());
           if (responses[7]?.ok) setTaskActivity(await responses[7].json());
-          setIsOffline(false);
+          setCachedIsOffline(false);
           setIsLoading(false);
           return;
         }
@@ -125,7 +125,7 @@ export default function ReportsScreen() {
 
     // 2. Offline fallback: Calculate genuine metrics from SQLite
     try {
-      setIsOffline(true);
+      setCachedIsOffline(true);
       const localSummary = await getLocalAnalyticsSummary(userId);
       setSummary(localSummary);
       setScore({ score: null, insufficient_data: true });
@@ -525,8 +525,8 @@ const styles = StyleSheet.create({
   screenHeading: { paddingTop: 6, paddingBottom: 4 },
   screenTitle: { fontSize: 30, lineHeight: 36, fontWeight: "800", letterSpacing: -0.6, color: theme.colors.text.primary },
   screenSubtitle: { fontSize: 14, lineHeight: 20, color: theme.colors.text.secondary, marginTop: 1 },
-  insightPanel: { padding: 16, borderRadius: 21, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: theme.colors.border.subtle, gap: 14, shadowColor: "#19354A", shadowOpacity: .04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
-  retrospectiveCard: { padding: 16, borderRadius: 21, backgroundColor: "#FAF7FF", borderWidth: 1, borderColor: "#ECE5FF", gap: 12 },
+  insightPanel: { padding: 16, borderRadius: theme.radius.card, backgroundColor: theme.colors.surface.card, borderWidth: 1, borderColor: theme.colors.border.subtle, gap: 14, shadowColor: theme.colors.brand.navy, shadowOpacity: .04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
+  retrospectiveCard: { padding: 16, borderRadius: theme.radius.card, backgroundColor: "#FAF7FF", borderWidth: 1, borderColor: "#ECE5FF", gap: 12 },
   reviewFacts: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   reviewFact: { color: "#4C3F72", backgroundColor: "#F0EAFE", borderRadius: 11, paddingHorizontal: 10, paddingVertical: 7, fontSize: 11, fontWeight: "700" },
   reviewInput: { minHeight: 72, borderRadius: 13, borderWidth: 1, borderColor: "#E4DDF3", backgroundColor: "#FFFFFF", padding: 12, color: theme.colors.text.primary, textAlignVertical: "top", fontSize: 13 },
@@ -581,12 +581,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   summaryCard: {
-    backgroundColor: "#102E42",
-    borderRadius: 22,
+    backgroundColor: theme.colors.brand.navy,
+    borderRadius: theme.radius.card,
     padding: 16,
     borderWidth: 1,
     borderColor: "#1E435A",
-    shadowColor: "#0B2030",
+    shadowColor: theme.colors.brand.navy,
     shadowOpacity: .14,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 7 },
@@ -692,13 +692,14 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   generateBtn: {
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: theme.colors.accent.amber,
+    backgroundColor: theme.colors.accent.primary,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: theme.radius.control,
   },
   generateBtnDisabled: {
     opacity: 0.6,
@@ -706,7 +707,7 @@ const styles = StyleSheet.create({
   generateBtnText: {
     fontSize: 13,
     fontWeight: "700",
-    color: theme.colors.background.base,
+    color: "#FFFFFF",
   },
   sectionHeader: {
     flexDirection: "row",
@@ -726,7 +727,7 @@ const styles = StyleSheet.create({
   },
   emptyReports: {
     backgroundColor: theme.colors.surface.card,
-    borderRadius: 14,
+    borderRadius: theme.radius.cardSecondary,
     padding: 24,
     alignItems: "center",
     borderWidth: 1,
@@ -747,7 +748,7 @@ const styles = StyleSheet.create({
   },
   reportCard: {
     backgroundColor: theme.colors.surface.card,
-    borderRadius: 12,
+    borderRadius: theme.radius.cardSecondary,
     padding: 14,
     borderWidth: 1,
     borderColor: theme.colors.border.subtle,

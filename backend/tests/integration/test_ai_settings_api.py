@@ -9,11 +9,11 @@ async def test_ai_settings_lifecycle_and_key_masking(
     auth_client: httpx.AsyncClient,
 ) -> None:
     """AC-AI-3: API key is write-only, encrypted at rest, and returned masked as key_last4."""
-    # 1. List providers: all 4 supported providers listed, none enabled initially
+    # 1. List providers: all 5 supported providers listed (OpenRouter added in ADR-028), none enabled initially
     resp = await auth_client.get("/api/v1/ai/providers")
     assert resp.status_code == 200
     providers = resp.json()
-    assert len(providers) == 4
+    assert len(providers) == 5
     names = [p["provider"] for p in providers]
     assert "groq" in names
     assert "gemini" in names

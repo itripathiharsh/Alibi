@@ -33,16 +33,18 @@ import {
   Repeat2,
   FileText,
   ChevronRight,
+  Brain,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
-import { getAccessToken, ensureAuthenticated, getUserProfile } from "../../lib/auth";
+import { getAccessToken, ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder, scheduleTaskTimerReminder, syncTaskTimerReminders } from "../../lib/timer-reminders";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
 import { triggerHaptic, startFocusNotification, stopFocusNotification } from "../../lib/focus-session-notification";
 import { loadLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
+import { predictTaskDuration, type DurationPrediction } from "../../lib/personal-learning-engine";
 import { CaptureReviewSheet } from "../../components/capture-review-sheet";
 import { decideTaskExtraction, type TaskExtractionProposal } from "../../lib/task-extraction";
 import { RepeatTaskSheet, type RepeatFrequency, type RepeatRuleSummary } from "../../components/repeat-task-sheet";
@@ -182,7 +184,7 @@ export default function TasksScreen() {
   const [runningTimers, setRunningTimers] = useState<RunningTimer[]>([]);
   const [clockNow, setClockNow] = useState(Date.now());
   const [isLoading, setIsLoading] = useState(true);
-  const [isOffline, setIsOffline] = useState(false);
+  const { isOffline } = useOfflineStatus();
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
   const [taskTimeEntries, setTaskTimeEntries] = useState<TaskTimeEntry[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -206,6 +208,31 @@ export default function TasksScreen() {
   const [customTimeStr, setCustomTimeStr] = useState("");
   const [learnedRoutines, setLearnedRoutines] = useState<LearnedTaskRoutine[]>([]);
   const [isLoadingRoutines, setIsLoadingRoutines] = useState(false);
+  const [userEstimateMin, setUserEstimateMin] = useState<number | null>(null);
+  const [customEstimateStr, setCustomEstimateStr] = useState("");
+  const [durationPrediction, setDurationPrediction] = useState<DurationPrediction | null>(null);
+  const [isPredictingDuration, setIsPredictingDuration] = useState(false);
+
+  useEffect(() => {
+    if (!captureVisible || captureText.trim().length < 3) {
+      setDurationPrediction(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsPredictingDuration(true);
+      try {
+        const token = await ensureAuthenticated().catch(() => null);
+        const baseUrl = getServerUrl();
+        const pred = await predictTaskDuration(baseUrl, token, captureText, userEstimateMin);
+        setDurationPrediction(pred);
+      } catch {
+        setDurationPrediction(null);
+      } finally {
+        setIsPredictingDuration(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [captureText, captureVisible, userEstimateMin]);
 
   // Batch selection mode
   const [selectionMode, setSelectionMode] = useState(false);
@@ -332,6 +359,9 @@ export default function TasksScreen() {
     setSelectedTime(null);
     setCustomTimeStr("");
     setIsListening(false);
+    setUserEstimateMin(null);
+    setCustomEstimateStr("");
+    setDurationPrediction(null);
   };
 
   const handleMicPress = async () => {
@@ -431,7 +461,7 @@ export default function TasksScreen() {
       if (cached) setTasks(cached as TaskItem[]);
       setRunningTimers(await getLocalTimers(effectiveUserId));
     } finally {
-      setIsOffline(userIsOffline);
+      setCachedIsOffline(userIsOffline);
       setIsLoading(false);
     }
   }, [activeView]);
@@ -463,6 +493,9 @@ export default function TasksScreen() {
       };
       if (deadlineIso) {
         payload.deadline_at = deadlineIso;
+      }
+      if (userEstimateMin != null) {
+        payload.estimate_user_min = userEstimateMin;
       }
 
       let res: Response | null = null;
@@ -541,6 +574,7 @@ export default function TasksScreen() {
         status: taskStatus,
         deadline_at: deadlineIso,
         origin: isListening ? "voice" : "manual",
+        estimate_user_min: userEstimateMin,
       });
       setTasks((previous) => [task as TaskItem, ...previous.filter((item) => item.id !== task.id)]);
       if (!deadlineIso && taskStatus === "pending") setActiveView("backlog");
@@ -1130,7 +1164,7 @@ export default function TasksScreen() {
       </Pressable>
 
       {/* Quick Capture Modal */}
-      <Modal visible={captureVisible} transparent animationType="fade">
+      <Modal visible={captureVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setCaptureVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -1355,6 +1389,115 @@ export default function TasksScreen() {
                 </View>
               )}
 
+              {/* Estimated Duration (Optional & PLE Duration Prediction) */}
+              <View style={styles.optionSection}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={styles.optionSectionHeader}>Estimated Duration (Optional):</Text>
+                  {userEstimateMin != null && (
+                    <Pressable
+                      onPress={() => {
+                        setUserEstimateMin(null);
+                        setCustomEstimateStr("");
+                      }}
+                    >
+                      <Text style={styles.clearOptionText}>Clear Estimate</Text>
+                    </Pressable>
+                  )}
+                </View>
+                <View style={styles.optionRow}>
+                  {[
+                    { val: 15, label: "15m" },
+                    { val: 30, label: "30m" },
+                    { val: 45, label: "45m" },
+                    { val: 60, label: "60m" },
+                  ].map((opt) => (
+                    <Pressable
+                      key={opt.val}
+                      style={[styles.timePill, userEstimateMin === opt.val && styles.timePillActive]}
+                      onPress={() => {
+                        const next = userEstimateMin === opt.val ? null : opt.val;
+                        setUserEstimateMin(next);
+                        setCustomEstimateStr(next ? String(next) : "");
+                      }}
+                    >
+                      <Clock
+                        size={12}
+                        color={userEstimateMin === opt.val ? "#38BDF8" : theme.colors.text.secondary}
+                      />
+                      <Text
+                        style={[
+                          styles.timePillText,
+                          userEstimateMin === opt.val && styles.timePillTextActive,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <TextInput
+                  style={styles.customInputSmall}
+                  value={customEstimateStr}
+                  onChangeText={(val) => {
+                    setCustomEstimateStr(val);
+                    const parsed = parseInt(val, 10);
+                    setUserEstimateMin(isNaN(parsed) || parsed <= 0 ? null : parsed);
+                  }}
+                  keyboardType="numeric"
+                  placeholder="Custom minutes (e.g. 25, 90)"
+                  placeholderTextColor={theme.colors.text.secondary}
+                />
+              </View>
+
+              {/* PLE Calibrated Prediction Card */}
+              {isPredictingDuration && (
+                <Text style={styles.routineLoading}>Analyzing historical completion patterns...</Text>
+              )}
+              {durationPrediction && (
+                durationPrediction.confidence > 0 && durationPrediction.maturity_level > 0 ? (
+                  <View style={styles.predictionCard}>
+                    <View style={styles.predictionTitleRow}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Sparkles size={14} color={theme.colors.brand.orange} />
+                        <Text style={styles.predictionTitle}>
+                          ALIBI Predicted: ~{durationPrediction.p50_min}m
+                        </Text>
+                      </View>
+                      <Pressable
+                        style={styles.predictionApplyBtn}
+                        onPress={() => {
+                          setUserEstimateMin(durationPrediction.p50_min);
+                          setCustomEstimateStr(String(durationPrediction.p50_min));
+                        }}
+                      >
+                        <Text style={styles.predictionApplyText}>Use {durationPrediction.p50_min}m</Text>
+                      </Pressable>
+                    </View>
+                    <Text style={styles.predictionSubtext}>
+                      {durationPrediction.p10_min ? `Range: ${durationPrediction.p10_min}m–${durationPrediction.p90_min}m • ` : ""}
+                      {Math.round(durationPrediction.confidence * 100)}% calibrated confidence
+                    </Text>
+                    {durationPrediction.explanation && (
+                      <Text style={[styles.predictionSubtext, { fontStyle: "italic" }]}>
+                        {durationPrediction.explanation}
+                      </Text>
+                    )}
+                  </View>
+                ) : (
+                  <View style={styles.coldStartCard}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Brain size={14} color={theme.colors.text.secondary} />
+                      <Text style={[styles.predictionTitle, { color: theme.colors.text.secondary }]}>
+                        Learning Engine: Cold Start
+                      </Text>
+                    </View>
+                    <Text style={styles.predictionSubtext}>
+                      Not enough finished tasks to predict yet. Estimates appear once ALIBI has learned from your completed work.
+                    </Text>
+                  </View>
+                )
+              )}
+
               {learnedRoutines.length > 0 && (
                 <View style={styles.suggestionSection}>
                   <Text style={styles.suggestionHeader}>From your learned routines</Text>
@@ -1405,7 +1548,7 @@ export default function TasksScreen() {
         onKeepOriginal={(rejectedFields) => { void submitExtractionDecision({}, rejectedFields); }}
       />
 
-      <Modal visible={Boolean(selectedTask)} transparent animationType="slide" onRequestClose={() => setSelectedTask(null)}>
+      <Modal visible={Boolean(selectedTask)} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setSelectedTask(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.detailContent}>
             <View style={styles.modalHeader}>
@@ -1491,7 +1634,7 @@ export default function TasksScreen() {
         onStop={stopRepeatSchedule}
       />
 
-      <Modal visible={tagModalVisible} transparent animationType="fade" onRequestClose={() => setTagModalVisible(false)}>
+      <Modal visible={tagModalVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setTagModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -1582,28 +1725,28 @@ const styles = StyleSheet.create({
   },
   taskCard: {
     backgroundColor: theme.colors.surface.card,
-    borderRadius: 19,
+    borderRadius: theme.radius.cardSecondary,
     padding: 16,
     borderWidth: 1,
     borderColor: theme.colors.border.subtle,
     gap: 10,
-    shadowColor: "#19354A",
+    shadowColor: theme.colors.brand.navy,
     shadowOpacity: 0.045,
     shadowRadius: 11,
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
   },
   taskCardSelected: {
-    borderColor: "#F97316",
-    backgroundColor: "rgba(249, 115, 22, 0.08)",
+    borderColor: theme.colors.accent.primary,
+    backgroundColor: "rgba(255, 116, 31, 0.08)",
   },
   batchActionBar: {
     position: "absolute",
     bottom: 88,
     left: 16,
     right: 16,
-    backgroundColor: "#0D1929",
-    borderRadius: 16,
+    backgroundColor: theme.colors.brand.navy,
+    borderRadius: theme.radius.cardSecondary,
     paddingVertical: 10,
     paddingHorizontal: 14,
     flexDirection: "column",
@@ -1612,7 +1755,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
     elevation: 9,
-    shadowColor: "#000",
+    shadowColor: theme.colors.brand.navy,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
@@ -1761,8 +1904,8 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: theme.colors.surface.card,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    borderTopLeftRadius: theme.radius.sheet,
+    borderTopRightRadius: theme.radius.sheet,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     padding: 20,
@@ -1781,7 +1924,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: theme.colors.text.primary,
   },
-  detailContent: { backgroundColor: theme.colors.surface.card, borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 20, paddingBottom: 32, borderWidth: 1, borderColor: theme.colors.border.subtle, gap: 14, maxHeight: "86%" },
+  detailContent: { backgroundColor: theme.colors.surface.card, borderTopLeftRadius: theme.radius.sheet, borderTopRightRadius: theme.radius.sheet, padding: 20, paddingBottom: 32, borderWidth: 1, borderColor: theme.colors.border.subtle, gap: 14, maxHeight: "86%" },
   detailHeading: { flexDirection: "row", alignItems: "center", gap: 8 },
   detailTaskTitle: { fontSize: 20, lineHeight: 27, color: theme.colors.text.primary, fontWeight: "700" },
   detailSummaryRow: { flexDirection: "row", alignItems: "stretch", gap: 8 },
@@ -1892,10 +2035,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   cancelBtn: {
+    minHeight: 48,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: theme.colors.background.base,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.colors.surface.surface2,
+    alignItems: "center",
+    justifyContent: "center",
   },
   cancelBtnText: {
     color: theme.colors.text.secondary,
@@ -1903,13 +2049,16 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   confirmBtn: {
+    minHeight: 48,
     paddingVertical: 10,
     paddingHorizontal: 18,
-    borderRadius: 8,
-    backgroundColor: theme.colors.accent.amber,
+    borderRadius: theme.radius.control,
+    backgroundColor: theme.colors.accent.primary,
+    alignItems: "center",
+    justifyContent: "center",
   },
   confirmBtnText: {
-    color: "#090D16",
+    color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "700",
   },
@@ -2031,5 +2180,46 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: theme.colors.accent.amber,
     fontWeight: "500",
+  },
+  predictionCard: {
+    backgroundColor: "rgba(255, 116, 31, 0.08)",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255, 116, 31, 0.25)",
+    padding: 10,
+    gap: 4,
+  },
+  coldStartCard: {
+    backgroundColor: "rgba(11, 32, 48, 0.04)",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.border.subtle,
+    padding: 10,
+    gap: 4,
+  },
+  predictionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  predictionTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: theme.colors.brand.navy,
+  },
+  predictionApplyBtn: {
+    backgroundColor: theme.colors.brand.orange,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  predictionApplyText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  predictionSubtext: {
+    fontSize: 11,
+    color: theme.colors.text.secondary,
   },
 });

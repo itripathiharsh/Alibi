@@ -2,14 +2,19 @@ import "../polyfills";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Pressable, StyleSheet, Text, View, Image } from "react-native";
+import { AppState, Pressable, StyleSheet, Text, View, Image } from "react-native";
+import * as Notifications from "expo-notifications";
 import { User } from "lucide-react-native";
 import theme from "../lib/theme";
-import { getAccessToken, getRefreshToken, getUserProfile } from "../lib/auth";
+import { getAccessToken, getRefreshToken, getUserProfile, setCachedIsOffline } from "../lib/auth";
 import FirstLaunchIntro from "../components/first-launch-intro";
 import { completeFirstLaunchIntro, shouldShowFirstLaunchIntro } from "../lib/first-launch";
 import { registerNotificationHandler, scheduleDailyWittyReminders, scheduleInactivityNudge } from "../lib/notification-witty-engine";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { ensureCheckInCategory, handleNotificationResponse, syncTaskCheckIns } from "../lib/task-check-ins";
+import { refreshHomeWidget } from "../lib/home-widget";
+import { flushLearningSignals } from "../lib/learning-signals";
+import { onLocalTasksChanged } from "../lib/offline-sync";
 
 // Ensure Expo notifications can play sounds and show heads-up banners across the entire app
 registerNotificationHandler();
@@ -35,6 +40,44 @@ export default function RootLayout() {
     });
   }, []);
 
+  // Check-ins, home widget and learning signals (ADR-028): all driven from the
+  // on-device task cache so they keep working offline.
+  useEffect(() => {
+    if (launchState !== "ready") return;
+    const navigate = (path: string) => router.push(path as Parameters<typeof router.push>[0]);
+    void ensureCheckInCategory();
+    void Notifications.getLastNotificationResponseAsync()
+      .then((response) => (response ? handleNotificationResponse(response, navigate) : false))
+      .catch(() => false);
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      void handleNotificationResponse(response, navigate);
+    });
+
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    const onTasksChanged = () => {
+      refreshHomeWidget();
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(() => { void syncTaskCheckIns(); }, 1500);
+    };
+    const unsubscribeTasks = onLocalTasksChanged(onTasksChanged);
+    const onForeground = () => {
+      refreshHomeWidget();
+      void syncTaskCheckIns();
+      void flushLearningSignals();
+    };
+    onForeground();
+    const appStateSub = AppState.addEventListener("change", (state) => {
+      if (state === "active") onForeground();
+      else refreshHomeWidget();
+    });
+    return () => {
+      responseSub.remove();
+      appStateSub.remove();
+      unsubscribeTasks();
+      if (debounce) clearTimeout(debounce);
+    };
+  }, [launchState, router]);
+
   useEffect(() => {
     if (launchState !== "ready") return;
     let cancelled = false;
@@ -48,6 +91,8 @@ export default function RootLayout() {
         getUserProfile(),
       ]);
       if (cancelled) return;
+      const isOffline = profile?.id === "local_user" || (!accessToken && !refreshToken);
+      setCachedIsOffline(isOffline);
       const isAuthenticated = Boolean(accessToken || refreshToken || profile);
       if (isAuthenticated) {
         void scheduleDailyWittyReminders();
