@@ -74,6 +74,13 @@ jobs:
         working-directory: backend
         run: uv run lint-imports
 
+      - name: Run database migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://alibi_test:change-me-test@localhost:5434/alibi_test
+          ALIBI_MODE: local
+        run: uv run alembic upgrade head
+
       - name: Run Pytest suite
         working-directory: backend
         env:

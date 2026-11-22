@@ -19,6 +19,24 @@ from app.models.workspace import Workspace
 @pytest.mark.asyncio
 async def test_ac_m1_7_backup_and_restore_drill(db_session: AsyncSession) -> None:
     """Verify AC-M1-7: Full backup and restore drill reproduces identical users and categories."""
+    import shutil
+
+    if not shutil.which("pwsh"):
+        pytest.skip("pwsh is not available on this platform/runner")
+    if not shutil.which("docker"):
+        pytest.skip("Docker is not available in this test environment")
+    try:
+        res = subprocess.run(
+            ["docker", "ps", "--filter", "name=alibi-postgres", "--format", "{{.Names}}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if "alibi-postgres" not in res.stdout:
+            pytest.skip("Container alibi-postgres is not running for backup/restore drill")
+    except Exception:
+        pytest.skip("Unable to inspect docker containers for backup/restore drill")
+
     repo_root = Path(__file__).resolve().parents[3]
     backup_script = repo_root / "infrastructure" / "scripts" / "backup.ps1"
     restore_script = repo_root / "infrastructure" / "scripts" / "restore.ps1"
