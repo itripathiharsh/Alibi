@@ -21,6 +21,9 @@ export interface BrainDumpItem {
   priority: number | null;
   estimate_minutes: number | null;
   category: string | null;
+  /** A planner-suggested slot when no time was said (the user can drop it). */
+  suggested_at?: string | null;
+  time_source?: "said" | "suggested" | null;
 }
 
 export interface BrainDumpResult {

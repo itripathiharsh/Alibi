@@ -37,12 +37,16 @@ async def test_brain_dump_endpoint_splits_without_saving(
     assert body["mode"] == "rules"
     assert body["ai_status"] == "server_disabled"
     assert [i["title"] for i in body["items"]] == [
-        "mandir jana hai",
-        "assignment dena hai",
-        "sabzi lena",
+        "Mandir jana hai",
+        "Assignment dena hai",
+        "Sabzi lena",
     ]
     assert body["items"][1]["deadline_kind"] == "hard"
-    assert body["items"][2]["bucket"] == "anytime"
+    assert body["items"][0]["time_source"] == "said"
+    # No time was said for "sabzi lena": it gets a suggested slot, not a deadline.
+    assert body["items"][2]["deadline_at"] is None
+    assert body["items"][2]["time_source"] == "suggested"
+    assert body["items"][2]["suggested_at"] is not None
 
     user_id = auth_client.user_id  # type: ignore[attr-defined]
     saved = (await db_session.execute(select(Task).where(Task.user_id == user_id))).scalars().all()

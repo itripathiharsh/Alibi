@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, BookOpen, CheckSquare, ListChecks, Mic, Save, Square } from "lucide-react-native";
 import { BrandHeader } from "../components/brand-ui";
@@ -201,7 +201,7 @@ export default function QuickCaptureScreen() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <BrandHeader right={<Pressable onPress={() => router.back()} style={styles.back} accessibilityRole="button" accessibilityLabel="Close quick capture"><ArrowLeft size={19} color={theme.colors.text.primary} /></Pressable>} />
-      <View style={styles.content}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.segmentContainer}>
           <Pressable
             onPress={() => setCaptureType("task")}
@@ -299,7 +299,7 @@ export default function QuickCaptureScreen() {
         </Text>
         </>
         )}
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -307,7 +307,7 @@ export default function QuickCaptureScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background.base },
   back: { width: 44, height: 44, borderRadius: theme.radius.control, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: theme.colors.border.subtle },
-  content: { paddingHorizontal: 20, paddingTop: 16, gap: 13 },
+  content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32, gap: 13 },
   segmentContainer: {
     flexDirection: "row",
     backgroundColor: "#F1F3F5",

@@ -6,12 +6,12 @@ This directory hosts the official compiled Android application package (`.apk`) 
 
 - **File**: [`ALIBI-0.1.0.apk`](./ALIBI-0.1.0.apk)
 - **Direct Download Link**: [Download ALIBI-0.1.0.apk (Raw)](https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk)
-- **Version**: `0.2.1` (versionCode 3; release manifest: [`latest.json`](./latest.json))
-- **Build Date**: November 22, 2026 (branch fix/voice-typing-repeats-and-error-11: voice typing fix KI-041)
+- **Version**: `0.2.2` (versionCode 4; release manifest: [`latest.json`](./latest.json))
+- **Build Date**: November 22, 2026 (branch feat/update-popup-highlights: update popup with highlights, diary page redesign, brain dump planning and review fix)
 - **Variant**: Android release APK, Hermes Bytecode Engine (React Native 0.76 New Architecture)
-- **File Size**: `72,342,733 bytes` (68.99 MB)
+- **File Size**: `72,346,241 bytes` (68.99 MB)
 - **Signing**: Signed with the repository's debug keystore, not an owner-managed release key.
-- **SHA-256**: `31B2CECC74C5C4542BB01C4D649FE4A91E0326D552B7975BB352CD078908084B`
+- **SHA-256**: `3FE90682CFF398FAD91FC86870396793198EC4F0592C91EE4CE52C70CC347915`
 - **JS Bundle SHA-256**: `83e5bf892893ee6520077aa6ed777bc0903bbd42c78c0358c9bf69535358e197`
 
 > Includes the 2026-11-22 review fixes and ADR-028: brain dump on the Add screen, "Did it get done?" check-ins, recommendations card, and the round "ALIBI Today" home-screen widget with a quick-action menu. Not yet tested on a physical device (KI-032).

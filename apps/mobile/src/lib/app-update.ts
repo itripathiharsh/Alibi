@@ -14,7 +14,9 @@ export const UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/itripathih
 const AUTO_CHECK_KEY = "alibi_update_auto_check";
 const LAST_CHECK_KEY = "alibi_update_last_check";
 const SNOOZE_KEY = "alibi_update_snooze";
-const CHECK_EVERY_MS = 6 * 3_600_000;
+// Checked whenever the app opens or comes back to the screen; this only stops repeat
+// fetches when someone switches apps several times a minute.
+const CHECK_EVERY_MS = 10 * 60_000;
 const SNOOZE_MS = 24 * 3_600_000;
 
 interface UpdaterNative {
@@ -27,13 +29,38 @@ interface UpdaterNative {
 const native: UpdaterNative | undefined =
   Platform.OS === "android" ? (NativeModules.AlibiUpdater as UpdaterNative | undefined) : undefined;
 
+export interface ReleaseHighlight {
+  title: string;
+  body: string;
+}
+
 export interface ReleaseInfo {
   versionCode: number;
   versionName: string;
   url: string;
   sha256: string;
+  /** One line under the title, e.g. "Speak your tasks and watch them appear". */
+  headline: string | null;
+  /** "What's new" cards. Older manifests only have plain `notes`, which become titles. */
+  highlights: ReleaseHighlight[];
   notes: string[];
   installedVersionName: string;
+}
+
+function readHighlights(raw: unknown, notes: string[]): ReleaseHighlight[] {
+  if (Array.isArray(raw)) {
+    const items = raw.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const v = item as Record<string, unknown>;
+      if (typeof v.title !== "string" || !v.title.trim()) return [];
+      return [{ title: v.title.trim().slice(0, 60), body: typeof v.body === "string" ? v.body.trim().slice(0, 140) : "" }];
+    });
+    if (items.length) return items.slice(0, 4);
+  }
+  return notes.slice(0, 4).map((note) => {
+    const [title, ...rest] = note.split(":");
+    return rest.length ? { title: title.trim(), body: rest.join(":").trim() } : { title: note.trim(), body: "" };
+  });
 }
 
 export async function getInstalledVersion(): Promise<{ versionCode: number; versionName: string } | null> {
@@ -56,7 +83,7 @@ export async function setAutoUpdateCheckEnabled(enabled: boolean): Promise<void>
   await SecureStore.setItemAsync(AUTO_CHECK_KEY, String(enabled));
 }
 
-function isRelease(value: unknown): value is Omit<ReleaseInfo, "installedVersionName"> {
+function isRelease(value: unknown): value is { versionCode: number; versionName: string; url: string; sha256: string; notes?: unknown[] } {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
   return typeof v.versionCode === "number"
@@ -100,12 +127,16 @@ export async function checkForUpdate(manual = false): Promise<ReleaseInfo | null
     const [code, until] = (snooze ?? "").split(":").map(Number);
     if (code === manifest.versionCode && until > Date.now()) return null;
   }
+  const notes = (manifest.notes ?? []).filter((note): note is string => typeof note === "string").slice(0, 6);
+  const extra = manifest as unknown as { headline?: unknown; highlights?: unknown };
   return {
     versionCode: manifest.versionCode,
     versionName: manifest.versionName,
     url: manifest.url,
     sha256: manifest.sha256,
-    notes: (manifest.notes ?? []).filter((note): note is string => typeof note === "string").slice(0, 6),
+    headline: typeof extra.headline === "string" && extra.headline.trim() ? extra.headline.trim().slice(0, 90) : null,
+    highlights: readHighlights(extra.highlights, notes),
+    notes,
     installedVersionName: installed.versionName,
   };
 }

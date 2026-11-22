@@ -2530,6 +2530,10 @@ export interface components {
             estimate_minutes?: number | null;
             /** Category */
             category?: ("professional" | "personal" | "academic" | "learning") | null;
+            /** Suggested At */
+            suggested_at?: string | null;
+            /** Time Source */
+            time_source?: ("said" | "suggested") | null;
         };
         /** BrainDumpRequest */
         BrainDumpRequest: {
