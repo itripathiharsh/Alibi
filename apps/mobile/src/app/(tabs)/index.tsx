@@ -10,8 +10,9 @@
  * Execution tracking (ADR-032): "Start" records a work session on the phone (local_timers,
  * timestamp-based, survives restarts). "Pause" ends the session and saves it as a time entry
  * (synced to the server); "Start" again opens a new session; completing a task stops its
- * running session first. Starting a task here pauses any other running one, so time is
- * never double-counted. Overdue tasks keep their original due date and can be rescheduled.
+ * running session first. Several tasks can run at once (ADR-033): each keeps its own time,
+ * and Insights counts overlapping time once for the day. Overdue tasks keep their original
+ * due date and can be rescheduled.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -199,13 +200,12 @@ export default function TodayDiaryScreen() {
 
   const startWork = useCallback(async (entry: DiaryEntry) => {
     const userId = await currentUserId();
-    if (timerFor(entry.task.id)) return; // already running: never a second timer
-    for (const other of timers) await endSession(userId, other); // one task at a time here
-    await startTaskTimerOffline(userId, entry.task.id);
+    if (timerFor(entry.task.id)) return; // already running: never a second timer for one task
+    await startTaskTimerOffline(userId, entry.task.id); // other running tasks keep going
     triggerHaptic("tap");
     await readLocal();
     scheduleSync();
-  }, [endSession, readLocal, scheduleSync, timerFor, timers]);
+  }, [readLocal, scheduleSync, timerFor]);
 
   const pauseWork = useCallback(async (entry: DiaryEntry) => {
     const userId = await currentUserId();
@@ -337,6 +337,7 @@ export default function TodayDiaryScreen() {
           <View style={styles.progressBlock}>
             <Text style={styles.progressText}>
               <Text style={styles.progressStrong}>{page.done} of {page.total}</Text> done
+              {timers.length > 0 ? <Text style={styles.runningText}>{`  ·  ${timers.length} running`}</Text> : null}
             </Text>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
@@ -564,6 +565,7 @@ const styles = StyleSheet.create({
   progressBlock: { gap: 8 },
   progressText: { fontSize: 13, color: theme.colors.text.secondary },
   progressStrong: { fontWeight: "800", color: INK },
+  runningText: { fontWeight: "700", color: PEN },
   progressTrack: { height: 6, borderRadius: 3, backgroundColor: "#EAE2D7", overflow: "hidden" },
   progressFill: { height: 6, borderRadius: 3, backgroundColor: PEN },
   section: { gap: 8 },

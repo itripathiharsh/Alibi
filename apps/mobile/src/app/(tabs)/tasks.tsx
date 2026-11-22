@@ -43,7 +43,7 @@ import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
 import { cancelTaskTimerReminder, scheduleTaskTimerReminder, syncTaskTimerReminders } from "../../lib/timer-reminders";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
-import { triggerHaptic, startFocusNotification, stopFocusNotification } from "../../lib/focus-session-notification";
+import { triggerHaptic, stopFocusNotification } from "../../lib/focus-session-notification";
 import { loadLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
 import { predictTaskDuration, type DurationPrediction } from "../../lib/personal-learning-engine";
 import { CaptureReviewSheet } from "../../components/capture-review-sheet";
@@ -704,7 +704,6 @@ export default function TasksScreen() {
       } else {
         const timer = await startTaskTimerOffline(profile.id, task.id);
         setRunningTimers((previous) => [...previous.filter((item) => item.task_id !== task.id), timer]);
-        void startFocusNotification(task.id, task.title, timer.started_at, task.estimate_user_min, profile.settings?.focus_show_task_name === true);
         void scheduleTaskTimerReminder({ timerId: timer.id, taskId: timer.task_id, startedAt: timer.started_at });
       }
       void fetchTasks();
@@ -773,7 +772,6 @@ export default function TasksScreen() {
         if (res.ok) {
           const entry = await res.json();
           setRunningTimers((previous) => [...previous.filter((timer) => timer.task_id !== task.id), entry]);
-          void startFocusNotification(task.id, task.title, entry.started_at, task.estimate_user_min, profile?.settings?.focus_show_task_name === true);
           if (profile) await cacheRunningTimers(profile.id, [...runningTimers.filter((timer) => timer.task_id !== task.id), entry]);
           void scheduleTaskTimerReminder({ timerId: entry.id, taskId: entry.task_id, startedAt: entry.started_at });
           fetchTasks();

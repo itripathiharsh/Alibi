@@ -209,3 +209,56 @@ async def test_time_report_endpoint_shape(auth_client: httpx.AsyncClient) -> Non
     assert body["average_completion_minutes"] is None
     assert body["tasks"] == []
     assert len(body["days"]) >= 28
+
+
+@pytest.mark.asyncio
+async def test_parallel_tasks_keep_their_own_time_but_the_day_counts_clock_time(
+    auth_client: httpx.AsyncClient, db_session: AsyncSession
+) -> None:
+    """Two tasks run together 10:00-11:00 and one alone 11:00-11:30 (ADR-033)."""
+    user_id = auth_client.user_id  # type: ignore[attr-defined]
+    workspace_id = auth_client.workspace_id  # type: ignore[attr-defined]
+    now = datetime(2026, 11, 25, 18, 0, tzinfo=IST)
+    laundry = Task(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        workspace_id=workspace_id,
+        title="Laundry",
+        status="pending",
+        origin="manual",
+    )
+    podcast = Task(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        workspace_id=workspace_id,
+        title="Podcast notes",
+        status="pending",
+        origin="manual",
+    )
+    db_session.add_all([laundry, podcast])
+    await db_session.flush()
+    for task, start, minutes in (
+        (laundry, datetime(2026, 11, 25, 10, 0, tzinfo=IST), 60),
+        (podcast, datetime(2026, 11, 25, 10, 0, tzinfo=IST), 90),
+    ):
+        db_session.add(
+            TimeEntry(
+                id=uuid.uuid4(),
+                user_id=user_id,
+                task_id=task.id,
+                started_at=start,
+                ended_at=start + timedelta(minutes=minutes),
+                duration_min=minutes,
+                source="timer",
+            )
+        )
+    await db_session.commit()
+
+    report = await TimeReportBuilder(db_session).build(user_id, "Asia/Kolkata", "daily", now=now)
+    assert report.today_minutes == 90  # clock time 10:00-11:30, overlap counted once
+    assert report.total_minutes == 90
+    by_title = {t.title: t.minutes for t in report.tasks}
+    assert by_title == {"Podcast notes": 90, "Laundry": 60}  # each task keeps its full time
+    [day] = report.days
+    assert day.tasks_worked == 2
+    assert day.average_minutes_per_task == 75

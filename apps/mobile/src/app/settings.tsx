@@ -138,7 +138,7 @@ export default function SettingsScreen() {
         const current = await Notifications.getPermissionsAsync();
         const permission = current.status === "granted" ? current : await Notifications.requestPermissionsAsync();
         if (permission.status !== "granted") {
-          Alert.alert("Notifications are off", "Allow notifications in Android settings to receive private two-hour task check-ins.", [
+          Alert.alert("Notifications are off", "Allow notifications in Android settings to see running tasks and time checks.", [
             { text: "Not now", style: "cancel" },
             { text: "Open settings", onPress: () => { void Linking.openSettings(); } },
           ]);
@@ -378,12 +378,12 @@ export default function SettingsScreen() {
       <View style={styles.preferenceCard}>
         <View style={styles.preferenceRow}>
           <View style={styles.iconBox}><Clock3 size={20} color="#F47B25" /></View>
-          <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>Two-hour task check-ins</Text><Text style={styles.preferenceDescription}>A private reminder helps you review a timer that is still running. Task names are never shown on the lock screen.</Text></View>
-          {loading || saving ? <ActivityIndicator size="small" color="#F47B25" /> : <Switch value={remindersEnabled} onValueChange={updateReminders} trackColor={{ false: "#D3D9DF", true: "#F5B27E" }} thumbColor={remindersEnabled ? "#F47B25" : "#FFFFFF"} accessibilityLabel="Two-hour task check-ins" />}
+          <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>Tasks in progress</Text><Text style={styles.preferenceDescription}>Each running task stays in your notifications with Pause and Done, and checks in when its planned time is up.</Text></View>
+          {loading || saving ? <ActivityIndicator size="small" color="#F47B25" /> : <Switch value={remindersEnabled} onValueChange={updateReminders} trackColor={{ false: "#D3D9DF", true: "#F5B27E" }} thumbColor={remindersEnabled ? "#F47B25" : "#FFFFFF"} accessibilityLabel="Tasks in progress notifications" />}
         </View>
         <View style={[styles.preferenceRow, styles.preferenceRowBorder]}>
           <View style={styles.iconBox}><CalendarDays size={20} color={theme.colors.accent.amber} /></View>
-          <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>Deadline reminders</Text><Text style={styles.preferenceDescription}>A private on-device alert comes before a due time. It never shows your task name on the lock screen.</Text></View>
+          <View style={styles.preferenceCopy}><Text style={styles.preferenceTitle}>Up next</Text><Text style={styles.preferenceDescription}>An alert before a due time, with Start now and Snooze. Task names stay hidden on the lock screen.</Text></View>
           {loading || saving ? <ActivityIndicator size="small" color={theme.colors.accent.amber} /> : <Switch value={deadlineRemindersEnabled} onValueChange={updateDeadlineReminders} trackColor={{ false: "#D3D9DF", true: "#F5B27E" }} thumbColor={deadlineRemindersEnabled ? theme.colors.accent.amber : theme.colors.surface.card} accessibilityLabel="Deadline reminders" />}
         </View>
         <View style={[styles.preferenceRow, styles.preferenceRowBorder]}>

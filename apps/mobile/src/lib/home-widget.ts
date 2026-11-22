@@ -48,11 +48,14 @@ export function buildWidgetSnapshot(
   let currentStartedAt: number | null = null;
   let currentDueAt: number | null = null;
 
-  const running = timers
+  const runningAll = timers
     .map((timer) => ({ timer, task: tasks.find((task) => task.id === timer.task_id) }))
-    .find((entry) => entry.task);
+    .filter((entry) => entry.task);
+  const running = runningAll[0];
   if (running?.task) {
-    currentTitle = running.task.title;
+    // Several tasks can run at once (ADR-033): the widget names the first and counts the rest.
+    const others = runningAll.length - 1;
+    currentTitle = others > 0 ? `${running.task.title} (+${others} more)` : running.task.title;
     currentKind = "running";
     const started = Date.parse(running.timer.started_at);
     currentStartedAt = Number.isFinite(started) ? started : null;
