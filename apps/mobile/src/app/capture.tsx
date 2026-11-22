@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, BookOpen, CheckSquare, Mic, Save, Square } from "lucide-react-native";
+import { ArrowLeft, BookOpen, CheckSquare, ListChecks, Mic, Save, Square } from "lucide-react-native";
 import { BrandHeader } from "../components/brand-ui";
+import BrainDumpReview from "../components/brain-dump-review";
+import { saveBrainDumpItems, setCloudAiOptIn, splitBrainDump, type BrainDumpResult, type ReviewedItem } from "../lib/brain-dump";
 import { ensureAuthenticated, getUserProfile } from "../lib/auth";
 import { getServerUrl } from "../lib/config";
 import { createTaskOffline, saveLocalNote } from "../lib/offline-sync";
@@ -12,8 +14,12 @@ import theme from "../lib/theme";
 
 export default function QuickCaptureScreen() {
   const router = useRouter();
-  const { mode, voice } = useLocalSearchParams<{ mode?: "task" | "idea" | "voice"; voice?: string }>();
-  const [captureType, setCaptureType] = useState<"task" | "idea">(mode === "idea" ? "idea" : "task");
+  const { mode, voice } = useLocalSearchParams<{ mode?: "task" | "idea" | "voice" | "dump"; voice?: string }>();
+  const [captureType, setCaptureType] = useState<"task" | "dump" | "idea">(
+    mode === "idea" ? "idea" : mode === "dump" ? "dump" : "task",
+  );
+  const [dumpResult, setDumpResult] = useState<BrainDumpResult | null>(null);
+  const [enablingAi, setEnablingAi] = useState(false);
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
   const [listening, setListening] = useState(false);
@@ -50,10 +56,47 @@ export default function QuickCaptureScreen() {
 
     if (captureType === "idea") {
       await saveIdea(raw);
+    } else if (captureType === "dump") {
+      await sortDump(raw);
     } else {
       await saveTask(raw);
     }
     setSaving(false);
+  };
+
+  const sortDump = async (content: string) => {
+    try {
+      setDumpResult(await splitBrainDump(content));
+    } catch (error) {
+      Alert.alert("Could not sort your list", error instanceof Error ? error.message : "Try again.");
+    }
+  };
+
+  const enableSmartSorting = async () => {
+    setEnablingAi(true);
+    try {
+      await setCloudAiOptIn(true);
+      setDumpResult(await splitBrainDump(text.trim()));
+    } catch (error) {
+      Alert.alert("Smart sorting", error instanceof Error ? error.message : "Try again.");
+    } finally {
+      setEnablingAi(false);
+    }
+  };
+
+  const saveDumpItems = async (items: ReviewedItem[]) => {
+    if (!dumpResult) return;
+    setSaving(true);
+    try {
+      const saved = await saveBrainDumpItems(items, { proposed: dumpResult.items.length, mode: dumpResult.mode });
+      triggerHaptic("complete");
+      Alert.alert("Added", `${saved} ${saved === 1 ? "task" : "tasks"} added to your list.`);
+      router.replace("/(tabs)");
+    } catch (error) {
+      Alert.alert("Could not save tasks", error instanceof Error ? error.message : "Try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const saveIdea = async (content: string) => {
@@ -162,27 +205,49 @@ export default function QuickCaptureScreen() {
             <Text style={[styles.segmentLabel, captureType === "task" && styles.segmentLabelActive]}>Task</Text>
           </Pressable>
           <Pressable
+            onPress={() => { setCaptureType("dump"); setDumpResult(null); }}
+            style={[styles.segmentButton, captureType === "dump" && styles.segmentButtonActive]}
+            accessibilityRole="button"
+            accessibilityLabel="Brain dump: add many tasks at once"
+          >
+            <ListChecks size={16} color={captureType === "dump" ? "#FFFFFF" : theme.colors.text.secondary} />
+            <Text style={[styles.segmentLabel, captureType === "dump" && styles.segmentLabelActive]}>Brain dump</Text>
+          </Pressable>
+          <Pressable
             onPress={() => setCaptureType("idea")}
             style={[styles.segmentButton, captureType === "idea" && styles.segmentButtonActive]}
             accessibilityRole="button"
             accessibilityLabel="Capture idea note"
           >
             <BookOpen size={16} color={captureType === "idea" ? "#FFFFFF" : theme.colors.text.secondary} />
-            <Text style={[styles.segmentLabel, captureType === "idea" && styles.segmentLabelActive]}>Idea / Note</Text>
+            <Text style={[styles.segmentLabel, captureType === "idea" && styles.segmentLabelActive]}>Note</Text>
           </Pressable>
         </View>
 
-        <Text style={styles.eyebrow}>{captureType === "task" ? "QUICK TASK CAPTURE" : "QUICK IDEA CAPTURE"}</Text>
-        <Text style={styles.title}>{captureType === "task" ? "Get it out of your head." : "Capture the thought."}</Text>
+        {captureType === "dump" && dumpResult ? (
+          <BrainDumpReview
+            result={dumpResult}
+            saving={saving}
+            onSave={(items) => { void saveDumpItems(items); }}
+            onBack={() => setDumpResult(null)}
+            onEnableAi={() => { void enableSmartSorting(); }}
+            enablingAi={enablingAi}
+          />
+        ) : (
+        <>
+        <Text style={styles.eyebrow}>{captureType === "task" ? "QUICK TASK CAPTURE" : captureType === "dump" ? "BRAIN DUMP" : "QUICK IDEA CAPTURE"}</Text>
+        <Text style={styles.title}>{captureType === "task" ? "Get it out of your head." : captureType === "dump" ? "Empty your head." : "Capture the thought."}</Text>
         <Text style={styles.subtitle}>
           {captureType === "task"
             ? "A short phrase is enough. You can add deadlines or tags later."
-            : "Save notes, raw thoughts and ideas directly to your private Vault."}
+            : captureType === "dump"
+              ? "Type or say everything on your mind, in any language. ALIBI splits it into tasks and sorts them by day. You review before anything is saved."
+              : "Save notes, raw thoughts and ideas directly to your private Vault."}
         </Text>
         <TextInput
           value={text}
           onChangeText={setText}
-          placeholder={captureType === "task" ? "What do you need to do?" : "Write or dictate your idea..."}
+          placeholder={captureType === "task" ? "What do you need to do?" : captureType === "dump" ? "mandir jana hai shaam ko, sabzi lena, assignment kal tak dena hai…" : "Write or dictate your idea..."}
           placeholderTextColor={theme.colors.text.muted}
           style={styles.input}
           multiline
@@ -209,17 +274,23 @@ export default function QuickCaptureScreen() {
           {saving ? <ActivityIndicator color="#FFFFFF" /> : <Save size={18} color="#FFFFFF" />}
           <Text style={styles.saveLabel}>
             {saving
-              ? "Saving…"
+              ? captureType === "dump" ? "Sorting…" : "Saving…"
               : captureType === "task"
                 ? "Save Task"
-                : "Save to Vault"}
+                : captureType === "dump"
+                  ? "Sort into tasks"
+                  : "Save to Vault"}
           </Text>
         </Pressable>
         <Text style={styles.privateHint}>
           {captureType === "task"
             ? "Captured to your private ALIBI task list."
-            : "Saved locally in SQLite. Convert to a task anytime in Vault."}
+            : captureType === "dump"
+              ? "Needs internet. Nothing is saved until you tap Add."
+              : "Saved locally in SQLite. Convert to a task anytime in Vault."}
         </Text>
+        </>
+        )}
       </View>
     </KeyboardAvoidingView>
   );

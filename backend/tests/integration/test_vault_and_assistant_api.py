@@ -143,3 +143,32 @@ async def test_assistant_chat_lifecycle_and_grounded_answer(
     assert len(messages) >= 2
     assert messages[0]["role"] == "user"
     assert messages[1]["role"] == "assistant"
+
+
+@pytest.mark.asyncio
+async def test_regression_KI_029_assistant_today_uses_user_timezone_not_server_date(
+    auth_client: httpx.AsyncClient,
+) -> None:
+    """Regression: "today" was resolved with the server's date (UTC when hosted) while tasks
+    were filtered by the user's local date, so between 00:00 and 05:30 IST "What did I
+    accomplish today?" found nothing. The user's timezone here is chosen so its date always
+    differs from the UTC date at the moment the test runs."""
+    from datetime import UTC, datetime
+
+    tz = "Pacific/Kiritimati" if datetime.now(UTC).hour >= 10 else "Etc/GMT+12"
+    me = await auth_client.patch("/api/v1/auth/me", json={"timezone": tz})
+    assert me.status_code == 200
+
+    t_res = await auth_client.post(
+        "/api/v1/tasks/capture",
+        json={"raw_input": "Reconcile timezone ledger", "origin": "manual"},
+    )
+    task_id = t_res.json()["task"]["id"]
+    done = await auth_client.post(f"/api/v1/tasks/{task_id}/status", json={"status": "completed"})
+    assert done.status_code == 200
+
+    chat = await auth_client.post(
+        "/api/v1/assistant/chat", json={"message": "What did I accomplish today?"}
+    )
+    assert chat.status_code == 200
+    assert "Reconcile timezone ledger" in chat.json()["content"]

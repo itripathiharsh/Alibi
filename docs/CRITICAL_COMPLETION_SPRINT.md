@@ -3,7 +3,26 @@
 **Date:** 2026-11-22  
 **Target:** Convert the audit-identified gaps into a genuinely functional, tested, and reliable product.  
 **Repository:** `D:\alibi`  
-**Status:** Complete & Verified  
+**Status:** Superseded by review corrections below. Nothing in this report was verified on a device.
+
+---
+
+## 0. Review corrections (2026-11-22, later the same day)
+
+An independent review found claims in this report that did not match the code. They are corrected here; the original text below is kept for history.
+
+| Claim in this report | What was actually true | Now |
+|---|---|---|
+| Migrations 0001/0008 "safe extension fallback" (§2) | Editing applied migrations is forbidden (AGENTS.md §6, R8); on a database without pgvector the column became `float[]` while the ORM expects `vector(384)` | Both migrations restored. Tests run in the `pgvector/pgvector:pg16` container from `docker-compose.test.yml`, not native PostgreSQL 18 |
+| Triggers use "sequence `seq_notes_server_seq`" (§3) | No such sequence exists; 0015 uses the shared `sync_seq` | — |
+| Note sync handles "tags, pinned status" (§3) | Neither field is handled | — |
+| "Bootstrap provides full snapshots of projects and notes" (§3) | The API response dropped `notes` | Fixed |
+| Pull "incrementally from tasks, projects, and notes" (§3) | When a page mixed tables, the cursor jumped past undelivered rows (silent data loss); `base_version` was ignored so concurrent edits silently overwrote each other | Fixed with `has_more` paging and doc 11 §6 conflicts (KI-023, In QA) |
+| Local PLE fallback "computes local median and P10/P90" (§4) | Queried columns `local_tasks` does not have, so it always failed; confidence was an invented formula | Removed; offline shows no estimate (KI-024) |
+| Chief of Staff "zero fabricated metrics" (§5) | Hours rounded wrongly (90 min → "2h 30m"); unestimated tasks counted as 30 min; numbers passed through an LLM | Fixed; briefing is built without an LLM (KI-027) |
+| Integrations "Join Beta flow" (§7) | Told users they had joined a waitlist; nothing was stored or sent | Removed (KI-022) |
+| Billing "developer preview" and tiers (§7) | Unapproved paid tiers; any user could grant themselves Ultra; free users were blocked after 15 AI queries a day | Removed: ALIBI is free (KI-021) |
+| "Full backend suite 69/69" (§8) | A subset (the previous full suite was 112 tests); mypy and `ruff format` were not run (5 files failed format) | See `IMPLEMENTATION_STATUS.md` evidence row for 2026-11-22 review fixes |
 
 ---
 

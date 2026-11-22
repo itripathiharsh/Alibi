@@ -432,6 +432,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/brain-dump": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Split Brain Dump
+         * @description Split a free-text dump into task proposals; saves nothing (FR-TASK-022, ADR-028).
+         */
+        post: operations["split_brain_dump_api_v1_tasks_brain_dump_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/extraction": {
         parameters: {
             query?: never;
@@ -1085,12 +1105,15 @@ export interface paths {
         };
         /**
          * Get Ai Config
-         * @description Get the current global AI external permission state (default False).
+         * @description Get this user's cloud-AI consent and whether the server allows cloud AI (ADR-028).
          */
         get: operations["get_ai_config_api_v1_ai_config_get"];
         /**
          * Update Ai Config
-         * @description Toggle external AI outbound calls master switch.
+         * @description Turn cloud AI on or off for the signed-in user only (ADR-028).
+         *
+         *     The server-wide AI_EXTERNAL_ENABLED switch is deployment configuration. It used to be
+         *     writable here, which let any signed-in user change it for every account.
          */
         put: operations["update_ai_config_api_v1_ai_config_put"];
         post?: never;
@@ -1292,6 +1315,49 @@ export interface paths {
          * @description List active and candidate behavioral patterns (routines, work periods).
          */
         get: operations["list_learned_patterns_api_v1_learning_patterns_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Learning Signals
+         * @description Store check-in answers, brain-dump review counts and recommendation feedback.
+         *
+         *     FR-LEARN-012. Signals carry ids and counts only (never task text). Task ids that do
+         *     not belong to the user are dropped. Nothing is stored while learning is paused.
+         */
+        post: operations["record_learning_signals_api_v1_learning_signals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning/recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Recommendations
+         * @description Up to three recommendations counted from the user's own history (FR-LEARN-013).
+         */
+        get: operations["get_recommendations_api_v1_learning_recommendations_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2285,6 +2351,16 @@ export interface components {
         AIGlobalConfigRead: {
             /** Ai External Enabled */
             ai_external_enabled: boolean;
+            /**
+             * Server External Enabled
+             * @default false
+             */
+            server_external_enabled: boolean;
+            /**
+             * Server Keys Available
+             * @default false
+             */
+            server_keys_available: boolean;
         };
         /** AIGlobalConfigUpdate */
         AIGlobalConfigUpdate: {
@@ -2430,6 +2506,52 @@ export interface components {
         Body_voice_capture_endpoint_api_v1_voice_capture_post: {
             /** File */
             file: string;
+        };
+        /** BrainDumpItemResponse */
+        BrainDumpItemResponse: {
+            /** Title */
+            title: string;
+            /** Source Text */
+            source_text: string;
+            /** Deadline At */
+            deadline_at?: string | null;
+            /** Deadline Phrase */
+            deadline_phrase?: string | null;
+            /** Deadline Kind */
+            deadline_kind?: ("hard" | "soft") | null;
+            /**
+             * Bucket
+             * @enum {string}
+             */
+            bucket: "today" | "this_week" | "later" | "anytime";
+            /** Priority */
+            priority?: number | null;
+            /** Estimate Minutes */
+            estimate_minutes?: number | null;
+            /** Category */
+            category?: ("professional" | "personal" | "academic" | "learning") | null;
+        };
+        /** BrainDumpRequest */
+        BrainDumpRequest: {
+            /** Text */
+            text: string;
+        };
+        /** BrainDumpResponse */
+        BrainDumpResponse: {
+            /** Items */
+            items: components["schemas"]["BrainDumpItemResponse"][];
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "ai" | "rules";
+            /**
+             * Ai Status
+             * @enum {string}
+             */
+            ai_status: "used" | "not_opted_in" | "server_disabled" | "unavailable";
+            /** Provider */
+            provider?: string | null;
         };
         /** CalendarEventCreate */
         CalendarEventCreate: {
@@ -3084,6 +3206,38 @@ export interface components {
              */
             last_observed_at: string;
         };
+        /** LearningSignalBatch */
+        LearningSignalBatch: {
+            /** Signals */
+            signals: components["schemas"]["LearningSignalIn"][];
+        };
+        /** LearningSignalBatchResponse */
+        LearningSignalBatchResponse: {
+            /** Accepted */
+            accepted: number;
+        };
+        /**
+         * LearningSignalIn
+         * @description One behaviour signal from the device. Carries counts and ids, never task text.
+         */
+        LearningSignalIn: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "checkin_done" | "checkin_snoozed" | "checkin_moved" | "checkin_opened" | "brain_dump_review" | "recommendation_dismissed" | "recommendation_accepted";
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Task Id */
+            task_id?: string | null;
+            /** Data */
+            data?: {
+                [key: string]: number | boolean | string | null;
+            };
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -3578,6 +3732,46 @@ export interface components {
              */
             horizon_days: number;
         };
+        /** RecommendationItem */
+        RecommendationItem: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "best_time" | "stuck_task" | "underestimate" | "overdue_pile" | "too_many_moved" | "routine";
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /** Evidence */
+            evidence: {
+                [key: string]: number | string;
+            };
+            /** Task Id */
+            task_id?: string | null;
+            /**
+             * Action
+             * @default none
+             * @enum {string}
+             */
+            action: "open_task" | "review_today" | "make_routine" | "none";
+        };
+        /** RecommendationsResponse */
+        RecommendationsResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "learning" | "ready";
+            /** Days Observed */
+            days_observed: number;
+            /** Days Needed */
+            days_needed: number;
+            /** Items */
+            items: components["schemas"]["RecommendationItem"][];
+        };
         /** RecurrenceCreateRequest */
         RecurrenceCreateRequest: {
             /**
@@ -4004,6 +4198,10 @@ export interface components {
             tags: {
                 [key: string]: unknown;
             }[];
+            /** Notes */
+            notes?: {
+                [key: string]: unknown;
+            }[];
         };
         /** SyncConflictResolveRequest */
         SyncConflictResolveRequest: {
@@ -4079,6 +4277,11 @@ export interface components {
             since_seq: number;
             /** Next Seq */
             next_seq: number;
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
             /** Changes */
             changes: {
                 [key: string]: unknown;
@@ -5416,6 +5619,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskCaptureResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    split_brain_dump_api_v1_tasks_brain_dump_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrainDumpRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrainDumpResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6946,6 +7182,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LearnedPatternResponse"][];
+                };
+            };
+        };
+    };
+    record_learning_signals_api_v1_learning_signals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearningSignalBatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningSignalBatchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recommendations_api_v1_learning_recommendations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationsResponse"];
                 };
             };
         };

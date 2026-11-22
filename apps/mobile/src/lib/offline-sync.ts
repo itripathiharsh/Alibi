@@ -19,8 +19,41 @@ export interface LocalTask {
   tags: string[];
   subtasks?: { id: string; title: string; completed: boolean }[];
   created_at?: string;
+  completed_at?: string | null;
   origin?: string;
   server_seq?: number;
+}
+
+type LocalTasksListener = (userId: string) => void;
+const localTasksListeners = new Set<LocalTasksListener>();
+
+/** Subscribe to "a task in the on-device cache changed" (widget, check-ins). */
+export function onLocalTasksChanged(listener: LocalTasksListener): () => void {
+  localTasksListeners.add(listener);
+  return () => { localTasksListeners.delete(listener); };
+}
+
+function notifyLocalTasksChanged(userId: string): void {
+  for (const listener of localTasksListeners) {
+    try { listener(userId); } catch { /* a listener must never break a task write */ }
+  }
+}
+
+/** All cached tasks for the user, including completed ones. */
+export async function getAllLocalTasks(userId: string): Promise<LocalTask[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ data_json: string }>(
+    "SELECT data_json FROM local_tasks WHERE user_id = ?",
+    userId,
+  );
+  return rows.flatMap((row) => {
+    try {
+      const task = normalizeTask(JSON.parse(row.data_json) as Record<string, unknown>);
+      return task ? [task] : [];
+    } catch {
+      return [];
+    }
+  });
 }
 
 let database: SQLite.SQLiteDatabase | null = null;
@@ -141,15 +174,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
           primary_goal TEXT,
           updated_at TEXT NOT NULL
         );
-        CREATE TABLE IF NOT EXISTS local_subscriptions (
-          user_id TEXT PRIMARY KEY,
-          tier TEXT NOT NULL DEFAULT 'free',
-          status TEXT NOT NULL DEFAULT 'active',
-          valid_until TEXT,
-          ai_queries_today INTEGER NOT NULL DEFAULT 0,
-          last_query_date TEXT,
-          updated_at TEXT NOT NULL
-        );
+        DROP TABLE IF EXISTS local_subscriptions;
         CREATE TABLE IF NOT EXISTS local_integrations (
           user_id TEXT NOT NULL,
           provider TEXT NOT NULL,
@@ -242,6 +267,7 @@ function normalizeTask(value: Record<string, unknown>): LocalTask | null {
     workspace_id: typeof value.workspace_id === "string" ? value.workspace_id : null,
     version: typeof value.version === "number" ? value.version : 1,
     created_at: typeof value.created_at === "string" ? value.created_at : undefined,
+    completed_at: typeof value.completed_at === "string" ? value.completed_at : null,
   };
 }
 
@@ -259,6 +285,7 @@ async function saveTask(db: SQLite.SQLiteDatabase, userId: string, task: LocalTa
     typeof task.server_seq === "number" ? task.server_seq : 0,
     new Date().toISOString(),
   );
+  notifyLocalTasksChanged(userId);
 }
 
 async function enqueue(
@@ -409,6 +436,11 @@ export async function updateTaskOffline(
     const current = normalizeTask(JSON.parse(row.data_json) as Record<string, unknown>);
     if (!current) return;
     updated = { ...current, ...patch };
+    if (patch.status === "completed" && current.status !== "completed" && patch.completed_at === undefined) {
+      updated.completed_at = new Date().toISOString();
+    } else if (patch.status !== undefined && patch.status !== "completed") {
+      updated.completed_at = null;
+    }
     await saveTask(db, userId, updated);
     const payload: Record<string, unknown> = {};
     if (patch.status !== undefined) payload.status = patch.status;
@@ -485,12 +517,14 @@ export async function cacheRunningTimers(
       );
     }
   });
+  notifyLocalTasksChanged(userId);
   return getLocalTimers(userId);
 }
 
 export async function removeLocalTimer(userId: string, timerId: string): Promise<void> {
   const db = await getDatabase();
   await db.runAsync("DELETE FROM local_timers WHERE user_id = ? AND id = ?", userId, timerId);
+  notifyLocalTasksChanged(userId);
 }
 
 export async function cacheTaskTimeEntries(
@@ -567,6 +601,7 @@ export async function stopTaskTimerOffline(userId: string, timerId: string): Pro
     if (task) await updateTaskOffline(userId, timer.task_id, { actual_min: task.actual_min + duration });
   }
   await db.runAsync("DELETE FROM local_timers WHERE user_id = ? AND id = ?", userId, timerId);
+  notifyLocalTasksChanged(userId);
 }
 
 class ExpoSyncAdapter implements SyncStorageAdapter {
@@ -716,6 +751,7 @@ class ExpoSyncAdapter implements SyncStorageAdapter {
         if (pending) continue;
         if (value.deleted === true) {
           await db.runAsync("DELETE FROM local_tasks WHERE user_id=? AND id=?", this.userId, task.id);
+          notifyLocalTasksChanged(this.userId);
           continue;
         }
         await saveTask(db, this.userId, task);
@@ -845,6 +881,7 @@ export async function deleteTaskOffline(userId: string, taskId: string): Promise
       taskId,
     );
     await db.runAsync("DELETE FROM local_tasks WHERE user_id = ? AND id = ?", userId, taskId);
+    notifyLocalTasksChanged(userId);
     await enqueue(db, userId, taskId, "delete", {}, row?.version ?? null, "task");
     const rows = await db.getAllAsync<{ view_key: string; data_json: string }>(
       "SELECT view_key, data_json FROM task_views WHERE user_id = ?",
@@ -1111,7 +1148,7 @@ export async function migrateOfflineUserToAccount(newUserId: string): Promise<vo
     }
     await db.runAsync("DELETE FROM local_projects WHERE user_id = 'local_user'");
 
-    // 7. User Preferences, Subscriptions & Integrations
+    // 7. User Preferences & Integrations
     await db.runAsync(
       `INSERT INTO local_user_preferences(user_id, work_start_time, work_end_time, planning_style, learning_paused, timezone, primary_goal, updated_at)
        SELECT ?, work_start_time, work_end_time, planning_style, learning_paused, timezone, primary_goal, updated_at
@@ -1123,15 +1160,6 @@ export async function migrateOfflineUserToAccount(newUserId: string): Promise<vo
       newUserId,
     );
     await db.runAsync("DELETE FROM local_user_preferences WHERE user_id = 'local_user'");
-
-    await db.runAsync(
-      `INSERT INTO local_subscriptions(user_id, tier, status, valid_until, ai_queries_today, last_query_date, updated_at)
-       SELECT ?, tier, status, valid_until, ai_queries_today, last_query_date, updated_at
-       FROM local_subscriptions WHERE user_id = 'local_user'
-       ON CONFLICT(user_id) DO NOTHING`,
-      newUserId,
-    );
-    await db.runAsync("DELETE FROM local_subscriptions WHERE user_id = 'local_user'");
 
     await db.runAsync("UPDATE local_integrations SET user_id = ? WHERE user_id = 'local_user'", newUserId);
 
@@ -1413,109 +1441,6 @@ export async function saveLocalUserPreferences(
     next.primary_goal,
     now,
   );
-}
-
-// -------------------------------------------------------------
-// COMMERCIALIZATION: Subscriptions & Entitlements
-// -------------------------------------------------------------
-
-export interface LocalSubscriptionState {
-  tier: "free" | "pro" | "ultra";
-  status: "active" | "expired" | "grace_period";
-  valid_until: string | null;
-  ai_queries_today: number;
-  last_query_date: string;
-}
-
-export async function getLocalSubscription(userId: string): Promise<LocalSubscriptionState> {
-  const db = await getDatabase();
-  const row = await db.getFirstAsync<{
-    tier: string;
-    status: string;
-    valid_until: string | null;
-    ai_queries_today: number;
-    last_query_date: string | null;
-  }>("SELECT * FROM local_subscriptions WHERE user_id = ?", userId);
-
-  const todayStr = new Date().toISOString().slice(0, 10);
-
-  if (!row) {
-    return {
-      tier: "free",
-      status: "active",
-      valid_until: null,
-      ai_queries_today: 0,
-      last_query_date: todayStr,
-    };
-  }
-
-  // If new day, reset query count
-  const queriesToday = row.last_query_date === todayStr ? (row.ai_queries_today || 0) : 0;
-
-  return {
-    tier: (row.tier as "free" | "pro" | "ultra") || "free",
-    status: (row.status as "active" | "expired" | "grace_period") || "active",
-    valid_until: row.valid_until,
-    ai_queries_today: queriesToday,
-    last_query_date: todayStr,
-  };
-}
-
-export async function saveLocalSubscription(
-  userId: string,
-  sub: Partial<LocalSubscriptionState>,
-): Promise<void> {
-  const db = await getDatabase();
-  const current = await getLocalSubscription(userId);
-  const next = { ...current, ...sub };
-  const now = new Date().toISOString();
-
-  await db.runAsync(
-    `INSERT INTO local_subscriptions(user_id, tier, status, valid_until, ai_queries_today, last_query_date, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(user_id) DO UPDATE SET
-       tier = excluded.tier,
-       status = excluded.status,
-       valid_until = excluded.valid_until,
-       ai_queries_today = excluded.ai_queries_today,
-       last_query_date = excluded.last_query_date,
-       updated_at = excluded.updated_at`,
-    userId,
-    next.tier,
-    next.status,
-    next.valid_until,
-    next.ai_queries_today,
-    next.last_query_date,
-    now,
-  );
-}
-
-export async function checkAndIncrementAIUsage(
-  userId: string,
-): Promise<{ allowed: boolean; remaining: number; tier: string }> {
-  const sub = await getLocalSubscription(userId);
-  const limits: Record<string, number> = {
-    free: 15,
-    pro: 100,
-    ultra: 1000,
-  };
-
-  const maxAllowed = limits[sub.tier] || 15;
-  if (sub.ai_queries_today >= maxAllowed) {
-    return { allowed: false, remaining: 0, tier: sub.tier };
-  }
-
-  const nextCount = sub.ai_queries_today + 1;
-  await saveLocalSubscription(userId, {
-    ai_queries_today: nextCount,
-    last_query_date: new Date().toISOString().slice(0, 10),
-  });
-
-  return {
-    allowed: true,
-    remaining: Math.max(0, maxAllowed - nextCount),
-    tier: sub.tier,
-  };
 }
 
 // -------------------------------------------------------------

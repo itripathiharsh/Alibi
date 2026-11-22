@@ -129,3 +129,26 @@ In accordance with ADR-018 and the Zero-Lockin constraint:
 2. Can be run directly on any Node.js 22+ runtime or containerized behind standard Nginx reverse proxy.
 
 
+
+## 8. Running backend tests on the Windows dev machine (no Docker)
+
+Windows Application Control blocks the venv's `python.exe`, and Docker Desktop currently cannot start (KI-030). Backend checks run inside WSL Ubuntu instead; everything lives in the WSL distro on D:.
+
+One-time setup (already done on 2026-11-22):
+- Python tooling: `~/uvtool` (uv) and `~/alibi-backend-venv` (`UV_PROJECT_ENVIRONMENT=$HOME/alibi-backend-venv uv sync --frozen`).
+- Database: PostgreSQL 16 + pgvector from conda-forge via micromamba in `~/mamba/root/envs/pgtest`, data in `~/pgtest-data`, port **5434**, role/db `alibi_test` (same as CI).
+
+Each session (in WSL):
+```bash
+E=$HOME/mamba/root/envs/pgtest/bin
+$E/pg_ctl -D ~/pgtest-data -o "-p 5434 -k /tmp" -l ~/pgtest.log -w start
+cd /mnt/d/alibi/backend && V=$HOME/alibi-backend-venv/bin
+export DATABASE_URL=postgresql+asyncpg://alibi_test:change-me-test@localhost:5434/alibi_test ALIBI_MODE=local
+$V/alembic upgrade head
+$V/ruff check app tests && $V/ruff format --check app tests && $V/mypy app && $V/lint-imports
+$V/python -m pytest tests -p no:cacheprovider -q
+$E/pg_ctl -D ~/pgtest-data stop
+```
+Expected: everything passes except `test_backup_restore` (needs PowerShell). A test that fails with 401 `invalid_token` is the WSL clock step in KI-030; re-run it.
+
+Never point tests at a database without pgvector and never edit applied migrations to make one work (AGENTS.md §6).

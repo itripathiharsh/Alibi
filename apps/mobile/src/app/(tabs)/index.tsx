@@ -55,6 +55,7 @@ import { filterLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/le
 import { CaptureReviewSheet } from "../../components/capture-review-sheet";
 import { decideTaskExtraction, type TaskExtractionProposal } from "../../lib/task-extraction";
 import { ChiefOfStaffCard } from "../../components/chief-of-staff-card";
+import { RecommendationsCard } from "../../components/recommendations-card";
 import { OnboardingModal } from "../../components/onboarding-modal";
 import { ProjectManagerSheet } from "../../components/project-manager-sheet";
 import {
@@ -1017,6 +1018,9 @@ export default function DashboardScreen() {
             void handleRescheduleOverdue(taskIds);
           }}
         />
+
+        {/* One tip counted from the user's own history (FR-LEARN-013) */}
+        <RecommendationsCard />
 
         {/* Elevated Quick Capture Pill */}
         <Pressable

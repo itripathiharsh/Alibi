@@ -1128,6 +1128,53 @@
         ]
       }
     },
+    "/api/v1/tasks/brain-dump": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Split Brain Dump",
+        "description": "Split a free-text dump into task proposals; saves nothing (FR-TASK-022, ADR-028).",
+        "operationId": "split_brain_dump_api_v1_tasks_brain_dump_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrainDumpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrainDumpResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/tasks/{task_id}/extraction": {
       "get": {
         "tags": [
@@ -3508,7 +3555,7 @@
           "AI"
         ],
         "summary": "Get Ai Config",
-        "description": "Get the current global AI external permission state (default False).",
+        "description": "Get this user's cloud-AI consent and whether the server allows cloud AI (ADR-028).",
         "operationId": "get_ai_config_api_v1_ai_config_get",
         "responses": {
           "200": {
@@ -3533,7 +3580,7 @@
           "AI"
         ],
         "summary": "Update Ai Config",
-        "description": "Toggle external AI outbound calls master switch.",
+        "description": "Turn cloud AI on or off for the signed-in user only (ADR-028).\n\nThe server-wide AI_EXTERNAL_ENABLED switch is deployment configuration. It used to be\nwritable here, which let any signed-in user change it for every account.",
         "operationId": "update_ai_config_api_v1_ai_config_put",
         "requestBody": {
           "content": {
@@ -3966,6 +4013,80 @@
                   },
                   "type": "array",
                   "title": "Response List Learned Patterns Api V1 Learning Patterns Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/learning/signals": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Record Learning Signals",
+        "description": "Store check-in answers, brain-dump review counts and recommendation feedback.\n\nFR-LEARN-012. Signals carry ids and counts only (never task text). Task ids that do\nnot belong to the user are dropped. Nothing is stored while learning is paused.",
+        "operationId": "record_learning_signals_api_v1_learning_signals_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningSignalBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningSignalBatchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/learning/recommendations": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Get Recommendations",
+        "description": "Up to three recommendations counted from the user's own history (FR-LEARN-013).",
+        "operationId": "get_recommendations_api_v1_learning_recommendations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationsResponse"
                 }
               }
             }
@@ -6763,6 +6884,16 @@
           "ai_external_enabled": {
             "type": "boolean",
             "title": "Ai External Enabled"
+          },
+          "server_external_enabled": {
+            "type": "boolean",
+            "title": "Server External Enabled",
+            "default": false
+          },
+          "server_keys_available": {
+            "type": "boolean",
+            "title": "Server Keys Available",
+            "default": false
           }
         },
         "type": "object",
@@ -7159,6 +7290,174 @@
           "file"
         ],
         "title": "Body_voice_capture_endpoint_api_v1_voice_capture_post"
+      },
+      "BrainDumpItemResponse": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source_text": {
+            "type": "string",
+            "title": "Source Text"
+          },
+          "deadline_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline At"
+          },
+          "deadline_phrase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline Phrase"
+          },
+          "deadline_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "hard",
+                  "soft"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline Kind"
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "today",
+              "this_week",
+              "later",
+              "anytime"
+            ],
+            "title": "Bucket"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "estimate_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Minutes"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "professional",
+                  "personal",
+                  "academic",
+                  "learning"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "source_text",
+          "bucket"
+        ],
+        "title": "BrainDumpItemResponse"
+      },
+      "BrainDumpRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "BrainDumpRequest"
+      },
+      "BrainDumpResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BrainDumpItemResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "ai",
+              "rules"
+            ],
+            "title": "Mode"
+          },
+          "ai_status": {
+            "type": "string",
+            "enum": [
+              "used",
+              "not_opted_in",
+              "server_disabled",
+              "unavailable"
+            ],
+            "title": "Ai Status"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "mode",
+          "ai_status"
+        ],
+        "title": "BrainDumpResponse"
       },
       "CalendarEventCreate": {
         "properties": {
@@ -8680,6 +8979,106 @@
         ],
         "title": "LearnedPatternResponse"
       },
+      "LearningSignalBatch": {
+        "properties": {
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/LearningSignalIn"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Signals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "signals"
+        ],
+        "title": "LearningSignalBatch"
+      },
+      "LearningSignalBatchResponse": {
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accepted"
+        ],
+        "title": "LearningSignalBatchResponse"
+      },
+      "LearningSignalIn": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "checkin_done",
+              "checkin_snoozed",
+              "checkin_moved",
+              "checkin_opened",
+              "brain_dump_review",
+              "recommendation_dismissed",
+              "recommendation_accepted"
+            ],
+            "title": "Type"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "data": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "propertyNames": {
+              "maxLength": 40
+            },
+            "type": "object",
+            "maxProperties": 12,
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "occurred_at"
+        ],
+        "title": "LearningSignalIn",
+        "description": "One behaviour signal from the device. Carries counts and ids, never task text."
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -9918,6 +10317,117 @@
         "type": "object",
         "title": "ProposalGenerateRequest"
       },
+      "RecommendationItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "best_time",
+              "stuck_task",
+              "underestimate",
+              "overdue_pile",
+              "too_many_moved",
+              "routine"
+            ],
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "evidence": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Evidence"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "open_task",
+              "review_today",
+              "make_routine",
+              "none"
+            ],
+            "title": "Action",
+            "default": "none"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "body",
+          "evidence"
+        ],
+        "title": "RecommendationItem"
+      },
+      "RecommendationsResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "learning",
+              "ready"
+            ],
+            "title": "Status"
+          },
+          "days_observed": {
+            "type": "integer",
+            "title": "Days Observed"
+          },
+          "days_needed": {
+            "type": "integer",
+            "title": "Days Needed"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RecommendationItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "days_observed",
+          "days_needed",
+          "items"
+        ],
+        "title": "RecommendationsResponse"
+      },
       "RecurrenceCreateRequest": {
         "properties": {
           "task_id": {
@@ -10829,6 +11339,14 @@
             },
             "type": "array",
             "title": "Tags"
+          },
+          "notes": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Notes"
           }
         },
         "type": "object",
@@ -10974,6 +11492,11 @@
           "next_seq": {
             "type": "integer",
             "title": "Next Seq"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false
           },
           "changes": {
             "items": {

@@ -84,16 +84,6 @@ export function IntegrationsHubModal({
   onRefreshIntegrations,
   onClose,
 }: IntegrationsHubModalProps) {
-  const [waitlistJoined, setWaitlistJoined] = useState<Record<string, boolean>>({});
-
-  const handleJoinWaitlist = (name: string, provider: string) => {
-    setWaitlistJoined((prev) => ({ ...prev, [provider]: true }));
-    Alert.alert(
-      "Beta Waitlist Joined!",
-      `Native OAuth synchronization for ${name} is scheduled for v0.2.0. You will receive priority access when live connectors are deployed.`,
-    );
-  };
-
   const handleDisconnect = async (provider: string) => {
     Alert.alert(
       "Disconnect Integration",
@@ -128,7 +118,7 @@ export function IntegrationsHubModal({
             <View>
               <Text style={styles.title}>External Integrations</Text>
               <Text style={styles.subtitle}>
-                Upcoming OAuth integrations with external calendars, email, and repositories. Private by default with zero unapproved write actions.
+                None of these connections are available yet. Nothing is connected, and no data leaves this device for them.
               </Text>
             </View>
             <Pressable onPress={onClose} hitSlop={10}>
@@ -141,7 +131,6 @@ export function IntegrationsHubModal({
               const Icon = meta.icon;
               const record = integrations.find((i) => i.provider === meta.provider);
               const isConnected = record?.status === "connected";
-              const isWaitlisted = waitlistJoined[meta.provider];
 
               return (
                 <View key={meta.provider} style={styles.providerCard}>
@@ -177,9 +166,7 @@ export function IntegrationsHubModal({
                       >
                         {isConnected
                           ? `Connected: ${record?.account_email || "Active"}`
-                          : isWaitlisted
-                            ? "Waitlist Joined (v0.2.0)"
-                            : "Coming Soon (Beta Waitlist)"}
+                          : "Not available yet"}
                       </Text>
                     </View>
 
@@ -191,25 +178,7 @@ export function IntegrationsHubModal({
                         <Unlink size={13} color="#DC2626" />
                         <Text style={styles.disconnectBtnText}>Disconnect</Text>
                       </Pressable>
-                    ) : (
-                      <Pressable
-                        style={[
-                          styles.connectBtn,
-                          isWaitlisted && { backgroundColor: "rgba(11, 32, 48, 0.08)" },
-                        ]}
-                        disabled={isWaitlisted}
-                        onPress={() => handleJoinWaitlist(meta.name, meta.provider)}
-                      >
-                        <Text
-                          style={[
-                            styles.connectBtnText,
-                            isWaitlisted && { color: theme.colors.text.secondary },
-                          ]}
-                        >
-                          {isWaitlisted ? "On Waitlist" : "Join Beta"}
-                        </Text>
-                      </Pressable>
-                    )}
+                    ) : null}
                   </View>
                 </View>
               );

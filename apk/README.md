@@ -7,16 +7,15 @@ This directory hosts the official compiled Android application package (`.apk`) 
 - **File**: [`ALIBI-0.1.0.apk`](./ALIBI-0.1.0.apk)
 - **Direct Download Link**: [Download ALIBI-0.1.0.apk (Raw)](https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk)
 - **Version**: `0.1.0`
-- **Build Date**: November 22, 2026 (00:16 IST)
+- **Build Date**: November 22, 2026 (built from the uncommitted working tree with ADR-028)
 - **Variant**: Android release APK, Hermes Bytecode Engine (React Native 0.76 New Architecture)
-- **File Size**: `69,185,513 bytes` (65.98 MB)
-- **Signing**: Signed with the repository's Android release/debug keystore. Installable directly for distribution/testing.
-- **SHA-256**: `1A3CD18BE6DDFEEF95D605C9CE147BB77B83F744A8A32468AE650F4EC6E49F72`
-- **Build verification**: `assembleRelease` succeeded (741 actionable tasks, BUILD SUCCESSFUL in 2m 26s); Hermes bytecode compiled (`entry-1972e2638302a509809c0c7f86d96088.hbc`, 6.04 MB); monorepo typecheck passed across all 6 workspace packages (`pnpm -r run typecheck`: 0 errors); monorepo unit tests passed (`pnpm -r test`: 7/7 passed); backend unit tests passed (`45/45` pure unit & property-based tests passed).
-- **Previous Build Backups**:
-  - [`ALIBI-0.1.0-backup-precommercial.apk`](./ALIBI-0.1.0-backup-precommercial.apk) (`69,150,585 bytes`, SHA-256: `BE9A423DCA9A511AEA26EBB0239F11DA3AD91B81545C17F4770B9DCFE871A452`)
-  - [`ALIBI-0.1.0-backup-stage1.apk`](./ALIBI-0.1.0-backup-stage1.apk) (`69,143,001 bytes`, SHA-256: `5C0B5C5646BC04787F08F75302B6F15B7CD17799845A9BBB8CDBF66DD65FC590`)
-  - [`ALIBI-0.1.0-backup-step2.apk`](./ALIBI-0.1.0-backup-step2.apk) (`69,141,677 bytes`, preserved).
+- **File Size**: `69,218,793 bytes` (66.01 MB)
+- **Signing**: Signed with the repository's debug keystore, not an owner-managed release key.
+- **SHA-256**: `8B66C19DF8FF1FE4FBD46046C7E297EE6677A9F40925AB6DB044437C2FF836CE`
+
+> Includes the 2026-11-22 review fixes and ADR-028: brain dump on the Add screen, "Did it get done?" check-ins, recommendations card, and the round "ALIBI Today" home-screen widget with a quick-action menu. Not yet tested on a physical device (KI-032).
+>
+> Old build backups are no longer kept in Git (`apk/*-backup-*.apk` is ignored).
 
 ---
 
@@ -46,18 +45,12 @@ This directory hosts the official compiled Android application package (`.apk`) 
    - Persisted projects to SQLite table `local_projects` with full offline support and outbox synchronization.
 
 5. **Module G — Connected ALIBI (Integrations Hub)**:
-   - Created `<IntegrationsHubModal>` on the Profile screen supporting 4 modular external connectors: Google Calendar, Gmail, Google Drive, and GitHub.
-   - Displays real-time connection status (`connected`, `disconnected`, `needs_credentials`, `syncing`), authorized OAuth scopes, last sync timestamp, and disconnect safety.
+   - Lists Google Calendar, Gmail, Google Drive and GitHub as **not available yet**. No connector, OAuth flow or sync worker exists (KI-022). The "Join Beta" waitlist button was removed on 2026-11-22 because it recorded nothing.
 
 6. **Module H — AI Assistant & Action Proposal Guardrails**:
-   - Added daily AI query entitlement metering using `checkAndIncrementAIUsage()`. Free tier receives 15 daily queries; Pro receives 100 queries; Ultra receives 1,000 queries.
-   - Automatically presents the `<UpgradeModal>` when daily query limits are reached.
-   - Added Action Proposals in Ask ALIBI: when AI recommends creating a task, an interactive card renders with `[Approve & Create]` and `[Dismiss]` buttons. Writing to data is strictly a proposal until approved by the user.
+   - Action Proposals in Ask ALIBI: when the assistant suggests a task, a card offers `[Approve & Create]` and `[Dismiss]`. Nothing is written until the user approves.
 
-7. **Commercialization & Subscription Architecture**:
-   - Created `<UpgradeModal>` with transparent tier comparisons: Free (₹0 forever), Pro (₹149/month or ₹1,499/year), and Ultra (₹299/month or ₹2,999/year).
-   - Enforces the core product guarantee: expiring subscriptions never lock users out of their offline tasks, history, or exports.
-   - Added subscription management card on the Profile screen.
+7. **Paid plans — removed 2026-11-22**: the Free/Pro/Ultra tiers, the 15-query daily AI limit and the upgrade screen were removed from the source. ALIBI is free with no paid plan; any future pricing needs an owner-approved ADR first (KI-021).
 
 ---
 

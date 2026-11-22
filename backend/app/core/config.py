@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     # AI & Privacy Gating (Privacy by default: False)
     ai_external_enabled: bool = Field(default=False, alias="AI_EXTERNAL_ENABLED")
 
+    # Optional server-held free-tier provider keys (ADR-028). Used only for users who
+    # opted in to cloud AI and have not saved their own key. Never logged or returned.
+    groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
+    gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
+    openrouter_api_key: str | None = Field(default=None, alias="OPENROUTER_API_KEY")
+    openrouter_model: str | None = Field(default=None, alias="OPENROUTER_MODEL")
+
     # App Info
     app_name: str = "ALIBI"
     app_version: str = "0.1.0"

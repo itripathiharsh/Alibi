@@ -23,14 +23,7 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     # 1. PostgreSQL Extensions
     op.execute('CREATE EXTENSION IF NOT EXISTS "citext";')
-    op.execute("""
-    DO $$
-    BEGIN
-        CREATE EXTENSION IF NOT EXISTS "vector";
-    EXCEPTION WHEN OTHERS THEN
-        RAISE NOTICE 'vector extension not available, skipping';
-    END $$;
-    """)
+    op.execute('CREATE EXTENSION IF NOT EXISTS "vector";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "pg_trgm";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "btree_gist";')
 

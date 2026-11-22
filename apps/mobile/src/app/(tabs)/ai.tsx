@@ -32,13 +32,7 @@ import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/bra
 import { getAccessToken, ensureAuthenticated, getUserProfile, isOfflineUser, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
-import {
-  checkAndIncrementAIUsage,
-  createTaskOffline,
-  getLocalSubscription,
-  LocalSubscriptionState,
-} from "../../lib/offline-sync";
-import { UpgradeModal } from "../../components/upgrade-modal";
+import { createTaskOffline } from "../../lib/offline-sync";
 
 interface Message {
   id: string;
@@ -80,26 +74,10 @@ export default function AIScreen() {
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const { isOffline } = useOfflineStatus();
   const scrollViewRef = useRef<ScrollView>(null);
-
-  // Commercialization & AI usage limit state
-  const [upgradeVisible, setUpgradeVisible] = useState(false);
-  const [subscription, setSubscription] = useState<LocalSubscriptionState>({
-    tier: "free",
-    status: "active",
-    valid_until: null,
-    ai_queries_today: 0,
-    last_query_date: "",
-  });
   const [userId, setUserId] = useState<string>("local_user");
 
   useEffect(() => {
-    getUserProfile().then((p) => {
-      const uid = p?.id || "local_user";
-      setUserId(uid);
-      getLocalSubscription(uid).then((sub) => {
-        if (sub) setSubscription(sub);
-      });
-    });
+    getUserProfile().then((p) => setUserId(p?.id || "local_user"));
   }, []);
 
   const handleApproveProposal = async (msgId: string, proposal: NonNullable<Message["proposal"]>) => {
@@ -184,21 +162,6 @@ export default function AIScreen() {
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
-
-    const currentUserId = userId;
-    const usageCheck = await checkAndIncrementAIUsage(currentUserId);
-    if (!usageCheck.allowed) {
-      const upgradeMsg: Message = {
-        id: `limit-${Date.now()}`,
-        role: "assistant",
-        content: `You have reached your daily limit of AI queries on the ${usageCheck.tier.toUpperCase()} plan. Upgrade to ALIBI Pro for 100 queries/day and AI Chief of Staff, or ALIBI Ultra for 1,000 queries/day.`,
-        createdAt: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, upgradeMsg]);
-      setIsLoading(false);
-      setUpgradeVisible(true);
-      return;
-    }
 
     try {
       let token = await ensureAuthenticated();
@@ -529,16 +492,6 @@ export default function AIScreen() {
           <Send size={18} color={inputText.trim() ? theme.colors.background.base : theme.colors.text.muted} />
         </Pressable>
       </View>
-      <UpgradeModal
-        visible={upgradeVisible}
-        userId={userId}
-        currentSubscription={subscription}
-        onClose={() => setUpgradeVisible(false)}
-        onSubscriptionUpdated={(sub) => {
-          setSubscription(sub);
-          setUpgradeVisible(false);
-        }}
-      />
     </KeyboardAvoidingView>
   );
 }

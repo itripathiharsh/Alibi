@@ -25,6 +25,7 @@ class MainApplication : Application(), ReactApplication {
             val packages = PackageList(this).packages
             packages.add(SpeechRecognitionPackage())
             packages.add(FocusSessionPackage())
+            packages.add(AlibiWidgetPackage())
             return packages
           }
 

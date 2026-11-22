@@ -1454,7 +1454,7 @@ export default function TasksScreen() {
                 <Text style={styles.routineLoading}>Analyzing historical completion patterns...</Text>
               )}
               {durationPrediction && (
-                durationPrediction.confidence > 0 && durationPrediction.maturity_level !== "L0_COLD" ? (
+                durationPrediction.confidence > 0 && durationPrediction.maturity_level > 0 ? (
                   <View style={styles.predictionCard}>
                     <View style={styles.predictionTitleRow}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -1492,7 +1492,7 @@ export default function TasksScreen() {
                       </Text>
                     </View>
                     <Text style={styles.predictionSubtext}>
-                      No historical model yet (&lt; 5 completed tasks). Estimates calibrate automatically as tasks are finished.
+                      Not enough finished tasks to predict yet. Estimates appear once ALIBI has learned from your completed work.
                     </Text>
                   </View>
                 )

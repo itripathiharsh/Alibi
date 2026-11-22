@@ -73,6 +73,7 @@ Category body: `{name, sharing_class, external_ai_allowed, color}`.
 | Method | Path | Notes |
 |---|---|---|
 | POST | /tasks/capture | `{id, raw_input, origin, captured_at, category_hint?}` → 201 `{task, extraction|null, extraction_status}`; `?parse=sync|async|none` (default sync with 8 s budget, falls back to async) |
+| POST | /tasks/brain-dump | FR-TASK-022, ADR-028. `{text}` (1–4000 chars) → `{items[{title, source_text, deadline_at, deadline_phrase, deadline_kind, bucket: today|this_week|later|anytime, priority, estimate_minutes, category}], mode: ai|rules, ai_status: used|not_opted_in|server_disabled|unavailable, provider}`. Saves nothing; the device saves the items the user keeps. Dates come only from the rules parser on phrases found in the text. |
 | GET | /tasks/{id}/extraction | latest extraction proposal |
 | POST | /tasks/{id}/extraction/decision | `{accepted_fields{}, corrected_fields{}, rejected_fields[]}` → updated task; emits prediction feedback |
 | POST | /tasks | full create `{id, title, description?, category_id?, project_id?, priority?, deadline_at?, deadline_kind?, estimate_user_min?, origin, origin_ref?, tags?[], subtasks?[]}` |
@@ -144,9 +145,12 @@ Hosted mode (ADR-020): these endpoints return 503 `ai_unavailable` unless extern
 | POST | /learning/predict | `{title, description?}` → category/project/duration/priority predictions (no persistence) |
 | GET | /learning/metrics | evaluation metrics (MAE, accuracy, acceptance) |
 | GET | /learning/routines/suggestions · POST /learning/routines/{id}/convert | turn a routine into a recurrence rule (user approval) |
+| POST | /learning/signals | FR-LEARN-012. `{signals[1..100]{type: checkin_done|checkin_snoozed|checkin_moved|checkin_opened|brain_dump_review|recommendation_dismissed|recommendation_accepted, occurred_at, task_id?, data{≤12 keys; numbers, booleans, strings ≤60}}}` → `{accepted}`. Foreign task ids are stored as null; nothing is stored while `settings.learning_paused` is true. |
+| GET | /learning/recommendations | FR-LEARN-013. `{status: learning|ready, days_observed, days_needed: 7, items[≤3]{id, kind, title, body, evidence, task_id?, action}}`. Counted from the user's rows; dismissed items are hidden for 30 days. |
 
 ### 4.12 AI settings & usage (FR-AI)
-| GET | /ai/providers | settings without keys (`key_set: bool, key_last4`) |
+| GET · PUT | /ai/config | FR-AI-012, ADR-028. `{ai_external_enabled}` is **this user's** cloud-AI consent (default false), stored in `users.settings.cloud_ai_opt_in`. Read also returns `server_external_enabled` and `server_keys_available`. The server-wide `AI_EXTERNAL_ENABLED` switch is deployment config and cannot be changed through the API. |
+| GET | /ai/providers | settings without keys (`key_set: bool, key_last4`); providers: groq, gemini, nvidia, openrouter, ollama |
 | PUT | /ai/providers/{provider} | `{enabled, api_key?, base_url?, models, fallback_rank}` |
 | DELETE | /ai/providers/{provider}/key | |
 | POST | /ai/providers/{provider}/test | → `{ok, latency_ms, models_available[], error?}` |

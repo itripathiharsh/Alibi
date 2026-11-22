@@ -142,9 +142,7 @@ class CpSatScheduler:
         for idx, (b_start, b_end) in enumerate(merged_blocked):
             dur = b_end - b_start
             if dur > 0:
-                fixed_interval = model.NewFixedSizeIntervalVar(
-                    b_start, dur, f"blocked_{idx}"
-                )
+                fixed_interval = model.new_fixed_size_interval_var(b_start, dur, f"blocked_{idx}")
                 all_intervals.append(fixed_interval)
 
         # 2. Filter tasks and decompose into chunks
@@ -182,53 +180,64 @@ class CpSatScheduler:
         task_presence_vars: dict[str, Any] = {}
         objective_terms: list[Any] = []
 
+        # Break each task's remaining time into chunks up front, so the cost of dropping a
+        # task can be sized against every other term in the objective.
+        chunk_plan: dict[str, list[int]] = {}
         for task in eligible_tasks:
-            task_id = task["id"]
-            rem_min = int(task["remaining_min"])
-            pri = int(task.get("priority") or 4)
-            pri_weight = {1: 8, 2: 4, 3: 2, 4: 1}.get(pri, 1)
-
-            dl_str = task.get("deadline_at")
-            deadline_dt = _parse_iso(dl_str) if dl_str else None
-            deadline_m = (
-                int((deadline_dt - horizon_start).total_seconds() // 60)
-                if deadline_dt
-                else None
-            )
-            is_hard_dl = task.get("deadline_kind") == "hard"
-
-            # Break remaining time into chunks
             chunk_durations: list[int] = []
-            curr_rem = rem_min
+            curr_rem = int(task["remaining_min"])
             while curr_rem > 0:
                 cdur = min(preferred_session_min, curr_rem)
                 if cdur < min_block_min and curr_rem > cdur:
                     cdur = min_block_min
                 chunk_durations.append(cdur)
                 curr_rem -= cdur
+            chunk_plan[task["id"]] = chunk_durations
+
+        # Dropping a task must always cost more than any timing trade-off. Secondary terms are
+        # at most total_horizon_min per chunk (earliness) plus 20 * total_horizon_min per task
+        # (lateness), so the unscheduled cost exceeds their combined maximum. Without this, a
+        # horizon starting on a weekend or late evening (first slot > 1000 minutes away) made
+        # leaving every priority-4 task unscheduled the "optimal" answer.
+        total_chunks = sum(len(c) for c in chunk_plan.values())
+        unscheduled_cost = total_horizon_min * (total_chunks + 20 * len(eligible_tasks)) + 1
+
+        for task in eligible_tasks:
+            task_id = task["id"]
+            pri = int(task.get("priority") or 4)
+            pri_weight = {1: 8, 2: 4, 3: 2, 4: 1}.get(pri, 1)
+
+            dl_str = task.get("deadline_at")
+            deadline_dt = _parse_iso(dl_str) if dl_str else None
+            deadline_m = (
+                int((deadline_dt - horizon_start).total_seconds() // 60) if deadline_dt else None
+            )
+            is_hard_dl = task.get("deadline_kind") == "hard"
+
+            chunk_durations = chunk_plan[task_id]
 
             # Task presence variable: 1 if all chunks of task are scheduled, 0 otherwise
-            task_is_sched = model.NewBoolVar(f"sched_{task_id}")
+            task_is_sched = model.new_bool_var(f"sched_{task_id}")
             task_presence_vars[task_id] = task_is_sched
-            # Soft penalty if task is not scheduled
-            objective_terms.append((1 - task_is_sched) * (pri_weight * 1000))
+            # Penalty if task is not scheduled (priority keeps higher-priority work in first)
+            objective_terms.append((1 - task_is_sched) * (pri_weight * unscheduled_cost))
 
             chunks_meta: list[dict[str, Any]] = []
             prev_end_var: Any = None
 
             for c_idx, cdur in enumerate(chunk_durations):
-                c_start = model.NewIntVar(0, total_horizon_min - cdur, f"start_{task_id}_{c_idx}")
-                c_end = model.NewIntVar(cdur, total_horizon_min, f"end_{task_id}_{c_idx}")
-                model.Add(c_end == c_start + cdur)
+                c_start = model.new_int_var(0, total_horizon_min - cdur, f"start_{task_id}_{c_idx}")
+                c_end = model.new_int_var(cdur, total_horizon_min, f"end_{task_id}_{c_idx}")
+                model.add(c_end == c_start + cdur)
 
-                c_interval = model.NewOptionalIntervalVar(
+                c_interval = model.new_optional_interval_var(
                     c_start, cdur, c_end, task_is_sched, f"interval_{task_id}_{c_idx}"
                 )
                 all_intervals.append(c_interval)
 
                 # Chunks within same task run in non-overlapping order
                 if prev_end_var is not None:
-                    model.Add(c_start >= prev_end_var)
+                    model.add(c_start >= prev_end_var)
                 prev_end_var = c_end
 
                 # Prefer earlier slots (small penalty proportional to start time)
@@ -247,18 +256,18 @@ class CpSatScheduler:
             if deadline_m is not None and prev_end_var is not None:
                 if is_hard_dl:
                     # Hard constraint: end of last chunk <= deadline if scheduled
-                    model.Add(prev_end_var <= deadline_m).OnlyEnforceIf(task_is_sched)
+                    model.add(prev_end_var <= deadline_m).only_enforce_if(task_is_sched)
                 else:
                     # Soft constraint: penalty for lateness beyond deadline
-                    lateness = model.NewIntVar(0, total_horizon_min, f"lateness_{task_id}")
-                    model.Add(lateness >= prev_end_var - deadline_m).OnlyEnforceIf(task_is_sched)
-                    model.Add(lateness == 0).OnlyEnforceIf(task_is_sched.Not())
+                    lateness = model.new_int_var(0, total_horizon_min, f"lateness_{task_id}")
+                    model.add(lateness >= prev_end_var - deadline_m).only_enforce_if(task_is_sched)
+                    model.add(lateness == 0).only_enforce_if(task_is_sched.Not())
                     objective_terms.append(lateness * 20)
 
             task_chunk_vars[task_id] = chunks_meta
 
         # 3. Add NoOverlap across all chunks and blocked intervals
-        model.AddNoOverlap(all_intervals)
+        model.add_no_overlap(all_intervals)
 
         # 4. Enforce daily focus cap
         for day, (d_start, d_end) in day_bounds.items():
@@ -267,15 +276,15 @@ class CpSatScheduler:
                 task_id = task["id"]
                 for cm in task_chunk_vars.get(task_id, []):
                     # Check if chunk falls in day d
-                    in_day = model.NewBoolVar(f"in_day_{task_id}_{cm['chunk_idx']}_{day}")
-                    model.Add(cm["start_var"] >= d_start).OnlyEnforceIf(in_day)
-                    model.Add(cm["start_var"] < d_end).OnlyEnforceIf(in_day)
+                    in_day = model.new_bool_var(f"in_day_{task_id}_{cm['chunk_idx']}_{day}")
+                    model.add(cm["start_var"] >= d_start).only_enforce_if(in_day)
+                    model.add(cm["start_var"] < d_end).only_enforce_if(in_day)
                     day_dur_terms.append(in_day * cm["duration"])
             if day_dur_terms:
-                model.Add(sum(day_dur_terms) <= max_daily_focus_min)
+                model.add(sum(day_dur_terms) <= max_daily_focus_min)
 
         # Set objective
-        model.Minimize(sum(objective_terms))
+        model.minimize(sum(objective_terms))
 
         # Solve model
         solver = cp_model.CpSolver()
@@ -283,7 +292,7 @@ class CpSatScheduler:
         solver.parameters.random_seed = int(self.seed)
         solver.parameters.num_search_workers = 4
 
-        status = solver.Solve(model)
+        status = solver.solve(model)
 
         if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             # Infeasible or error: signal fallback
@@ -298,7 +307,7 @@ class CpSatScheduler:
         for task in eligible_tasks:
             task_id = task["id"]
             chunks = task_chunk_vars[task_id]
-            is_present = solver.BooleanValue(task_presence_vars[task_id])
+            is_present = solver.boolean_value(task_presence_vars[task_id])
 
             if not is_present:
                 dl_str = task.get("deadline_at")
@@ -314,7 +323,7 @@ class CpSatScheduler:
                 continue
 
             for cm in chunks:
-                start_m = solver.Value(cm["start_var"])
+                start_m = solver.value(cm["start_var"])
                 dur = cm["duration"]
                 end_m = start_m + dur
 

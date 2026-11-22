@@ -10,7 +10,6 @@ import {
   ChevronRight,
   CircleHelp,
   Clock,
-  Crown,
   Link2,
   LockKeyhole,
   LogOut,
@@ -30,15 +29,11 @@ import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/bra
 import {
   getLocalAnalyticsSummary,
   getLocalIntegrations,
-  getLocalSubscription,
   getLocalUserPreferences,
   LocalIntegrationRecord,
-  LocalSubscriptionState,
   LocalUserPreferences,
-  saveLocalSubscription,
   saveLocalUserPreferences,
 } from "../../lib/offline-sync";
-import { UpgradeModal } from "../../components/upgrade-modal";
 import { IntegrationsHubModal } from "../../components/integrations-hub-modal";
 import { OnboardingModal } from "../../components/onboarding-modal";
 import { resetLearningProfile, syncLearningPausedPreference } from "../../lib/personal-learning-engine";
@@ -54,17 +49,9 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const { isOffline } = useOfflineStatus();
 
-  // Commercialization, Integrations & Intelligence Preferences
-  const [upgradeVisible, setUpgradeVisible] = useState(false);
+  // Integrations & intelligence preferences
   const [integrationsVisible, setIntegrationsVisible] = useState(false);
   const [onboardingVisible, setOnboardingVisible] = useState(false);
-  const [subscription, setSubscription] = useState<LocalSubscriptionState>({
-    tier: "free",
-    status: "active",
-    valid_until: null,
-    ai_queries_today: 0,
-    last_query_date: "",
-  });
   const [integrations, setIntegrations] = useState<LocalIntegrationRecord[]>([]);
   const [preferences, setPreferences] = useState<LocalUserPreferences>({
     work_start_time: "09:00",
@@ -103,12 +90,10 @@ export default function ProfileScreen() {
     } finally {
       const userId = resolvedProfile?.id || "local_user";
       try {
-        const [sub, prefs, integs] = await Promise.all([
-          getLocalSubscription(userId),
+        const [prefs, integs] = await Promise.all([
           getLocalUserPreferences(userId),
           getLocalIntegrations(userId),
         ]);
-        if (sub) setSubscription(sub);
         if (prefs) setPreferences(prefs);
         if (integs) setIntegrations(integs);
       } catch {}
@@ -151,8 +136,8 @@ export default function ProfileScreen() {
             const token = await ensureAuthenticated().catch(() => null);
             const baseUrl = getServerUrl();
             const result = await resetLearningProfile(baseUrl, token);
-            setLearning(null);
-            Alert.alert("Reset Complete", result.message);
+            if (result.success) setLearning(null);
+            Alert.alert(result.success ? "Reset complete" : "Reset not done", result.message);
           },
         },
       ]
@@ -196,32 +181,6 @@ export default function ProfileScreen() {
               <Text style={styles.memberText}>Private by default</Text>
             </View>
           </View>
-        </View>
-
-        {/* Subscription Tier Banner */}
-        <View style={styles.subscriptionCard}>
-          <View style={styles.subCardTop}>
-            <View style={styles.subBadgeWrap}>
-              <Crown size={18} color="#FF741F" />
-              <Text style={styles.subTierTitle}>
-                {subscription?.tier === "ultra" ? "ALIBI Ultra" : subscription?.tier === "pro" ? "ALIBI Pro" : "Free Plan"}
-              </Text>
-            </View>
-            <Pressable
-              style={styles.subUpgradeBtn}
-              onPress={() => setUpgradeVisible(true)}
-              accessibilityLabel="Upgrade or manage plan"
-            >
-              <Text style={styles.subUpgradeBtnText}>
-                {subscription?.tier === "pro" || subscription?.tier === "ultra" ? "Manage Plan" : "Upgrade"}
-              </Text>
-            </Pressable>
-          </View>
-          <Text style={styles.subCardSubtitle}>
-            {subscription?.tier === "pro" || subscription?.tier === "ultra"
-              ? `Active subscription · ${subscription.tier === "ultra" ? "1,000" : "100"} AI queries/day · Zero data lockout`
-              : "15 AI queries/day · Unlimited local offline tasks & vault notes"}
-          </Text>
         </View>
 
         <Text style={styles.metricPeriod}>Activity · this month</Text>
@@ -282,8 +241,7 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.settingsCard}>
-          <ProfileRow icon={Crown} title="Subscription & Plans" subtitle={subscription?.tier === "pro" || subscription?.tier === "ultra" ? "Manage Pro / Ultra plan" : "Upgrade for Chief of Staff & Cloud Sync"} onPress={() => setUpgradeVisible(true)} />
-          <ProfileRow icon={Link2} title="Connected Integrations" subtitle="Google Calendar, Gmail, Google Drive, GitHub" onPress={() => setIntegrationsVisible(true)} />
+          <ProfileRow icon={Link2} title="Connected Integrations" subtitle="Not available yet" onPress={() => setIntegrationsVisible(true)} />
           <ProfileRow icon={Clock} title="Working Window & Habits" subtitle={`Work: ${preferences.work_start_time || "09:00"}–${preferences.work_end_time || "18:00"}`} onPress={() => setOnboardingVisible(true)} />
           <ProfileRow icon={Settings} title="App Settings" subtitle="Task reminders and account preferences" onPress={() => router.push("/settings")} />
           <ProfileRow icon={BarChart3} title="Insights & Reports" subtitle="Productivity trends and reports" onPress={() => router.push("/(tabs)/reports")} />
@@ -307,15 +265,6 @@ export default function ProfileScreen() {
       </ScrollView>
 
       {/* Modals */}
-      <UpgradeModal
-        visible={upgradeVisible}
-        userId={profile?.id || "local_user"}
-        currentSubscription={subscription}
-        onClose={() => setUpgradeVisible(false)}
-        onSubscriptionUpdated={(updated) => {
-          setSubscription(updated);
-        }}
-      />
       <IntegrationsHubModal
         visible={integrationsVisible}
         userId={profile?.id || "local_user"}
@@ -346,13 +295,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background.base }, content: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 32, gap: 14 },
   heading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4, paddingBottom: 8 }, title: { fontSize: 31, color: theme.colors.text.primary, fontWeight: "800", letterSpacing: -.7 }, subtitle: { color: theme.colors.text.secondary, fontSize: 14, marginTop: 2 }, iconButton: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderRadius: 15, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: "#FFFFFF" }, metricPeriod: { color: theme.colors.text.muted, fontSize: 11, fontWeight: "700", marginBottom: -9, marginLeft: 2 },
   identityCard: { flexDirection: "row", alignItems: "center", gap: 13, padding: 16, borderRadius: theme.radius.card, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: theme.colors.border.subtle, minHeight: 112, shadowColor: theme.colors.brand.navy, shadowOpacity: .05, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 2 }, avatar: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center", backgroundColor: theme.colors.brand.navy, borderWidth: 3, borderColor: theme.colors.accent.primary }, initial: { color: "#FFFFFF", fontSize: 32, fontWeight: "700" }, identityCopy: { flex: 1, minWidth: 0 }, name: { color: theme.colors.text.primary, fontSize: 17, fontWeight: "800" }, email: { color: theme.colors.text.secondary, fontSize: 12, marginTop: 4 }, memberBadge: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 5, marginTop: 7, borderRadius: theme.radius.control, backgroundColor: "#FFF1E6" }, memberText: { color: "#B75216", fontSize: 10, fontWeight: "800" },
-  subscriptionCard: { backgroundColor: "#FFFFFF", borderRadius: theme.radius.card, borderWidth: 1, borderColor: "#FED7AA", padding: 16, gap: 8, shadowColor: theme.colors.brand.navy, shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
-  subCardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  subBadgeWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
-  subTierTitle: { fontSize: 17, fontWeight: "800", color: theme.colors.text.primary },
-  subUpgradeBtn: { backgroundColor: "#FFF7ED", borderWidth: 1, borderColor: "#FF741F", paddingHorizontal: 12, paddingVertical: 6, borderRadius: theme.radius.control },
-  subUpgradeBtnText: { color: "#FF741F", fontWeight: "700", fontSize: 12 },
-  subCardSubtitle: { fontSize: 12, color: theme.colors.text.secondary, lineHeight: 17 },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: 10 }, metricCard: { width: "47%", minHeight: 118, flexGrow: 1, padding: 13, borderRadius: theme.radius.card, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: "#FFFFFF" }, metricIcon: { width: 36, height: 36, borderRadius: theme.radius.control, alignItems: "center", justifyContent: "center" }, metricValue: { marginTop: 6, fontSize: 23, color: theme.colors.text.primary, fontWeight: "800" }, metricLabel: { marginTop: 1, color: theme.colors.text.secondary, fontSize: 12, fontWeight: "600" },
   learningCard: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16, borderRadius: theme.radius.card, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: theme.colors.border.subtle }, learningIcon: { width: 54, height: 54, borderRadius: 27, alignItems: "center", justifyContent: "center", backgroundColor: "#FFF0E5" }, learningContent: { flex: 1 }, learningTitle: { color: theme.colors.text.primary, fontSize: 17, fontWeight: "800" }, learningSubtitle: { color: theme.colors.text.secondary, fontSize: 12, marginTop: 3 }, learningPills: { flexDirection: "row", marginTop: 10 }, learningPill: { backgroundColor: "#F5F3FA", color: theme.colors.text.primary, fontSize: 11, fontWeight: "600", paddingVertical: 7, paddingHorizontal: 10, borderRadius: theme.radius.control },
   learningControlsCard: { backgroundColor: "#FFFFFF", borderRadius: theme.radius.card, borderWidth: 1, borderColor: theme.colors.border.subtle, padding: 16, gap: 10 },

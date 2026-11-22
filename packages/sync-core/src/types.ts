@@ -53,6 +53,7 @@ export interface SyncApiClient {
     server_epoch: string;
     since_seq: number;
     next_seq: number;
+    has_more?: boolean;
     changes: unknown[];
   }>;
   bootstrap(): Promise<{
@@ -61,6 +62,7 @@ export interface SyncApiClient {
     categories: unknown[];
     projects: unknown[];
     tags: unknown[];
+    notes?: unknown[];
   }>;
 }
 

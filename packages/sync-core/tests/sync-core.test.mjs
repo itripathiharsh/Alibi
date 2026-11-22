@@ -235,3 +235,43 @@ test('SyncEngine: first sync bootstraps while preserving outbox data', async () 
   assert.ok(savedStates.some((state) => state.server_epoch === 'epoch-new' && state.last_seq === 0));
 });
 
+
+test('SyncEngine: pull pages through has_more and saves the cursor after each page', async () => {
+  const serverLog = Array.from({ length: 7 }, (_, i) => ({ entity_type: 'task', id: `t-${i + 1}`, server_seq: i + 1 }));
+  const applied = [];
+  const savedCursors = [];
+  let lastSeq = 0;
+
+  const adapter = {
+    async getPendingOps() { return []; },
+    async markOpsInflight() {},
+    async markOpsComplete() {},
+    async markOpConflict() {},
+    async markOpFailed() {},
+    async markOpsRetryable() {},
+    async getSyncState() { return { server_epoch: 'epoch-1', last_seq: lastSeq, last_synced_at: null, in_progress: false }; },
+    async saveSyncState(state) { if (state.last_seq !== undefined) { lastSeq = state.last_seq; savedCursors.push(state.last_seq); } },
+    async applyRemoteChanges(changes) { applied.push(...changes); },
+  };
+  const api = {
+    async push() { return { results: [] }; },
+    async pull(sinceSeq, limit = 3) {
+      const rows = serverLog.filter((row) => row.server_seq > sinceSeq);
+      const page = rows.slice(0, limit);
+      return {
+        server_epoch: 'epoch-1',
+        since_seq: sinceSeq,
+        next_seq: page.length ? page[page.length - 1].server_seq : sinceSeq,
+        has_more: rows.length > limit,
+        changes: page,
+      };
+    },
+    async bootstrap() { throw new Error('bootstrap must not run when the epoch matches'); },
+  };
+
+  const { pulled } = await new SyncEngine(adapter, api).syncCycle();
+
+  assert.equal(pulled, 7);
+  assert.deepEqual(applied.map((row) => row.id), serverLog.map((row) => row.id));
+  assert.deepEqual(savedCursors, [3, 6, 7]);
+});

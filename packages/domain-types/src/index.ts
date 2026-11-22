@@ -96,16 +96,6 @@ export interface Project extends SyncableFields {
   target_date?: string | null;
 }
 
-export type SubscriptionTier = "free" | "pro" | "ultra";
-
-export interface UserSubscription {
-  tier: SubscriptionTier;
-  status: "active" | "expired" | "grace_period";
-  valid_until?: string | null;
-  ai_queries_today: number;
-  last_query_date: string;
-}
-
 export interface UserPreferences {
   work_start_time: string;
   work_end_time: string;

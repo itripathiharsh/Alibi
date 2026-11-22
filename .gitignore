@@ -32,3 +32,6 @@ coverage/
 .DS_Store
 .test_pg/
 backend/.test_pg/
+
+# Local APK backups are never committed; the current build is apk/ALIBI-0.1.0.apk
+apk/*-backup-*.apk

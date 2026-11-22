@@ -107,16 +107,6 @@ def upgrade() -> None:
     op.execute("CREATE INDEX ix_notes_body_trgm ON notes USING gin (body gin_trgm_ops);")
 
     # 2. embeddings
-    bind = op.get_bind()
-    has_vector = False
-    try:
-        res = bind.execute(sa.text("SELECT 1 FROM pg_extension WHERE extname = 'vector'"))
-        has_vector = res.scalar() is not None
-    except Exception:
-        has_vector = False
-
-    embedding_type = Vector(384) if has_vector else postgresql.ARRAY(sa.Float())
-
     op.create_table(
         "embeddings",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -136,7 +126,7 @@ def upgrade() -> None:
         ),
         sa.Column("chunk_index", sa.Integer(), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
-        sa.Column("embedding", embedding_type, nullable=True),
+        sa.Column("embedding", Vector(384), nullable=True),
         sa.Column("model", sa.String(64), nullable=False, server_default="BAAI/bge-small-en-v1.5"),
         sa.Column("content_hash", sa.String(64), nullable=False),
         sa.Column("meta", postgresql.JSONB(), server_default="{}", nullable=False),
@@ -148,10 +138,9 @@ def upgrade() -> None:
         ),
     )
     op.create_index("ix_embeddings_user_note", "embeddings", ["user_id", "note_id"])
-    if has_vector:
-        op.execute(
-            "CREATE INDEX ix_embeddings_vector ON embeddings USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);"
-        )
+    op.execute(
+        "CREATE INDEX ix_embeddings_vector ON embeddings USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);"
+    )
 
     # 3. chat_threads
     op.create_table(

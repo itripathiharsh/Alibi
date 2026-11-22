@@ -30,4 +30,15 @@ services:
         value: "true"
       - key: AI_EXTERNAL_ENABLED
         value: "false"
+      # Optional free-tier keys used for users who turn on smart sorting (ADR-028).
+      # Set them in the Render dashboard; never commit them. Each may hold several
+      # comma-separated keys (key1,key2,...); requests rotate across them.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        sync: false
 

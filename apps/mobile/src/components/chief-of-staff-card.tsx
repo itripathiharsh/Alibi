@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -24,8 +23,6 @@ import {
 } from "lucide-react-native";
 import theme from "../lib/theme";
 import { LocalUserPreferences } from "../lib/offline-sync";
-import { ensureAuthenticated } from "../lib/auth";
-import { getServerUrl } from "../lib/config";
 
 export interface ChiefOfStaffProps {
   todayTasks: Array<{
@@ -60,79 +57,49 @@ export function ChiefOfStaffCard({
   const [explainVisible, setExplainVisible] = useState(false);
   const [briefingVisible, setBriefingVisible] = useState(false);
   const [briefingText, setBriefingText] = useState<string | null>(null);
-  const [isLoadingBriefing, setIsLoadingBriefing] = useState(false);
-  const [briefingSource, setBriefingSource] = useState<string>("SQL Grounded Intelligence");
 
   // 1. Pending tasks for today
   const pendingTasks = todayTasks.filter((t) => t.status !== "completed");
   const completedTasks = todayTasks.filter((t) => t.status === "completed");
 
-  // 2. Compute available working minutes
+  // 2. Working window from the user's own settings, minus fixed calendar commitments.
   const [startHour, startMin] = (preferences.work_start_time || "09:00").split(":").map(Number);
   const [endHour, endMin] = (preferences.work_end_time || "18:00").split(":").map(Number);
   const totalWorkMin = Math.max(0, (endHour * 60 + (endMin || 0)) - (startHour * 60 + (startMin || 0)));
   const availableMin = Math.max(0, totalWorkMin - calendarBusyMinutes);
 
-  // 3. Compute total estimated pending workload
-  const estimatedMin = pendingTasks.reduce((acc, t) => acc + (t.estimate_user_min || 30), 0);
+  // 3. Planned time counts only estimates the user actually entered; unestimated tasks are
+  //    reported as a count instead of being given an invented duration.
+  const estimatedTasks = pendingTasks.filter((t) => typeof t.estimate_user_min === "number" && t.estimate_user_min > 0);
+  const unestimatedCount = pendingTasks.length - estimatedTasks.length;
+  const estimatedMin = estimatedTasks.reduce((acc, t) => acc + (t.estimate_user_min ?? 0), 0);
   const isWorkloadOverloaded = estimatedMin > availableMin && availableMin > 0;
 
-  // 4. Determine Recommended Next Action
-  // Priority order: Urgent/High priority with deadline today, then first pending
+  // 4. Recommended next action: highest priority (P1 is highest), then list order.
   const recommendedTask =
-    pendingTasks.find((t) => t.priority === "urgent" || t.priority === "high") ||
-    pendingTasks[0] ||
-    null;
+    [...pendingTasks].sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority))[0] ?? null;
 
-  const handleRequestBriefing = async () => {
-    setBriefingVisible(true);
-    setIsLoadingBriefing(true);
-    try {
-      const token = await ensureAuthenticated().catch(() => null);
-      const baseUrl = getServerUrl();
-      if (token && baseUrl) {
-        const queryText = `Give me my daily Chief of Staff briefing. Grounded facts: ${pendingTasks.length} pending tasks (${Math.round(estimatedMin / 60)}h ${estimatedMin % 60}m planned), ${overdueTasks.length} overdue tasks, ${Math.round(availableMin / 60)}h ${availableMin % 60}m available work time${recommendedTask ? `, next action: "${recommendedTask.title}"` : ""}.`;
-        const res = await fetch(`${baseUrl}/api/v1/assistant/chat`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            message: queryText,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.content) {
-            setBriefingText(data.content);
-            setBriefingSource(data.model ? `ALIBI ${data.model} (Grounded)` : "Grounded Assistant");
-            setIsLoadingBriefing(false);
-            return;
-          }
-        }
-      }
-    } catch {
-      // Fall through to deterministic grounded fallback
-    }
-
-    // Local deterministic briefing fallback (strictly grounded in verified facts, 0 fabrication)
+  const handleRequestBriefing = () => {
+    // The briefing is assembled from the same counts shown on the card. No language model
+    // is involved, so every number in it comes from the user's own records (AGENTS.md §2).
     const lines = [
-      `Chief of Staff Daily Briefing:`,
-      `• Workload: You have ${pendingTasks.length} pending tasks (${Math.round(estimatedMin / 60)}h ${estimatedMin % 60}m estimated) within ${Math.round(availableMin / 60)}h ${availableMin % 60}m of available working hours.`,
+      `• Workload: ${pendingTasks.length} pending ${pendingTasks.length === 1 ? "task" : "tasks"}` +
+        (estimatedTasks.length > 0 ? `, ${formatMinutes(estimatedMin)} estimated` : "") +
+        (unestimatedCount > 0 ? ` (${unestimatedCount} without an estimate)` : "") +
+        `, against ${formatMinutes(availableMin)} of working time outside calendar events.`,
       isWorkloadOverloaded
-        ? `• Capacity Warning: Planned work exceeds remaining focus capacity. Consider deferring non-urgent backlog items.`
-        : `• Capacity: Your current workload is within your daily capacity window.`,
+        ? `• Capacity: your estimated work is more than today's working window. Consider moving low-priority tasks to the backlog.`
+        : `• Capacity: your estimated work fits in today's working window.`,
       overdueTasks.length > 0
-        ? `• Attention Needed: ${overdueTasks.length} task${overdueTasks.length > 1 ? "s are" : " is"} overdue. Review and push to today.`
-        : `• Overdue Status: Zero overdue tasks. Your schedule is clean.`,
+        ? `• Overdue: ${overdueTasks.length} ${overdueTasks.length === 1 ? "task is" : "tasks are"} overdue.`
+        : `• Overdue: none.`,
       recommendedTask
-        ? `• Recommended Focus: Start with "${recommendedTask.title}" (${recommendedTask.estimate_user_min || 30} min).`
-        : `• Status: All planned priority tasks completed.`,
+        ? `• Suggested next: "${recommendedTask.title}"` +
+          (recommendedTask.estimate_user_min ? ` (${recommendedTask.estimate_user_min} min).` : ".")
+        : `• Nothing pending for today.`,
     ];
     setBriefingText(lines.join("\n\n"));
-    setBriefingSource("Local SQL-Grounded Engine");
-    setIsLoadingBriefing(false);
+    setBriefingVisible(true);
   };
 
   return (
@@ -141,14 +108,14 @@ export function ChiefOfStaffCard({
       <View style={styles.headerRow}>
         <View style={styles.briefingBadge}>
           <Sparkles size={14} color={theme.colors.accent.primary} />
-          <Text style={styles.briefingBadgeText}>AI CHIEF OF STAFF</Text>
+          <Text style={styles.briefingBadgeText}>CHIEF OF STAFF</Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Pressable
             style={styles.briefMeBtn}
             onPress={handleRequestBriefing}
             accessibilityRole="button"
-            accessibilityLabel="Request Chief of Staff AI Briefing"
+            accessibilityLabel="Show today's briefing"
           >
             <Sparkles size={13} color="#FFFFFF" />
             <Text style={styles.briefMeBtnText}>Brief Me</Text>
@@ -177,12 +144,12 @@ export function ChiefOfStaffCard({
       <View style={styles.statsStrip}>
         <View style={styles.statCol}>
           <Text style={styles.statLabel}>Available Work</Text>
-          <Text style={styles.statVal}>{Math.round(availableMin / 60)}h {availableMin % 60}m</Text>
+          <Text style={styles.statVal}>{formatMinutes(availableMin)}</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statCol}>
           <Text style={styles.statLabel}>Planned Time</Text>
-          <Text style={styles.statVal}>{Math.round(estimatedMin / 60)}h {estimatedMin % 60}m</Text>
+          <Text style={styles.statVal}>{formatMinutes(estimatedMin)}{unestimatedCount > 0 ? ` + unestimated` : ""}</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statCol}>
@@ -196,7 +163,7 @@ export function ChiefOfStaffCard({
         <View style={styles.warningBox}>
           <AlertTriangle size={15} color="#D97706" />
           <Text style={styles.warningText}>
-            Workload warning: Estimated work ({Math.round(estimatedMin / 60)}h) exceeds remaining working window ({Math.round(availableMin / 60)}h). Consider moving low priority tasks to backlog.
+            Workload warning: estimated work ({formatMinutes(estimatedMin)}) is more than today's working window ({formatMinutes(availableMin)}). Consider moving low priority tasks to backlog.
           </Text>
         </View>
       )}
@@ -240,7 +207,7 @@ export function ChiefOfStaffCard({
                 {recommendedTask.title}
               </Text>
               <Text style={styles.recMeta}>
-                {recommendedTask.estimate_user_min ? `${recommendedTask.estimate_user_min} min` : "Est. 30 min"} · {recommendedTask.priority ? `${String(recommendedTask.priority).toUpperCase()} priority` : "Normal priority"}
+                {recommendedTask.estimate_user_min ? `${recommendedTask.estimate_user_min} min` : "No estimate"} · {typeof recommendedTask.priority === "number" ? `P${recommendedTask.priority}` : "No priority"}
               </Text>
             </Pressable>
             <Pressable
@@ -278,27 +245,18 @@ export function ChiefOfStaffCard({
 
             <View style={styles.briefingSourcePill}>
               <ShieldCheck size={13} color={theme.colors.accent.emerald} />
-              <Text style={styles.briefingSourceText}>{briefingSource}</Text>
+              <Text style={styles.briefingSourceText}>Calculated from your tasks, settings and calendar</Text>
             </View>
 
-            {isLoadingBriefing ? (
-              <View style={{ paddingVertical: 28, alignItems: "center", gap: 10 }}>
-                <ActivityIndicator size="small" color={theme.colors.accent.primary} />
-                <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
-                  Compiling grounded daily briefing...
-                </Text>
-              </View>
-            ) : (
-              <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
-                <Text style={styles.briefingBodyText}>{briefingText}</Text>
-              </ScrollView>
-            )}
+            <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+              <Text style={styles.briefingBodyText}>{briefingText}</Text>
+            </ScrollView>
 
             <Pressable
               style={styles.modalCloseBtn}
               onPress={() => setBriefingVisible(false)}
             >
-              <Text style={styles.modalCloseBtnText}>Acknowledge Briefing</Text>
+              <Text style={styles.modalCloseBtnText}>Done</Text>
             </Pressable>
           </View>
         </View>
@@ -654,3 +612,14 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
   },
 });
+
+/** Format whole minutes as "Xh Ym" (floor, so 90 min is "1h 30m"). */
+function formatMinutes(totalMin: number): string {
+  const safe = Math.max(0, Math.round(totalMin));
+  return `${Math.floor(safe / 60)}h ${safe % 60}m`;
+}
+
+/** Task priority is 1 (highest) to 4; unprioritised tasks sort last. */
+function priorityRank(priority: string | number | null | undefined): number {
+  return typeof priority === "number" && priority >= 1 && priority <= 4 ? priority : 5;
+}

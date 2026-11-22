@@ -6,7 +6,9 @@ grounding validation, and deterministic fallbacks.
 
 import logging
 import uuid
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +19,7 @@ from app.assistant.validator import (
     generate_deterministic_answer,
 )
 from app.core.time import utc_now
+from app.models.user import User
 from app.models.vault import ChatMessage, ChatThread
 from app.vault.search import VaultSearchService
 
@@ -119,15 +122,18 @@ class AssistantService:
         self.session.add(user_msg)
         await self.session.flush()
 
-        # 2. Intent Routing
-        plan = route_intent(clean_msg)
+        # 2. Intent Routing. "Today" is the user's local date, not the server's (UTC on the
+        # hosted server), otherwise questions asked 00:00-05:30 IST resolve to yesterday.
+        tz_name = await self._user_timezone(user_id)
+        local_today = datetime.now(ZoneInfo(tz_name)).date()
+        plan = route_intent(clean_msg, ref_date=local_today)
         # Pre-fetch pending tasks for greeting and breakdown intents
         if (
             "GREETING" in plan.intents or "BREAKDOWN" in plan.intents
         ) and "PENDING_OVERDUE" not in plan.intents:
             plan.intents.append("PENDING_OVERDUE")
 
-        tools = AssistantSQLTools(self.session, user_id=user_id)
+        tools = AssistantSQLTools(self.session, user_id=user_id, tz_name=tz_name)
         tool_results_list: list[dict[str, Any]] = []
         allowed_numbers: set[float] = set()
         executed_tool_calls: list[dict[str, Any]] = []
@@ -140,7 +146,7 @@ class AssistantService:
             elif intent == "TIME_SPENT":
                 tr = await tools.time_spent(plan.start_date, plan.end_date)
             elif intent == "PENDING_OVERDUE":
-                tr = await tools.pending_overdue()
+                tr = await tools.pending_overdue(as_of=local_today)
             elif intent == "WORK_LOGS":
                 tr = await tools.work_logs(plan.start_date, plan.end_date)
             elif intent == "PROFILE_FACTS":
@@ -261,3 +267,14 @@ class AssistantService:
         await self.session.flush()
 
         return (thread, assistant_msg)
+
+    async def _user_timezone(self, user_id: uuid.UUID) -> str:
+        """The user's IANA timezone, falling back to the project default (AGENTS.md §7)."""
+        tz_name = await self.session.scalar(select(User.timezone).where(User.id == user_id))
+        if not tz_name:
+            return "Asia/Kolkata"
+        try:
+            ZoneInfo(tz_name)
+        except (ZoneInfoNotFoundError, ValueError):
+            return "Asia/Kolkata"
+        return tz_name
