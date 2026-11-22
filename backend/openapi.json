@@ -7387,6 +7387,33 @@
               }
             ],
             "title": "Category"
+          },
+          "suggested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested At"
+          },
+          "time_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "said",
+                  "suggested"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Source"
           }
         },
         "type": "object",

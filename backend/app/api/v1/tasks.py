@@ -152,6 +152,8 @@ async def split_brain_dump(
                 priority=item.priority,
                 estimate_minutes=item.estimate_minutes,
                 category=item.category,
+                suggested_at=item.suggested_at,
+                time_source=item.time_source,
             )
             for item in result.items
         ],

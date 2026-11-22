@@ -24,7 +24,7 @@ import {
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronLeft, ChevronRight, CloudOff, Mic, PenLine } from "lucide-react-native";
+import { Check, ChevronLeft, ChevronRight, CloudOff, Mic, PenLine } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { ProfileAvatar } from "../../components/profile-avatar";
 import { ensureAuthenticated, getAccessToken, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
@@ -44,12 +44,11 @@ import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from ".
 import { triggerHaptic } from "../../lib/focus-session-notification";
 import { splitBrainDump } from "../../lib/brain-dump";
 
-const PAPER = "#FFFCF6";
+const PAPER = "#F8F4EE";
 const RULE = "#EDE3D6";
-const MARGIN = "#F3C9B5";
 const INK = "#1F2A37";
 const PEN = "#E0612A";
-const HAND = Platform.select({ android: "casual", ios: "Noteworthy", default: undefined });
+const SERIF = Platform.select({ android: "serif", ios: "Georgia", default: undefined });
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -190,79 +189,79 @@ export default function TodayDiaryScreen() {
 
   const isToday = dayOffset === 0;
   const topInset = Platform.OS === "android" ? Math.max(insets.top, StatusBar.currentHeight ?? 0) : insets.top;
+  const openTask = (id: string) => router.push({ pathname: "/(tabs)/tasks", params: { taskId: id } });
+  const progress = page.total > 0 ? page.done / page.total : 0;
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.header, { paddingTop: topInset + 8 }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.dayName} accessibilityRole="header">{WEEKDAYS[day.getDay()]}</Text>
-          <View style={styles.dateRow}>
-            <Pressable onPress={() => setDayOffset((v) => v - 1)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Previous day">
-              <ChevronLeft size={18} color={theme.colors.text.secondary} />
-            </Pressable>
-            <Text style={styles.dateText}>{day.getDate()} {MONTHS[day.getMonth()]} {day.getFullYear()}</Text>
-            <Pressable onPress={() => setDayOffset((v) => v + 1)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Next day">
-              <ChevronRight size={18} color={theme.colors.text.secondary} />
-            </Pressable>
-            {!isToday ? (
-              <Pressable onPress={() => setDayOffset(0)} style={styles.todayPill} accessibilityRole="button">
-                <Text style={styles.todayPillText}>Today</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        </View>
-        <View style={styles.headerRight}>
-          {isOffline ? (
-            <Pressable onPress={() => router.push("/login")} style={styles.offlineChip} accessibilityRole="button" accessibilityLabel="Offline. Sign in to sync">
-              <CloudOff size={12} color={theme.colors.brand.peachText} />
-              <Text style={styles.offlineChipText}>Offline</Text>
-            </Pressable>
-          ) : null}
-          <ProfileAvatar />
-        </View>
-      </View>
-
       <ScrollView
-        style={styles.paper}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={[styles.scroll, { paddingTop: topInset + 12 }]}
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void onRefresh(); }} tintColor={PEN} />}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.marginLine} pointerEvents="none" />
-        <Text style={styles.count}>
-          {page.total === 0 ? (isToday ? "A fresh page" : "Nothing written for this day") : `${page.done} of ${page.total} done`}
-        </Text>
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.kicker}>{isToday ? "TODAY" : dayOffset === 1 ? "TOMORROW" : dayOffset === -1 ? "YESTERDAY" : " "}</Text>
+            <Text style={styles.dayName} accessibilityRole="header">{WEEKDAYS[day.getDay()]}</Text>
+            <View style={styles.dateRow}>
+              <Pressable onPress={() => setDayOffset((v) => v - 1)} hitSlop={12} style={styles.dayArrow} accessibilityRole="button" accessibilityLabel="Previous day">
+                <ChevronLeft size={16} color={theme.colors.text.secondary} />
+              </Pressable>
+              <Text style={styles.dateText}>{day.getDate()} {MONTHS[day.getMonth()]} {day.getFullYear()}</Text>
+              <Pressable onPress={() => setDayOffset((v) => v + 1)} hitSlop={12} style={styles.dayArrow} accessibilityRole="button" accessibilityLabel="Next day">
+                <ChevronRight size={16} color={theme.colors.text.secondary} />
+              </Pressable>
+              {!isToday ? (
+                <Pressable onPress={() => setDayOffset(0)} style={styles.todayPill} accessibilityRole="button">
+                  <Text style={styles.todayPillText}>Back to today</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+          <View style={styles.headerRight}>
+            {isOffline ? (
+              <Pressable onPress={() => router.push("/login")} style={styles.offlineChip} accessibilityRole="button" accessibilityLabel="Offline. Sign in to sync">
+                <CloudOff size={12} color={theme.colors.brand.peachText} />
+                <Text style={styles.offlineChipText}>Offline</Text>
+              </Pressable>
+            ) : null}
+            <ProfileAvatar />
+          </View>
+        </View>
+
+        {page.total > 0 ? (
+          <View style={styles.progressBlock}>
+            <Text style={styles.progressText}>
+              <Text style={styles.progressStrong}>{page.done} of {page.total}</Text> done
+            </Text>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+            </View>
+          </View>
+        ) : null}
 
         {loading ? <ActivityIndicator color={PEN} style={{ marginTop: 24 }} /> : null}
 
-        {page.carried.length > 0 ? (
-          <>
-            <Text style={[styles.section, { color: "#B45309" }]}>From earlier days</Text>
-            {page.carried.map((entry) => (
-              <DiaryLine key={entry.task.id} entry={entry} label="" onToggle={toggle} onOpen={(id) => router.push({ pathname: "/(tabs)/tasks", params: { taskId: id } })} />
-            ))}
-          </>
+        <DiarySection title="From earlier days" tone="warn" entries={page.carried} onToggle={toggle} onOpen={openTask} labelFor={() => "late"} />
+        <DiarySection title={isToday ? "Planned" : "On this day"} entries={page.timed} onToggle={toggle} onOpen={openTask} labelFor={(entry) => timeLabel(entry.dueAt)} />
+        <DiarySection title="Anytime" entries={page.anytime} onToggle={toggle} onOpen={openTask} labelFor={() => ""} />
+
+        {page.total === 0 && !loading ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>{isToday ? "A fresh page" : "Nothing written for this day"}</Text>
+            <Text style={styles.emptyBody}>Write one thing per line below, or tap the mic and say everything at once.</Text>
+          </View>
         ) : null}
 
-        {page.timed.length > 0 && (page.carried.length > 0 || page.anytime.length > 0) ? <Text style={styles.section}>By time</Text> : null}
-        {page.timed.map((entry) => (
-          <DiaryLine key={entry.task.id} entry={entry} label={timeLabel(entry.dueAt)} onToggle={toggle} onOpen={(id) => router.push({ pathname: "/(tabs)/tasks", params: { taskId: id } })} />
-        ))}
-
-        {page.anytime.length > 0 ? <Text style={styles.section}>Anytime</Text> : null}
-        {page.anytime.map((entry) => (
-          <DiaryLine key={entry.task.id} entry={entry} label="" onToggle={toggle} onOpen={(id) => router.push({ pathname: "/(tabs)/tasks", params: { taskId: id } })} />
-        ))}
-
-        <View style={styles.writeLine}>
-          <PenLine size={16} color={theme.colors.text.muted} />
+        <View style={styles.writeCard}>
+          <PenLine size={18} color={PEN} />
           <TextInput
             value={draft}
             onChangeText={setDraft}
             onSubmitEditing={() => { void addLine(); }}
-            placeholder={isToday ? "write a task…" : "write a task for this day…"}
-            placeholderTextColor="#B7AFA6"
+            placeholder={isToday ? "Write a task…" : "Write a task for this day…"}
+            placeholderTextColor="#A8A29E"
             style={styles.writeInput}
             returnKeyType="done"
             blurOnSubmit={false}
@@ -270,64 +269,113 @@ export default function TodayDiaryScreen() {
             accessibilityLabel="Write a task"
           />
           {adding ? <ActivityIndicator size="small" color={PEN} /> : (
-            <Pressable onPress={() => router.push({ pathname: "/capture", params: { mode: "dump", voice: "1" } })} hitSlop={10} accessibilityRole="button" accessibilityLabel="Say your tasks">
-              <Mic size={18} color={PEN} />
+            <Pressable onPress={() => router.push({ pathname: "/capture", params: { mode: "dump", voice: "1" } })} hitSlop={10} style={styles.micButton} accessibilityRole="button" accessibilityLabel="Say your tasks">
+              <Mic size={18} color="#FFFFFF" />
             </Pressable>
           )}
         </View>
-        {page.total === 0 && isToday && !loading ? (
-          <Text style={styles.hint}>Write one thing per line. Tap a line when it's done to strike it out. Long-press to open it.</Text>
-        ) : null}
+        <Text style={styles.hint}>Tap a task to strike it out. Long-press to open it.</Text>
       </ScrollView>
     </View>
   );
 }
 
+function DiarySection({
+  title,
+  entries,
+  tone,
+  onToggle,
+  onOpen,
+  labelFor,
+}: {
+  title: string;
+  entries: DiaryEntry[];
+  tone?: "warn";
+  onToggle: (entry: DiaryEntry) => void;
+  onOpen: (taskId: string) => void;
+  labelFor: (entry: DiaryEntry) => string;
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <View style={styles.section}>
+      <Text style={[styles.sectionTitle, tone === "warn" && { color: "#B45309" }]}>{title}</Text>
+      <View style={styles.card}>
+        {entries.map((entry, index) => (
+          <DiaryLine key={entry.task.id} entry={entry} label={labelFor(entry)} first={index === 0} onToggle={onToggle} onOpen={onOpen} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+interface TextLine { x: number; y: number; width: number; height: number }
+
 function DiaryLine({
   entry,
   label,
+  first,
   onToggle,
   onOpen,
 }: {
   entry: DiaryEntry;
   label: string;
+  first: boolean;
   onToggle: (entry: DiaryEntry) => void;
   onOpen: (taskId: string) => void;
 }) {
   const progress = useRef(new Animated.Value(entry.done ? 1 : 0)).current;
-  const [width, setWidth] = useState(0);
+  const [lines, setLines] = useState<TextLine[]>([]);
 
   useEffect(() => {
     Animated.timing(progress, {
       toValue: entry.done ? 1 : 0,
-      duration: entry.done ? 320 : 180,
+      duration: entry.done ? 380 : 180,
       easing: Easing.out(Easing.quad),
       useNativeDriver: false,
     }).start();
   }, [entry.done, progress]);
 
+  const shown = lines.slice(0, 2);
   return (
     <Pressable
       onPress={() => onToggle(entry)}
       onLongPress={() => onOpen(entry.task.id)}
-      style={styles.line}
+      style={({ pressed }) => [styles.line, !first && styles.lineDivider, pressed && { backgroundColor: "#FBF8F4" }]}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: entry.done }}
       accessibilityLabel={`${entry.task.title}${label ? `, ${label}` : ""}`}
       accessibilityHint="Tap to strike out or bring back. Long-press to open."
     >
-      <Text style={styles.time}>{label}</Text>
-      <View style={{ flex: 1 }}>
-        <View style={{ alignSelf: "flex-start" }} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
-          <Text style={[styles.title, entry.done && styles.titleDone]}>{entry.task.title}</Text>
+      <Text style={[styles.time, label === "late" && styles.timeLate, entry.done && styles.timeDone]}>{label}</Text>
+      <View style={styles.titleWrap}>
+        <Text
+          style={[styles.title, entry.done && styles.titleDone]}
+          numberOfLines={2}
+          onTextLayout={(event) => setLines(event.nativeEvent.lines.map((l) => ({ x: l.x, y: l.y, width: l.width, height: l.height })))}
+        >
+          {entry.task.title}
+        </Text>
+        {shown.map((line, i) => (
           <Animated.View
+            key={i}
             pointerEvents="none"
             style={[
               styles.strike,
-              { width: progress.interpolate({ inputRange: [0, 1], outputRange: [0, width + 6] }) },
+              {
+                left: line.x - 3,
+                top: line.y + line.height * 0.52,
+                width: progress.interpolate({
+                  inputRange: [i / shown.length, (i + 1) / shown.length],
+                  outputRange: [0, line.width + 6],
+                  extrapolate: "clamp",
+                }),
+              },
             ]}
           />
-        </View>
+        ))}
+      </View>
+      <View style={[styles.circle, entry.done && styles.circleDone]}>
+        {entry.done ? <Check size={13} color="#FFFFFF" strokeWidth={3} /> : null}
       </View>
     </Pressable>
   );
@@ -335,57 +383,42 @@ function DiaryLine({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: PAPER },
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    backgroundColor: PAPER,
-    borderBottomWidth: 1,
-    borderBottomColor: RULE,
-  },
-  dayName: { fontFamily: HAND, fontSize: 38, lineHeight: 46, color: INK, fontWeight: Platform.OS === "ios" ? "700" : "400" },
-  dateRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
-  dateText: { fontSize: 14, color: theme.colors.text.secondary, fontWeight: "600" },
-  todayPill: { marginLeft: 4, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: "#FDE7DA" },
+  scroll: { paddingHorizontal: 18, paddingBottom: 48, gap: 18 },
+  header: { flexDirection: "row", alignItems: "flex-start" },
+  kicker: { fontSize: 11, fontWeight: "800", letterSpacing: 1.6, color: PEN },
+  dayName: { fontFamily: SERIF, fontSize: 38, lineHeight: 46, color: INK, fontWeight: "700", letterSpacing: -0.5 },
+  dateRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  dayArrow: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#EFE8DF" },
+  dateText: { fontSize: 14, color: theme.colors.text.secondary, fontWeight: "600", marginHorizontal: 2 },
+  todayPill: { marginLeft: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: "#FDE7DA" },
   todayPillText: { color: "#B84E0B", fontSize: 12, fontWeight: "700" },
-  headerRight: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 6 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 18 },
   offlineChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: "#FDEBDD" },
   offlineChipText: { color: theme.colors.brand.peachText, fontSize: 11, fontWeight: "700" },
-  paper: { flex: 1, backgroundColor: PAPER },
-  marginLine: { position: "absolute", left: 66, top: 0, bottom: 0, width: 1.5, backgroundColor: MARGIN },
-  count: { marginLeft: 78, marginTop: 14, marginBottom: 6, fontSize: 13, color: theme.colors.text.secondary, fontWeight: "600" },
-  section: { marginLeft: 78, marginTop: 14, marginBottom: 2, fontSize: 12, color: theme.colors.text.muted, fontWeight: "700", letterSpacing: 0.4 },
-  line: {
-    flexDirection: "row",
-    alignItems: "center",
-    minHeight: 50,
-    paddingRight: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: RULE,
-  },
-  time: { width: 66, paddingLeft: 12, fontSize: 12, color: theme.colors.text.muted, fontWeight: "600" },
-  title: { fontFamily: HAND, fontSize: 21, lineHeight: 28, color: INK, paddingLeft: 12, paddingRight: 4 },
-  titleDone: { color: "#A39B92" },
-  strike: {
-    position: "absolute",
-    left: 9,
-    top: "54%",
-    height: 2.4,
-    borderRadius: 2,
-    backgroundColor: PEN,
-    transform: [{ rotate: "-1.2deg" }],
-  },
-  writeLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    minHeight: 54,
-    paddingLeft: 78,
-    paddingRight: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: RULE,
-  },
-  writeInput: { flex: 1, fontFamily: HAND, fontSize: 20, color: INK, paddingVertical: 8 },
-  hint: { marginLeft: 78, marginRight: 20, marginTop: 14, fontSize: 12, lineHeight: 18, color: theme.colors.text.muted },
+  progressBlock: { gap: 8 },
+  progressText: { fontSize: 13, color: theme.colors.text.secondary },
+  progressStrong: { fontWeight: "800", color: INK },
+  progressTrack: { height: 6, borderRadius: 3, backgroundColor: "#EAE2D7", overflow: "hidden" },
+  progressFill: { height: 6, borderRadius: 3, backgroundColor: PEN },
+  section: { gap: 8 },
+  sectionTitle: { fontSize: 12, fontWeight: "800", letterSpacing: 1.1, color: theme.colors.text.muted, textTransform: "uppercase", marginLeft: 4 },
+  card: { backgroundColor: "#FFFFFF", borderRadius: 18, borderWidth: 1, borderColor: RULE, overflow: "hidden" },
+  line: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 15, minHeight: 58 },
+  lineDivider: { borderTopWidth: 1, borderTopColor: "#F3EDE5" },
+  time: { width: 46, fontSize: 13, fontWeight: "700", color: INK },
+  timeLate: { color: "#B45309", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 },
+  timeDone: { color: "#B8B0A6" },
+  titleWrap: { flex: 1, justifyContent: "center" },
+  title: { fontSize: 16, lineHeight: 22, color: INK, fontWeight: "500" },
+  titleDone: { color: "#A8A29E" },
+  strike: { position: "absolute", height: 2.2, borderRadius: 2, backgroundColor: PEN, transform: [{ rotate: "-1deg" }] },
+  circle: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: "#D6CEC4", alignItems: "center", justifyContent: "center" },
+  circleDone: { backgroundColor: PEN, borderColor: PEN },
+  empty: { paddingVertical: 28, alignItems: "center", gap: 6 },
+  emptyTitle: { fontFamily: SERIF, fontSize: 22, color: INK, fontWeight: "700" },
+  emptyBody: { fontSize: 13, lineHeight: 19, color: theme.colors.text.secondary, textAlign: "center", maxWidth: 280 },
+  writeCard: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFFFFF", borderRadius: 18, borderWidth: 1, borderColor: RULE, paddingLeft: 16, paddingRight: 8, minHeight: 58 },
+  writeInput: { flex: 1, fontSize: 16, color: INK, paddingVertical: 12 },
+  micButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: PEN, alignItems: "center", justifyContent: "center" },
+  hint: { fontSize: 12, color: theme.colors.text.muted, textAlign: "center", marginTop: -8 },
 });

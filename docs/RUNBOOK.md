@@ -160,6 +160,9 @@ Installed apps check `apk/latest.json` on the `main` branch and offer any releas
 1. In `apps/mobile/android/app/build.gradle` raise `versionCode` by 1 and set `versionName`; set the same `version` in `apps/mobile/app.json`.
 2. Delete `apps/mobile/android/app/build/generated/assets` and `.../intermediates/assets` so the JS bundle is rebuilt, then run `gradlew assembleRelease`.
 3. Copy `app/build/outputs/apk/release/app-release.apk` to `apk/ALIBI-0.1.0.apk` (the file name stays fixed so the download link never changes).
-4. Put the new `versionCode`, `versionName`, the APK's SHA-256 (lowercase hex) and 1–4 short notes into `apk/latest.json`. The app refuses a download whose SHA-256 differs.
+4. Put the new `versionCode`, `versionName` and the APK's SHA-256 (lowercase hex) into `apk/latest.json`. The app refuses a download whose SHA-256 differs.
+   - `headline`: one line under "ALIBI x.y is here", about what the user gets ("Speak naturally. ALIBI gets every word right.").
+   - `highlights`: 1–4 cards `{ "title", "body" }`. Write each as a benefit the user feels, even for a fix: "Voice typing that gets you right" rather than "Fixed duplicate partial results". Title up to ~40 characters, body one sentence. Never claim a feature that isn't in the build.
+   - `notes`: the same highlights as plain `"Title: body"` strings, for phones on 0.2.0/0.2.1, which only read `notes`.
 5. Every release must be signed with the same key as the installed app, or Android refuses the update.
-6. Merge to `main`. Phones offer the update within about 6 hours, or at once from Settings → Check for updates.
+6. Merge to `main`. Phones on 0.2.2 or later show the update popup the next time ALIBI opens or comes back to the screen. Phones on 0.2.0/0.2.1 check about every 6 hours, or at once from Settings → Check for updates.

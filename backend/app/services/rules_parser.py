@@ -91,11 +91,16 @@ DURATION_PATTERNS = [
     (re.compile(r"\b(half\s+an\s+hour)\b", re.IGNORECASE), lambda _: 30),
     # "1.5 hours" / "2.5h"
     (
-        re.compile(r"\b(\d+(?:\.\d+)?)\s*(?:hours|hrs|hr|h)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(\d+(?:\.\d+)?)\s*(?:hours|hour|hrs|hr|h|ghante|ghanta|ghanton)\b", re.IGNORECASE
+        ),
         lambda m: int(float(m.group(1)) * 60),
     ),
-    # "45 mins" / "30 min" / "30m"
-    (re.compile(r"\b(\d+)\s*(?:minutes|mins|min|m)\b", re.IGNORECASE), lambda m: int(m.group(1))),
+    # "45 mins" / "30 min" / "30m" / Hinglish and voice-typing spellings "5 minute", "5 minut"
+    (
+        re.compile(r"\b(\d+)\s*(?:minutes|minute|minut|mint|minat|mins|min|m)\b", re.IGNORECASE),
+        lambda m: int(m.group(1)),
+    ),
 ]
 
 DEADLINE_PREFIX_PATTERN = re.compile(

@@ -20,6 +20,9 @@ class BrainDumpItemResponse(BaseModel):
     priority: int | None = None
     estimate_minutes: int | None = None
     category: Literal["personal", "professional", "academic", "learning"] | None = None
+    # A planner-suggested slot for tasks said without a time; the user can drop it.
+    suggested_at: datetime | None = None
+    time_source: Literal["said", "suggested"] | None = None
 
 
 class BrainDumpResponse(BaseModel):

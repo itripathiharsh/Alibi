@@ -73,7 +73,7 @@ Category body: `{name, sharing_class, external_ai_allowed, color}`.
 | Method | Path | Notes |
 |---|---|---|
 | POST | /tasks/capture | `{id, raw_input, origin, captured_at, category_hint?}` → 201 `{task, extraction|null, extraction_status}`; `?parse=sync|async|none` (default sync with 8 s budget, falls back to async) |
-| POST | /tasks/brain-dump | FR-TASK-022, ADR-028. `{text}` (1–4000 chars) → `{items[{title, source_text, deadline_at, deadline_phrase, deadline_kind, bucket: today|this_week|later|anytime, priority, estimate_minutes, category}], mode: ai|rules, ai_status: used|not_opted_in|server_disabled|unavailable, provider}`. Saves nothing; the device saves the items the user keeps. Dates come only from the rules parser on phrases found in the text. |
+| POST | /tasks/brain-dump | FR-TASK-022, ADR-028. `{text}` (1–4000 chars) → `{items[{title, source_text, deadline_at, deadline_phrase, deadline_kind, bucket: today|this_week|later|anytime, priority, estimate_minutes, category, suggested_at, time_source: said|suggested}], mode: ai|rules, ai_status: used|not_opted_in|server_disabled|unavailable, provider}`. Saves nothing; the device saves the items the user keeps. Dates come only from the rules parser on phrases found in the text. |
 | GET | /tasks/{id}/extraction | latest extraction proposal |
 | POST | /tasks/{id}/extraction/decision | `{accepted_fields{}, corrected_fields{}, rejected_fields[]}` → updated task; emits prediction feedback |
 | POST | /tasks | full create `{id, title, description?, category_id?, project_id?, priority?, deadline_at?, deadline_kind?, estimate_user_min?, origin, origin_ref?, tags?[], subtasks?[]}` |
