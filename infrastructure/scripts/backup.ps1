@@ -10,7 +10,9 @@ param(
     [string]$OutputFile = "D:\alibi\backups\alibi_backup.dump",
     [string]$Container = "alibi-postgres",
     [string]$DbUser = "alibi",
-    [string]$DbName = "alibi"
+    [string]$DbName = "alibi",
+    [string]$DbHost = "localhost",
+    [string]$DbPort = "5432"
 )
 
 Set-StrictMode -Version Latest
@@ -26,24 +28,43 @@ if (-not (Test-Path $outDir)) {
     New-Item -ItemType Directory -Path $outDir -Force | Out-Null
 }
 
-Write-Host "Dumping PostgreSQL database '$DbName' from container '$Container'..." -ForegroundColor Cyan
-
-# 1. Run pg_dump inside container writing to container temp
-& docker exec $Container pg_dump -U $DbUser -d $DbName -F c -f /tmp/alibi_backup.dump
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "pg_dump failed with exit code $LASTEXITCODE" -ForegroundColor Red
-    exit $LASTEXITCODE
+$hasDocker = $false
+try {
+    $dockerCheck = & docker ps --filter "name=^/${Container}$" --format "{{.Names}}" 2>$null
+    if ($dockerCheck -match $Container) {
+        $hasDocker = $true
+    }
+} catch {
+    $hasDocker = $false
 }
 
-# 2. Copy binary archive safely out of container to D: drive
-& docker cp "$($Container):/tmp/alibi_backup.dump" $OutputFile
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "docker cp failed with exit code $LASTEXITCODE" -ForegroundColor Red
-    exit $LASTEXITCODE
+if ($hasDocker) {
+    Write-Host "Dumping PostgreSQL database '$DbName' from container '$Container'..." -ForegroundColor Cyan
+    & docker exec $Container pg_dump -U $DbUser -d $DbName -F c -f /tmp/alibi_backup.dump
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "pg_dump failed with exit code $LASTEXITCODE" -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+    & docker cp "$($Container):/tmp/alibi_backup.dump" $OutputFile
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "docker cp failed with exit code $LASTEXITCODE" -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+    & docker exec $Container rm -f /tmp/alibi_backup.dump
+} else {
+    Write-Host "Dumping PostgreSQL database '$DbName' from $($DbHost):$($DbPort)..." -ForegroundColor Cyan
+    $pgDumpPath = "pg_dump"
+    if (-not (Get-Command "pg_dump" -ErrorAction SilentlyContinue)) {
+        if (Test-Path "D:\PostgreSQL\bin\pg_dump.exe") {
+            $pgDumpPath = "D:\PostgreSQL\bin\pg_dump.exe"
+        }
+    }
+    & $pgDumpPath -h $DbHost -p $DbPort -U $DbUser -d $DbName -F c -f $OutputFile
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "pg_dump failed with exit code $LASTEXITCODE" -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
 }
-
-# 3. Clean up container temporary file
-& docker exec $Container rm -f /tmp/alibi_backup.dump
 
 Write-Host "Backup successfully created: $OutputFile" -ForegroundColor Green
 exit 0

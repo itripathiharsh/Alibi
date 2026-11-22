@@ -2,15 +2,20 @@
 Backup -> drop/wipe DB -> restore -> users and categories are identical.
 """
 
+import os
+import shutil
 import subprocess
+import sys
 import uuid
 from pathlib import Path
 
 import pytest
 from sqlalchemy import func, select, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.session import AsyncSessionLocal
+from app.core.config import settings
+from app.database.session import AsyncSessionLocal, get_engine
 from app.models.category import Category
 from app.models.user import User
 from app.models.workspace import Workspace
@@ -19,28 +24,10 @@ from app.models.workspace import Workspace
 @pytest.mark.asyncio
 async def test_ac_m1_7_backup_and_restore_drill(db_session: AsyncSession) -> None:
     """Verify AC-M1-7: Full backup and restore drill reproduces identical users and categories."""
-    import shutil
-
-    if not shutil.which("pwsh"):
-        pytest.skip("pwsh is not available on this platform/runner")
-    if not shutil.which("docker"):
-        pytest.skip("Docker is not available in this test environment")
-    try:
-        res = subprocess.run(
-            ["docker", "ps", "--filter", "name=alibi-postgres", "--format", "{{.Names}}"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if "alibi-postgres" not in res.stdout:
-            pytest.skip("Container alibi-postgres is not running for backup/restore drill")
-    except Exception:
-        pytest.skip("Unable to inspect docker containers for backup/restore drill")
-
     repo_root = Path(__file__).resolve().parents[3]
-    backup_script = repo_root / "infrastructure" / "scripts" / "backup.ps1"
-    restore_script = repo_root / "infrastructure" / "scripts" / "restore.ps1"
-    dump_file = repo_root / "backups" / f"drill_{uuid.uuid4().hex[:8]}.dump"
+    dump_dir = repo_root / "backups"
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    dump_file = dump_dir / f"drill_{uuid.uuid4().hex[:8]}.dump"
 
     # 1. Seed distinctive user, workspace, and categories
     test_user_id = uuid.uuid4()
@@ -88,16 +75,73 @@ async def test_ac_m1_7_backup_and_restore_drill(db_session: AsyncSession) -> Non
         user_count_before = (await session.execute(select(func.count(User.id)))).scalar_one()
         cat_count_before = (await session.execute(select(func.count(Category.id)))).scalar_one()
 
-    # 2. Execute backup.ps1
-    try:
+    # Prepare connection details
+    db_url = make_url(settings.database_url)
+    cmd_env = os.environ.copy()
+    if db_url.host:
+        cmd_env["PGHOST"] = str(db_url.host)
+        cmd_env["POSTGRES_HOST"] = str(db_url.host)
+    if db_url.port:
+        cmd_env["PGPORT"] = str(db_url.port)
+        cmd_env["POSTGRES_PORT"] = str(db_url.port)
+    if db_url.username:
+        cmd_env["PGUSER"] = str(db_url.username)
+        cmd_env["POSTGRES_USER"] = str(db_url.username)
+    if db_url.password:
+        cmd_env["PGPASSWORD"] = str(db_url.password)
+        cmd_env["POSTGRES_PASSWORD"] = str(db_url.password)
+    if db_url.database:
+        cmd_env["PGDATABASE"] = str(db_url.database)
+        cmd_env["POSTGRES_DB"] = str(db_url.database)
+
+    is_windows = sys.platform == "win32"
+    if is_windows:
+        pwsh_bin = shutil.which("pwsh") or shutil.which("powershell") or "powershell"
+        backup_script = repo_root / "infrastructure" / "scripts" / "backup.ps1"
+        restore_script = repo_root / "infrastructure" / "scripts" / "restore.ps1"
+
         backup_cmd = [
-            "pwsh",
+            pwsh_bin,
             "-File",
             str(backup_script),
             "-OutputFile",
             str(dump_file),
+            "-DbHost",
+            str(db_url.host or "localhost"),
+            "-DbPort",
+            str(db_url.port or 5432),
+            "-DbUser",
+            str(db_url.username or "alibi"),
+            "-DbName",
+            str(db_url.database or "alibi"),
         ]
-        subprocess.run(backup_cmd, capture_output=True, text=True, check=True)
+        restore_cmd = [
+            pwsh_bin,
+            "-File",
+            str(restore_script),
+            "-InputFile",
+            str(dump_file),
+            "-DbHost",
+            str(db_url.host or "localhost"),
+            "-DbPort",
+            str(db_url.port or 5432),
+            "-DbUser",
+            str(db_url.username or "alibi"),
+            "-DbName",
+            str(db_url.database or "alibi"),
+        ]
+    else:
+        backup_script = repo_root / "infrastructure" / "scripts" / "backup.sh"
+        restore_script = repo_root / "infrastructure" / "scripts" / "restore.sh"
+
+        backup_cmd = ["bash", str(backup_script), str(dump_file)]
+        restore_cmd = ["bash", str(restore_script), str(dump_file)]
+
+    try:
+        # 2. Execute backup
+        res = subprocess.run(backup_cmd, env=cmd_env, capture_output=True, text=True)
+        if res.returncode != 0:
+            raise RuntimeError(f"Backup failed (rc={res.returncode}):\nstdout: {res.stdout}\nstderr: {res.stderr}")
         assert dump_file.exists() and dump_file.stat().st_size > 0
 
         # 3. Wipe database tables
@@ -110,15 +154,13 @@ async def test_ac_m1_7_backup_and_restore_drill(db_session: AsyncSession) -> Non
             wiped_users = (await session.execute(select(func.count(User.id)))).scalar_one()
             assert wiped_users == 0
 
-        # 4. Execute restore.ps1
-        restore_cmd = [
-            "pwsh",
-            "-File",
-            str(restore_script),
-            "-InputFile",
-            str(dump_file),
-        ]
-        subprocess.run(restore_cmd, capture_output=True, text=True, check=True)
+        # Dispose connection pool so pg_restore can cleanly acquire locks
+        await get_engine().dispose()
+
+        # 4. Execute restore
+        res = subprocess.run(restore_cmd, env=cmd_env, capture_output=True, text=True)
+        if res.returncode != 0 and res.returncode != 1:
+            raise RuntimeError(f"Restore failed (rc={res.returncode}):\nstdout: {res.stdout}\nstderr: {res.stderr}")
 
         # 5. Verify restored counts and data
         async with AsyncSessionLocal() as session:

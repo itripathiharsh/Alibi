@@ -40,10 +40,10 @@ allprojects {
     }
 }
 
-// expo-notifications 0.29 uses Java 16 pattern matching in its Android source.
-// Keep the SDK-52 module's Java bytecode target aligned with the project's JDK 17.
+// expo-notifications 0.29 uses Java 16 pattern matching and react-native-svg uses Java 14 switch rules.
+// Keep the SDK-52 modules' Java bytecode target aligned with the project's JDK 17.
 subprojects { subproject ->
-    if (subproject.name == "expo-notifications") {
+    if (subproject.name == "expo-notifications" || subproject.name == "react-native-svg") {
         subproject.plugins.withId("com.android.library") {
             subproject.android {
                 compileOptions {
