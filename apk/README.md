@@ -6,12 +6,12 @@ This directory hosts the official compiled Android application package (`.apk`) 
 
 - **File**: [`ALIBI-0.1.0.apk`](./ALIBI-0.1.0.apk)
 - **Direct Download Link**: [Download ALIBI-0.1.0.apk (Raw)](https://github.com/itripathiharsh/Alibi/raw/main/apk/ALIBI-0.1.0.apk)
-- **Version**: `0.2.5` (versionCode 7; release manifest: [`latest.json`](./latest.json))
-- **Build Date**: November 23, 2026 (branch feat/parallel-tasks-and-smart-nudges: ADR-033 several running tasks, Working on / Time check / Up next notifications with buttons, check-ins follow Start/End Day)
+- **Version**: `0.2.6` (versionCode 8; release manifest: [`latest.json`](./latest.json))
+- **Build Date**: November 24, 2026 (branch fix/one-task-path-and-logic-audit: ADR-034 one way to add a task, phone changes saved on the phone first, logic-audit fixes)
 - **Variant**: Android release APK, Hermes Bytecode Engine (React Native 0.76 New Architecture)
-- **File Size**: `72,362,841 bytes` (69.01 MB)
+- **File Size**: `72,345,793 bytes` (68.99 MB)
 - **Signing**: Signed with the repository's debug keystore, not an owner-managed release key.
-- **SHA-256**: `C095B3F54CD57BF3D7336EF5C9362C3863A31B262068D18CF61BF140FEB0AEE0`
+- **SHA-256**: `03AF51A7A3714B66D743D45215442B96BEFB245FB9752F70B1A2EF6FC6A802D1`
 
 > Includes the 2026-11-22 review fixes and ADR-028: brain dump on the Add screen, "Did it get done?" check-ins, recommendations card, and the round "ALIBI Today" home-screen widget with a quick-action menu. Not yet tested on a physical device (KI-032).
 >
