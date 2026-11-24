@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useRouter } from "expo-router";
 import {
   ScrollView,
@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  Linking,
 } from "react-native";
 import {
   Sparkles,
@@ -19,20 +18,18 @@ import {
   Bot,
   User as UserIcon,
   RotateCcw,
-  ShieldCheck,
   Zap,
   Mic,
   MicOff,
   CheckCircle2,
-  Clock,
   Layers,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
-import { getAccessToken, ensureAuthenticated, getUserProfile, isOfflineUser, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
+import { ensureAuthenticated, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
 import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
-import { createTaskOffline } from "../../lib/offline-sync";
+import { addTask } from "../../lib/task-intake";
 
 interface Message {
   id: string;
@@ -53,7 +50,7 @@ interface Message {
 const QUICK_PROMPTS = [
   "What are my highest priority tasks today?",
   "Summarize my pending tasks and deadlines",
-  "Break down my upcoming work into subtasks",
+  "What did I finish this week?",
   "What are my peak focus hours?",
 ];
 
@@ -63,8 +60,7 @@ export default function AIScreen() {
     {
       id: "welcome-1",
       role: "assistant",
-      content:
-        "Hello! I am your ALIBI Grounded Assistant. I am strictly grounded in your verified tasks, schedules, and learning data—I will never fabricate deadlines or metrics. How can I assist you with your work today?",
+      content: "Ask about your tasks, tracked time, routines or notes.",
       createdAt: new Date().toISOString(),
     },
   ]);
@@ -74,18 +70,11 @@ export default function AIScreen() {
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const { isOffline } = useOfflineStatus();
   const scrollViewRef = useRef<ScrollView>(null);
-  const [userId, setUserId] = useState<string>("local_user");
 
-  useEffect(() => {
-    getUserProfile().then((p) => setUserId(p?.id || "local_user"));
-  }, []);
-
+  /** A suggested task is added only when the user taps Add (same save path as the Add screen). */
   const handleApproveProposal = async (msgId: string, proposal: NonNullable<Message["proposal"]>) => {
     try {
-      await createTaskOffline(userId, {
-        title: proposal.title,
-        status: "pending",
-      });
+      await addTask({ title: proposal.title, origin: "ai_recommendation" });
       setMessages((prev) =>
         prev.map((m) =>
           m.id === msgId && m.proposal
@@ -93,9 +82,8 @@ export default function AIScreen() {
             : m
         )
       );
-      Alert.alert("Task Created", `"${proposal.title}" has been added to your tasks.`);
-    } catch {
-      Alert.alert("Error", "Could not create task.");
+    } catch (error) {
+      Alert.alert("Could not add the task", error instanceof Error ? error.message : "Try again.");
     }
   };
 
@@ -301,21 +289,16 @@ export default function AIScreen() {
         <View style={{ paddingHorizontal: 20 }}>
           <OfflineNoticeCard
             featureName="Ask ALIBI"
-            description="The grounded assistant requires an internet connection and an authenticated account to query server AI models. Your local tasks, focus timers, notes, and calendar remain completely available offline."
+            description="Ask ALIBI needs the internet and a signed-in account. Your tasks, timers and notes still work offline."
             actionText="Sign in to sync"
             onAction={() => router.push("/login")}
           />
         </View>
       )}
-      {/* Top Banner: Grounding Guarantee */}
       <View style={styles.topBanner}>
-        <View style={styles.bannerRow}>
-          <ShieldCheck size={16} color={theme.colors.accent.emerald} />
-          <Text style={styles.bannerText}>Grounded Assistant (Zero Hallucination Guarantee)</Text>
-        </View>
-        <Pressable onPress={handleClear} style={styles.clearBtn} hitSlop={8}>
+        <Pressable onPress={handleClear} style={styles.clearBtn} hitSlop={8} accessibilityRole="button">
           <RotateCcw size={14} color={theme.colors.text.muted} />
-          <Text style={styles.clearBtnText}>New Thread</Text>
+          <Text style={styles.clearBtnText}>New thread</Text>
         </Pressable>
       </View>
 
@@ -377,23 +360,23 @@ export default function AIScreen() {
                 {msg.proposal && !msg.proposal.dismissed && (
                   <View style={styles.proposalBox}>
                     <View style={styles.proposalHeader}>
-                      <Sparkles size={13} color="#FF741F" />
-                      <Text style={styles.proposalTitle}>Action Proposal</Text>
+                      <Text style={styles.proposalTitle}>Suggested task</Text>
                     </View>
                     <Text style={styles.proposalDesc}>{msg.proposal.title}</Text>
                     {msg.proposal.approved ? (
                       <View style={styles.proposalApprovedBadge}>
                         <CheckCircle2 size={12} color="#16A34A" />
-                        <Text style={styles.proposalApprovedText}>Approved & created in tasks</Text>
+                        <Text style={styles.proposalApprovedText}>Added to your tasks</Text>
                       </View>
                     ) : (
                       <View style={styles.proposalBtnRow}>
                         <Pressable
                           style={styles.proposalApproveBtn}
-                          onPress={() => handleApproveProposal(msg.id, msg.proposal!)}
+                          onPress={() => { void handleApproveProposal(msg.id, msg.proposal!); }}
+                          accessibilityRole="button"
                         >
                           <CheckCircle2 size={13} color="#FFFFFF" />
-                          <Text style={styles.proposalApproveText}>Approve & Create</Text>
+                          <Text style={styles.proposalApproveText}>Add task</Text>
                         </Pressable>
                         <Pressable
                           style={styles.proposalDismissBtn}
@@ -507,23 +490,11 @@ const styles = StyleSheet.create({
   topBanner: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: "rgba(16, 185, 129, 0.08)",
+    paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(16, 185, 129, 0.2)",
-  },
-  bannerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    flex: 1,
-  },
-  bannerText: {
-    fontSize: 11,
-    color: theme.colors.accent.emerald,
-    fontWeight: "700",
+    borderBottomColor: theme.colors.border.subtle,
   },
   clearBtn: {
     flexDirection: "row",

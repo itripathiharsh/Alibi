@@ -4395,6 +4395,8 @@ export interface components {
             status?: string | null;
             /** Deadline At */
             deadline_at?: string | null;
+            /** Estimate User Min */
+            estimate_user_min?: number | null;
         };
         /** TaskCaptureResponse */
         TaskCaptureResponse: {

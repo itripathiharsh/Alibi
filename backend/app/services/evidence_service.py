@@ -87,10 +87,13 @@ class EvidenceService:
         # 4. Storage Key and SHA-256
         sha256 = hashlib.sha256(content).hexdigest()
 
-        # Write to disk on D:
-        storage_dir = Path("D:/alibi/data/evidence") / str(self.user_id)
+        # Write under the configured storage folder (ALIBI_STORAGE_DIR). Only the last part
+        # of the client's file name is kept, so "a/b.pdf" or "..\\x" cannot leave the folder
+        # or fail on a missing sub-folder.
+        storage_dir = Path(settings.alibi_storage_dir) / "evidence" / str(self.user_id)
         storage_dir.mkdir(parents=True, exist_ok=True)
-        target_path = storage_dir / f"{sha256}_{filename}"
+        safe_name = Path(filename.replace("\\", "/")).name.strip() or "file"
+        target_path = storage_dir / f"{sha256}_{safe_name}"
         target_path.write_bytes(content)
 
         evidence = Evidence(

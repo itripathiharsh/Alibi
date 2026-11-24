@@ -85,6 +85,26 @@ class GroundingValidator:
         return ValidationResult(is_valid=True, extracted_citations=citations)
 
 
+_BREAKDOWN_PREFIX = re.compile(
+    r"(?:break\s*down|decompose|split\s+task|subtasks?\s+(?:for|of)|steps\s+for)\s*:?\s*(.+)$",
+    re.IGNORECASE,
+)
+
+
+def _breakdown_target(query: str, pending: list[dict[str, Any]]) -> str | None:
+    """The task the user named, matched to a pending task title when one fits."""
+    match = _BREAKDOWN_PREFIX.search(query.strip())
+    named = (match.group(1) if match else "").strip(" .?!\"'*")
+    if not named or named.lower() in ("this", "it", "my task", "my tasks", "task", "tasks"):
+        return None
+    lowered = named.lower()
+    for item in pending:
+        title = str(item.get("title") or "")
+        if len(title) >= 3 and (lowered in title.lower() or title.lower() in lowered):
+            return title
+    return named
+
+
 def generate_deterministic_answer(
     tool_results: list[dict[str, Any]],
     vault_sources: list[dict[str, Any]],
@@ -141,7 +161,8 @@ def generate_deterministic_answer(
     # 2. Handle Capabilities & Help
     if "CAPABILITIES" in active_intents:
         return (
-            "I am your ALIBI Grounded Assistant. I operate under a strict zero-hallucination guarantee, providing answers verified directly by your database records.\n\n"
+            "I answer from your own ALIBI records: tasks, tracked time, routines and vault notes. "
+            "When the records don't cover a question, I say so.\n\n"
             "Here is what you can ask me:\n"
             '- **Priorities & Tasks**: *"What are my highest priority tasks today?"*, *"What is pending or overdue?"*\n'
             '- **Accomplishments**: *"What did I accomplish today?"*, *"What tasks did I complete this week?"*\n'
@@ -151,27 +172,26 @@ def generate_deterministic_answer(
             [],
         )
 
-    # 3. Handle Work Breakdown
+    # 3. Handle Work Breakdown. No record says what the steps are or how long they take,
+    # so nothing is invented. This used to return a fixed three-phase plan with made-up
+    # minutes for whichever pending task came first (logic audit B4).
     if "BREAKDOWN" in active_intents:
         pending_tool = next(
             (t for t in tool_results if t.get("tool_name") == "pending_overdue"), None
         )
         pending_data = pending_tool.get("data", []) if pending_tool else []
-        if pending_data:
-            target_task = pending_data[0].get("title", "Upcoming Task")
+        target_task = _breakdown_target(query, pending_data)
+        if target_task:
             return (
-                f"Here is a recommended execution breakdown for **{target_task}**:\n\n"
-                "1. **Phase 1: Setup & Inputs** (~15 min)\n"
-                "   - Review requirements, context, and dependencies.\n"
-                "2. **Phase 2: Core Execution** (~30–45 min)\n"
-                "   - Focus solely on the primary deliverable without interruptions.\n"
-                "3. **Phase 3: Verification & Notes** (~15 min)\n"
-                "   - Review output, confirm completion, and record notes.\n\n"
-                "Tip: You can schedule a dedicated focus block for this task in your Timeline.",
+                f"I can't split **{target_task}** into steps from your records, and I won't "
+                "guess how long each step takes.\n\n"
+                "Write the steps on the Add screen, one per line: each becomes its own task "
+                "you can time.",
                 [],
             )
         return (
-            'To break down work into subtasks, capture your task first or mention the task name (e.g. *"Break down: Launch new campaign"*).',
+            'Say which task to break down, for example *"Break down: Launch new campaign"*. '
+            "Steps you write on the Add screen, one per line, each become a task.",
             [],
         )
 

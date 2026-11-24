@@ -137,7 +137,7 @@ export function ChiefOfStaffCard({
           ? "You've cleared your plan for today! 🎉"
           : pendingTasks.length === 0
             ? "Your schedule is clear. Plan ahead or capture an idea."
-            : `${pendingTasks.length} ${pendingTasks.length === 1 ? "priority task" : "priority tasks"} need your attention.`}
+            : `${pendingTasks.length} ${pendingTasks.length === 1 ? "open task" : "open tasks"} for today.`}
       </Text>
 
       {/* Metrics Row: Available Time & Commitment */}
@@ -154,7 +154,7 @@ export function ChiefOfStaffCard({
         <View style={styles.statDivider} />
         <View style={styles.statCol}>
           <Text style={styles.statLabel}>Calendar Busy</Text>
-          <Text style={styles.statVal}>{calendarBusyMinutes}m</Text>
+          <Text style={styles.statVal}>{formatMinutes(calendarBusyMinutes)}</Text>
         </View>
       </View>
 
@@ -186,7 +186,7 @@ export function ChiefOfStaffCard({
             accessibilityRole="button"
           >
             <RotateCcw size={12} color="#FFFFFF" />
-            <Text style={styles.rescheduleBtnText}>Push to Today</Text>
+            <Text style={styles.rescheduleBtnText}>Move to today</Text>
           </Pressable>
         </View>
       )}

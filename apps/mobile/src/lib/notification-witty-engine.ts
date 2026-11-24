@@ -1,6 +1,7 @@
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+import { formatClock, formatMinutes } from "./time-format";
 
 export type NotificationScenario =
   | "TIMER_RUNAWAY"
@@ -50,33 +51,34 @@ export const WITTY_NOTIFICATION_VAULT: Record<NotificationScenario, WittyCopy[]>
     { title: "Main apni favourite hoon 💅", body: "Toh apni favourite self ko 5 min ka chai break de do." },
   ],
 
-  // Scenario 2: Upcoming task deadline (15-30 min crunch)
+  // Scenario 2: Upcoming task deadline. "{left}" is filled with the real time left (the
+  // user's reminder lead), never a fixed "15 minutes" (logic audit 2026-11-24).
   DEADLINE_CRUNCH: [
-    { title: "Sirf 15 minute bache hain! ⏳", body: "Chak De phatte ya game over? Finish the task now!" },
-    { title: "Picture abhi baaki hai dost 🎞️", body: "Par deadline mein sirf 15 min baaki hain. Speed up!" },
+    { title: "Sirf {left} bache hain! ⏳", body: "Chak De phatte ya game over? Finish the task now!" },
+    { title: "Picture abhi baaki hai dost 🎞️", body: "Par deadline mein sirf {left} baaki hain. Speed up!" },
     { title: "Darr ke aage jeet hai 🧗", body: "Deadline sir pe hai, overthinking chhodo aur nipat lo." },
-    { title: "Khatam, tata, bye-bye, goodbye! 👋", body: "Agar agle 15 min mein complete nahi kiya toh yahi hoga." },
-    { title: "Apna time aayega? ⏳", body: "Time aa nahi raha, time jaa raha hai! 15 mins left." },
-    { title: "Shit just got real 💥", body: "Task deadline is 15 minutes away. Focus mode ON." },
-    { title: "Mission Impossible theme playing 🎵", body: "15 minutes to defuse this deadline. You got this." },
+    { title: "Khatam, tata, bye-bye, goodbye! 👋", body: "Agar agle {left} mein complete nahi kiya toh yahi hoga." },
+    { title: "Apna time aayega? ⏳", body: "Time aa nahi raha, time jaa raha hai! {left} left." },
+    { title: "Shit just got real 💥", body: "Task deadline is {left} away. Focus mode ON." },
+    { title: "Mission Impossible theme playing 🎵", body: "{left} to defuse this deadline. You got this." },
     { title: "Jaldi wahan se hato! 🚨", body: "Deadline knocking at the door with a danda." },
     { title: "Aila! Jadoo! 👽", body: "Jadoo bhi is deadline ko extend nahi kar sakta. Submit karo." },
     { title: "Singham: 'Aata maajhi satakli' 🦁", body: "Deadline miss hui toh manager ki satak jayegi." },
     { title: "Bhool Bhulaiyaa: 'Ami je tomar' 👻", body: "Manjulika se pehle deadline room mein ghus jayegi." },
     { title: "Ye kya tareeka hai bhai? 🤷", body: "Last-minute panic se pehle tick kar lo." },
     { title: "Mirzapur: 'Gaddi humari hogi' 👑", body: "Trophy unko milti hai jo deadline pe submit karte hain." },
-    { title: "Lord Bobby entry theme 🎧", body: "Walk in, crush the remaining 15 minutes, walk out." },
-    { title: "Last over: 12 runs needed 🏏", body: "15 mins on clock. Hit the winning shot." },
-    { title: "Kashyap climax mode 🎬", body: "Raw, gritty final 15 minutes. Nail this task." },
+    { title: "Lord Bobby entry theme 🎧", body: "Walk in, crush the remaining {left}, walk out." },
+    { title: "Last over: 12 runs needed 🏏", body: "{left} on the clock. Hit the winning shot." },
+    { title: "Kashyap climax mode 🎬", body: "Raw, gritty final {left}. Nail this task." },
     { title: "Shark Tank: 'I am out' 🦈", body: "Deadline miss hui toh investment out. Finish it!" },
     { title: "Zomato rider on the way 🛵", body: "Your deadline is arriving faster than your biryani." },
-    { title: "Fast & Furious: Family first 🚗", body: "Task completion second. 15 minutes remaining!" },
+    { title: "Fast & Furious: Family first 🚗", body: "Task completion second. {left} remaining!" },
     { title: "Kuch toh sharam karo, janab 🫣", body: "Deadline sir pe naach rahi hai aur tum shaant ho?" },
     { title: "Clock is ticking louder than anxiety ⏰", body: "Stop thinking, start typing. Wrap it up." },
-    { title: "Final destination alert ⚠️", body: "Deadlines wait for no one. 15 minutes to save the day." },
+    { title: "Final destination alert ⚠️", body: "Deadlines wait for no one. {left} to save the day." },
     { title: "Lagaan: 'Dugna lagaan bharna padega' 🌾", body: "Delay kiya toh extra work bharna padega. Hurry!" },
     { title: "Munna Bhai: 'Carrom ramvanu, juice pivanu' 🎲", body: "Lekin pehle deadline wala task khatam karvanu." },
-    { title: "Kabir Singh BGM blasting 🏍️", body: "Full aggression mode: Finish this task in 15 mins." },
+    { title: "Kabir Singh BGM blasting 🏍️", body: "Full aggression mode: Finish this task in {left}." },
   ],
 
   // Scenario 3: Morning agenda kickoff (8:30 - 9:30 AM)
@@ -84,7 +86,7 @@ export const WITTY_NOTIFICATION_VAULT: Record<NotificationScenario, WittyCopy[]>
     { title: "Subah ho gayi Mamu! ☀️", body: "Chai piyo, ALIBI kholo aur aaj ka agenda lock karo." },
     { title: "Wake Up Sid! 🏙️", body: "Aaj ki to-do list khud se chalke nahi aayegi." },
     { title: "Utho Anarkali, meeting bohot hain 💃", body: "Pehle top 3 high-leverage tasks mark karo." },
-    { title: "Ashneer: 'Bhai kya kar raha hai?' 🦈", body: "Subah ke 9 baj gaye aur task board blank hai?" },
+    { title: "Ashneer: 'Bhai kya kar raha hai?' 🦈", body: "Subah ho gayi. Aaj ka board dekh lo." },
     { title: "Aaj kuch toofani karte hain ⚡", body: "Pehle ALIBI mein mission set karte hain." },
     { title: "Breakfast for champions 🍳", body: "Eat the frog: Pick your hardest task first." },
     { title: "Munna Bhai: 'Tension lene ka nahi' 💊", body: "Priorities set kar lo, din bhar ka tension khatam." },
@@ -96,7 +98,7 @@ export const WITTY_NOTIFICATION_VAULT: Record<NotificationScenario, WittyCopy[]>
     { title: "Wasseypur: 'Subah subah...' 🌅", body: "Dimaag taaza hai, hardest problem pehle crack karo." },
     { title: "Bunny: 'Main rukna nahi chahta' 🏃", body: "Toh morning plan bana ke speed pakad!" },
     { title: "Dil Chahta Hai 🌊", body: "Ki aaj saare tasks green tick ho jaayein. Set them up." },
-    { title: "Monday blues? 💙", body: "Turn them into completed green checkmarks in ALIBI." },
+    { title: "Morning blues? 💙", body: "Turn them into completed green checkmarks in ALIBI." },
     { title: "Zindagi na milegi dobara 🤿", body: "Par aaj ka 24 hours mil gaya. Own every hour." },
     { title: "Aaj ki taaza khabar 📰", body: "A high-performing individual is about to open ALIBI." },
     { title: "Coffee loaded, goals unloaded 🎯", body: "Set your day before random fires set it for you." },
@@ -105,7 +107,7 @@ export const WITTY_NOTIFICATION_VAULT: Record<NotificationScenario, WittyCopy[]>
     { title: "Mirzapur: 'Niyam same hoga' ⚖️", body: "Subah ka plan, shaam ka chain. Plan now." },
     { title: "Rise and grind (smartly) 🧠", body: "Add today's top 3 tasks and let ALIBI pace you." },
     { title: "Babu Bhaiya: 'Utha le re baba' 📦", body: "Aalas ko utha ke bahar feko, kaam shuru karo." },
-    { title: "Goal setting mode: ON 🚀", body: "5 minutes in ALIBI now will save 2 hours of chaos later." },
+    { title: "Goal setting mode: ON 🚀", body: "5 minutes of planning now saves chaos later." },
   ],
 
   // Scenario 4: Sunset sweep / End of day review (7:00 - 8:30 PM)
@@ -117,53 +119,54 @@ export const WITTY_NOTIFICATION_VAULT: Record<NotificationScenario, WittyCopy[]>
     { title: "Mirzapur: 'Rest kar lijiye' 🛏️", body: "Varna rest in peace ho jayenge. Wrap up today's work." },
     { title: "Ghar aaja pardesi 🏡", body: "Screen time OFF, real life ON. Sweep your board." },
     { title: "Aaj ka kalyan ho gaya 🪔", body: "Review incomplete items, push to tomorrow, and chill." },
-    { title: "Babu bhaiya: 'Chhappar faad ke' 🎁", body: "Great output today! Review your score in ALIBI." },
+    { title: "Babu bhaiya: 'Chhappar faad ke' 🎁", body: "Dekho aaj kitna hua. Review your day in ALIBI." },
     { title: "Netflix is waiting for you 🍿", body: "Clear your tasks for 100% guilt-free bingeing." },
     { title: "So ja beta varna Gabbar aa jayega 🌙", body: "Close active timers, end your shift peacefully." },
     { title: "Mission accomplished? 🎯", body: "Review your completed vs planned tasks in ALIBI." },
     { title: "Main udna chahta tha, ab sona chahta hoon 😴", body: "Wrap your board and recharge your batteries." },
     { title: "Aap thak gaye honge 🫖", body: "Chai piyo, aaj ka hisaab ALIBI summary mein dekho." },
     { title: "Taare Zameen Par 🌟", body: "Every completed task counts. Check your daily summary." },
-    { title: "Dangal: 'Chhoriyan chhoron se kam nahi' 🥇", body: "Crushed today's workload. Great job!" },
+    { title: "Dangal: 'Chhoriyan chhoron se kam nahi' 🥇", body: "Aaj ka hisaab dekho, kal ki taiyari karo." },
     { title: "GOT: 'And now my watch is ended' 🏰", body: "Clock out like a warrior who won the day." },
     { title: "Yeh raat bheegi bheegi 🌧️", body: "Time to reflect, close pending tickets, and breathe." },
     { title: "Kuch toh log kahenge... 🎶", body: "Par tumhara proof ALIBI mein verified hai. Goodnight." },
     { title: "Shab-ba-khair dost 🌌", body: "Clean slate ready for tomorrow. Shut down now." },
     { title: "Swiggy order arrived? 🍕", body: "Put away work, cold pizza is a crime." },
-    { title: "3 Idiots: 'All is well' 🩺", body: "Today was productive. Rest well for tomorrow." },
+    { title: "3 Idiots: 'All is well' 🩺", body: "Review your day, then rest well for tomorrow." },
     { title: "Overtime is a scam 🕶️", body: "Smart workers log off on time. Pack your bags." },
     { title: "Battery at 5% 🔋", body: "Yours and the phone's. Close ALIBI and plug in." },
-    { title: "Paisa hi paisa hoga 🤑", body: "Consistent daily execution wins. Great shift today!" },
+    { title: "Paisa hi paisa hoga 🤑", body: "Consistent daily execution wins. Close today's board." },
     { title: "Lights out 🕯️", body: "Tap to review your day's score and close the tab." },
   ],
 
-  // Scenario 5: User has been inactive for 24-48 hours
+  // Scenario 5: ALIBI has not been opened for 36 hours. The phone can't know whether tasks
+  // were tracked elsewhere (web, widget), so no copy claims a count or a number of days.
   GHOSTING: [
-    { title: "Hum aapke hain koun? 🥺", body: "2 din se ek bhi task log nahi kiya? Yaad aa rahi hai." },
+    { title: "Hum aapke hain koun? 🥺", body: "Kaafi der se mulaqat nahi hui. Yaad aa rahi hai." },
     { title: "Seen pe chhod diya? 💔", body: "ALIBI app ro raha hai akele. Aao kuch capture karo." },
     { title: "Bhool gaye kya purane din? 🎶", body: "Hamara aur aapka productivity ka sacred pact tha." },
     { title: "Pushpa: 'Flower samjhe kya?' 🌸", body: "Main AI timekeeper hoon! Where are your tasks?" },
     { title: "Itna jo muskura rahe ho... 😏", body: "Kaam chhod ke kya chhipa rahe ho? Open ALIBI." },
-    { title: "CID ACP: 'Kuch toh gadbad hai' 🔍", body: "Zero tasks tracked today. Suspicious Daya!" },
+    { title: "CID ACP: 'Kuch toh gadbad hai' 🔍", body: "ALIBI itni der se band hai. Suspicious, Daya!" },
     { title: "Mirzapur: 'Darte nahi hain kya?' 🔫", body: "Guddu bhaiya wants to know where your goals went." },
-    { title: "Missing person report 🚨", body: "Last seen tracking tasks 48 hours ago. Come back!" },
+    { title: "Missing person report 🚨", body: "Last seen: a while ago. Come back!" },
     { title: "Tere naam humne kiya hai... 💔", body: "Par aapne app icon ko touch tak nahi kiya." },
     { title: "Shaadi ka khayal dil mein aaya hai? 💒", body: "Isliye kaam-dhandha sab bhool gaye?" },
     { title: "Zomato: 'We miss cravings' 🍔", body: "ALIBI: 'We miss your task checkmarks' ✅" },
     { title: "Hello darkness my old friend 🌑", body: "Your empty dashboard is crying silently." },
     { title: "Aapke bina sab soona soona 🌾", body: "Just 1 quick capture to break the silence." },
-    { title: "Bhai tuition gaya hai kya? 🎒", body: "No tasks in 24 hours. Jump back in the game." },
+    { title: "Bhai tuition gaya hai kya? 🎒", body: "Kaafi der se gayab ho. Jump back in the game." },
     { title: "Dil to pagal hai 💃", body: "Dil deewana hai... par kaam kaun karega bhaiya?" },
     { title: "Karan Arjun aayenge 👬", body: "Par tum kab aaoge ALIBI mein?" },
     { title: "Ek chutki sindoor... 💄", body: "Ek quick task capture ki keemat tum kya jaano user babu?" },
     { title: "Don ko dhoondhna mushkil hai... 🕵️", body: "Par tumko ALIBI open karna sirf 1 tap ka kaam hai!" },
-    { title: "Ghost mode: 100% 👻", body: "Break the ghosting streak with a 30-second capture." },
-    { title: "Shark Tank: 'I am out' 🦈", body: "Missing for 48 hours is not investable. Relog now!" },
+    { title: "Ghost mode: ON 👻", body: "Break the silence with a 30-second capture." },
+    { title: "Shark Tank: 'I am out' 🦈", body: "Itna lamba break is not investable. Come back!" },
     { title: "Kya se kya ho gaya bewafa 😢", body: "Come back to your goals before the week ends." },
-    { title: "Kaam 25 hai 🎵", body: "Par tumhara 0 dikh raha hai. Add one task now." },
+    { title: "Kaam 25 hai 🎵", body: "Par shuruaat ek se hoti hai. Add one task now." },
     { title: "Akele akele kahan ja rahe ho? 🚶", body: "ALIBI ko bhi pocket mein saath rakho." },
     { title: "Notification bell bajayi hai 🔔", body: "Darwaza kholo aur 1 priority log karo!" },
-    { title: "Gone with the wind 🍃", body: "Track 5 minutes today and revive your streak." },
+    { title: "Gone with the wind 🍃", body: "Track 5 minutes today and get back on track." },
   ],
 };
 
@@ -174,8 +177,8 @@ export const CALM_NOTIFICATION_VAULT: Record<NotificationScenario, WittyCopy> = 
     body: "A task timer has been running for 2 hours. Take a break or check your progress.",
   },
   DEADLINE_CRUNCH: {
-    title: "Upcoming deadline",
-    body: "You have a task deadline approaching in 15 minutes.",
+    title: "Due in {left}",
+    body: "A task is due soon.",
   },
   MORNING_KICKOFF: {
     title: "Plan your day",
@@ -212,42 +215,33 @@ export async function setNotificationStyle(style: "witty" | "calm"): Promise<voi
 
 /**
  * Returns a randomized witty copy (or calm copy) for the specified scenario.
+ *
+ * A deadline reminder states the real time left (`leadMinutes`, the user's reminder
+ * setting) and the due time. Before the logic audit it always said "15 minutes", even for
+ * a 30- or 60-minute lead.
  */
 export async function getNotificationCopy(
   scenario: NotificationScenario,
-  context?: { taskTitle?: string },
+  context?: { taskTitle?: string; leadMinutes?: number; dueAt?: number },
 ): Promise<WittyCopy> {
   const style = await getNotificationStyle();
-  if (style === "calm") {
-    const calm = CALM_NOTIFICATION_VAULT[scenario];
-    if (context?.taskTitle && scenario === "DEADLINE_CRUNCH") {
-      return { title: calm.title, body: `Deadline in 15m: ${context.taskTitle}` };
-    }
-    return calm;
+  if (scenario === "DEADLINE_CRUNCH") {
+    const lead = Math.max(0, Math.round(context?.leadMinutes ?? 0));
+    const left = formatMinutes(lead);
+    const due = context?.dueAt !== undefined ? formatClock(context.dueAt) : "";
+    const fact = [context?.taskTitle, due ? `due ${due}` : ""].filter(Boolean).join(" · ");
+    if (lead < 1) return { title: "Due now", body: fact || CALM_NOTIFICATION_VAULT.DEADLINE_CRUNCH.body };
+    const pick = style === "calm"
+      ? CALM_NOTIFICATION_VAULT.DEADLINE_CRUNCH
+      : WITTY_NOTIFICATION_VAULT.DEADLINE_CRUNCH[Math.floor(Math.random() * WITTY_NOTIFICATION_VAULT.DEADLINE_CRUNCH.length)];
+    const title = pick.title.replace(/\{left\}/g, left);
+    if (style === "calm") return { title, body: fact || pick.body };
+    const joke = pick.body.replace(/\{left\}/g, left);
+    return { title, body: fact ? `${fact} — ${joke}` : joke };
   }
-
+  if (style === "calm") return CALM_NOTIFICATION_VAULT[scenario];
   const list = WITTY_NOTIFICATION_VAULT[scenario];
-  const item = list[Math.floor(Math.random() * list.length)];
-  if (context?.taskTitle && scenario === "DEADLINE_CRUNCH") {
-    return {
-      title: item.title,
-      body: `${context.taskTitle} — ${item.body}`,
-    };
-  }
-  return item;
-}
-
-/** Synchronous fallback selector using math.random (when async style isn't awaited) */
-export function getRandomWittyCopy(scenario: NotificationScenario, context?: { taskTitle?: string }): WittyCopy {
-  const list = WITTY_NOTIFICATION_VAULT[scenario];
-  const item = list[Math.floor(Math.random() * list.length)];
-  if (context?.taskTitle && scenario === "DEADLINE_CRUNCH") {
-    return {
-      title: item.title,
-      body: `${context.taskTitle} — ${item.body}`,
-    };
-  }
-  return item;
+  return list[Math.floor(Math.random() * list.length)];
 }
 
 export const DAILY_CHANNEL_ID = "alibi-daily-digests-v2";
@@ -444,12 +438,13 @@ export async function triggerTestNotification(): Promise<boolean> {
     if (!granted) return false;
 
     await ensureNotificationChannels();
+    // The title shows the chosen style; the body never claims a timer is running.
     const copy = await getNotificationCopy("TIMER_RUNAWAY");
 
     await Notifications.scheduleNotificationAsync({
       content: {
         title: copy.title,
-        body: copy.body,
+        body: "Test notification. ALIBI's reminders look and sound like this.",
         data: { kind: "test_notification" },
         sound: true,
         priority: Notifications.AndroidNotificationPriority.MAX,

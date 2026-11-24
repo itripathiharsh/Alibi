@@ -1,14 +1,26 @@
 """Integration tests for AI Provider Settings and Usage API endpoints (AC-AI-3, AC-AI-4)."""
 
+from typing import Any
+
 import httpx
 import pytest
+
+from app.ai.adapters.groq import GroqProviderAdapter
+
+
+async def _groq_rejects_the_key(self: GroqProviderAdapter) -> dict[str, Any]:
+    """What Groq answers to a bad key, without the network (AGENTS.md §6: tests never
+    call real AI providers; this test used to send the dummy key to api.groq.com)."""
+    return {"status": "error", "error": "Invalid API key", "provider": self.name}
 
 
 @pytest.mark.asyncio
 async def test_ai_settings_lifecycle_and_key_masking(
     auth_client: httpx.AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """AC-AI-3: API key is write-only, encrypted at rest, and returned masked as key_last4."""
+    monkeypatch.setattr(GroqProviderAdapter, "health", _groq_rejects_the_key)
     # 1. List providers: all 5 supported providers listed (OpenRouter added in ADR-028), none enabled initially
     resp = await auth_client.get("/api/v1/ai/providers")
     assert resp.status_code == 200
@@ -38,12 +50,12 @@ async def test_ai_settings_lifecycle_and_key_masking(
     # Plaintext key must NOT be returned in response
     assert secret_key not in update_resp.text
 
-    # 3. Test connection (returns error since dummy key cannot hit external network, but validates endpoint)
+    # 3. Test connection: the provider's answer to a bad key is reported, not raised
     test_resp = await auth_client.post("/api/v1/ai/providers/groq/test")
     assert test_resp.status_code == 200
     test_data = test_resp.json()
     assert test_data["provider"] == "groq"
-    assert "status" in test_data
+    assert test_data["status"] == "error"
 
     # 4. Delete key
     del_resp = await auth_client.delete("/api/v1/ai/providers/groq/key")

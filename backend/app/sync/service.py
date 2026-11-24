@@ -5,11 +5,13 @@ and explicit non-destructive conflict surfacing.
 """
 
 import hashlib
+import logging
 import uuid
 from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import utc_now
@@ -25,6 +27,18 @@ from app.vault.links import append_task_completion
 
 # Static server epoch for current instance run (regenerated on DB restore)
 SERVER_EPOCH = uuid.UUID("01933000-0000-7000-8000-000000000001")
+
+logger = logging.getLogger("alibi.sync")
+
+MAX_ESTIMATE_MIN = 10080  # tasks table check constraint (one week)
+
+
+def _minutes(value: Any) -> int | None:
+    """An estimate the tasks table accepts (1..10080 minutes), else None."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    minutes = round(value)
+    return minutes if 1 <= minutes <= MAX_ESTIMATE_MIN else None
 
 
 class ServerSyncService:
@@ -74,47 +88,33 @@ class ServerSyncService:
                 )
                 continue
 
-            # 2. Dispatch Op Execution
+            # 2. Dispatch Op Execution, one savepoint per op. A malformed op used to raise
+            # out of the loop: the whole push failed with a 500, the phone retried the same
+            # batch forever and nothing queued after it ever synced (logic audit S1).
             result = "applied"
             result_detail: dict[str, Any] = {}
             new_version = (base_version or 1) + 1
-
-            if entity_type == "task":
-                result, result_detail, new_version = await self._apply_task_op(
-                    user_id=user_id,
-                    op_id=op_id,
-                    entity_id=entity_id,
-                    op_type=op_type,
-                    base_version=base_version,
-                    payload=payload,
+            try:
+                async with self.session.begin_nested():
+                    result, result_detail, new_version = await self._dispatch_op(
+                        user_id=user_id,
+                        op_id=op_id,
+                        entity_type=entity_type,
+                        entity_id=entity_id,
+                        op_type=op_type,
+                        base_version=base_version,
+                        payload=payload,
+                        default=(result, result_detail, new_version),
+                    )
+            except (SQLAlchemyError, ValueError, TypeError, KeyError) as exc:
+                logger.warning(
+                    "Sync op rejected (%s %s): %s", entity_type, op_type, type(exc).__name__
                 )
-            elif entity_type == "time_entry":
-                result, result_detail, new_version = await self._apply_time_entry_op(
-                    user_id=user_id,
-                    entity_id=entity_id,
-                    op_type=op_type,
-                    payload=payload,
+                result, result_detail, new_version = (
+                    "rejected",
+                    {"error": "The server could not apply this change"},
+                    base_version or 0,
                 )
-            elif entity_type == "project":
-                result, result_detail, new_version = await self._apply_project_op(
-                    user_id=user_id,
-                    op_id=op_id,
-                    entity_id=entity_id,
-                    op_type=op_type,
-                    base_version=base_version,
-                    payload=payload,
-                )
-            elif entity_type in ("vault_note", "note"):
-                result, result_detail, new_version = await self._apply_vault_note_op(
-                    user_id=user_id,
-                    op_id=op_id,
-                    entity_id=entity_id,
-                    op_type=op_type,
-                    base_version=base_version,
-                    payload=payload,
-                )
-            else:
-                result_detail = {"status": "generic_applied"}
 
             # Record in sync_operations audit table
             sync_op_record = SyncOperation(
@@ -145,6 +145,55 @@ class ServerSyncService:
             )
 
         return results
+
+    async def _dispatch_op(
+        self,
+        *,
+        user_id: uuid.UUID,
+        op_id: uuid.UUID,
+        entity_type: str,
+        entity_id: uuid.UUID,
+        op_type: str,
+        base_version: int | None,
+        payload: dict[str, Any],
+        default: tuple[str, dict[str, Any], int],
+    ) -> tuple[str, dict[str, Any], int]:
+        """Apply one op to its entity type; unknown types keep the generic result."""
+        if entity_type == "task":
+            return await self._apply_task_op(
+                user_id=user_id,
+                op_id=op_id,
+                entity_id=entity_id,
+                op_type=op_type,
+                base_version=base_version,
+                payload=payload,
+            )
+        if entity_type == "time_entry":
+            return await self._apply_time_entry_op(
+                user_id=user_id,
+                entity_id=entity_id,
+                op_type=op_type,
+                payload=payload,
+            )
+        if entity_type == "project":
+            return await self._apply_project_op(
+                user_id=user_id,
+                op_id=op_id,
+                entity_id=entity_id,
+                op_type=op_type,
+                base_version=base_version,
+                payload=payload,
+            )
+        if entity_type in ("vault_note", "note"):
+            return await self._apply_vault_note_op(
+                user_id=user_id,
+                op_id=op_id,
+                entity_id=entity_id,
+                op_type=op_type,
+                base_version=base_version,
+                payload=payload,
+            )
+        return default[0], {"status": "generic_applied"}, default[2]
 
     async def _apply_task_op(
         self,
@@ -227,7 +276,20 @@ class ServerSyncService:
                 if not project_exists:
                     return ("rejected", {"error": "Project not found"}, 0)
 
-            est_min = payload.get("estimate_min")
+            # Logic audit B2: phones send estimate_user_min / estimate_final_min, which this
+            # path ignored (older clients send estimate_min). Out-of-range values are dropped.
+            est_user = _minutes(payload.get("estimate_user_min")) or _minutes(
+                payload.get("estimate_min")
+            )
+            est_final = _minutes(payload.get("estimate_final_min")) or est_user
+            raw_actual = payload.get("actual_min")
+            actual_min = (
+                round(raw_actual)
+                if isinstance(raw_actual, int | float)
+                and not isinstance(raw_actual, bool)
+                and raw_actual > 0
+                else 0
+            )
             created_at = self._parse_datetime(payload.get("created_at")) or utc_now()
             deadline_at = self._parse_datetime(payload.get("deadline_at"))
             completed_at = self._parse_datetime(payload.get("completed_at"))
@@ -244,9 +306,9 @@ class ServerSyncService:
                 category_id=category_id,
                 project_id=project_id,
                 deadline_at=deadline_at,
-                estimate_user_min=est_min,
-                estimate_final_min=est_min,
-                actual_min=int(payload.get("actual_min") or 0),
+                estimate_user_min=est_user,
+                estimate_final_min=est_final,
+                actual_min=actual_min,
                 created_at=created_at,
                 completed_at=completed_at,
                 origin=payload.get("origin")
@@ -314,8 +376,18 @@ class ServerSyncService:
                 else:
                     task.priority = None
             if "estimate_min" in payload:
-                task.estimate_user_min = payload["estimate_min"]
-                task.estimate_final_min = payload["estimate_min"]
+                # None clears the estimate; an out-of-range value is ignored (logic audit B2).
+                minutes = _minutes(payload["estimate_min"])
+                if payload["estimate_min"] is None or minutes is not None:
+                    task.estimate_user_min = minutes
+                    task.estimate_final_min = minutes
+            if "reschedule_count" in payload:
+                # Logic audit B3: the phone counts moves of a due date locally, and this
+                # count was dropped. Keep the higher value so a replayed or older op never
+                # lowers it.
+                count = payload["reschedule_count"]
+                if isinstance(count, int) and not isinstance(count, bool) and 0 <= count <= 10_000:
+                    task.reschedule_count = max(task.reschedule_count or 0, count)
             if "deadline_at" in payload:
                 task.deadline_at = self._parse_datetime(payload.get("deadline_at"))
             if "category_id" in payload:

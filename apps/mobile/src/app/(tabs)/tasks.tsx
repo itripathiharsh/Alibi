@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ScrollView,
   StyleSheet,
@@ -10,8 +10,6 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
-  Linking,
-  Platform,
 } from "react-native";
 import {
   CheckSquare,
@@ -20,49 +18,45 @@ import {
   Calendar,
   Plus,
   Play,
-  Sparkles,
   Tag as TagIcon,
   CalendarDays,
   X,
   CheckCircle2,
   Circle,
-  Mic,
   History,
   Pause,
   Repeat2,
   FileText,
   ChevronRight,
-  Brain,
 } from "lucide-react-native";
 import theme from "../../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "../../components/brand-ui";
 import { ProfileAvatar } from "../../components/profile-avatar";
 import { formatClock, formatShortDay } from "../../lib/time-format";
-import { getAccessToken, ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
+import { ensureAuthenticated, getUserProfile, setCachedIsOffline, useOfflineStatus } from "../../lib/auth";
 import { getServerUrl } from "../../lib/config";
-import { startSpeechRecognition, stopSpeechRecognition } from "../../lib/speech";
-import { cancelTaskTimerReminder, scheduleTaskTimerReminder, syncTaskTimerReminders } from "../../lib/timer-reminders";
+import { syncWorkNotifications } from "../../lib/work-notifications";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
 import { triggerHaptic, stopFocusNotification } from "../../lib/focus-session-notification";
-import { loadLearnedTaskRoutines, type LearnedTaskRoutine } from "../../lib/learned-routines";
-import { predictTaskDuration, type DurationPrediction } from "../../lib/personal-learning-engine";
-import { CaptureReviewSheet } from "../../components/capture-review-sheet";
-import { decideTaskExtraction, type TaskExtractionProposal } from "../../lib/task-extraction";
+import { currentUserId } from "../../lib/learning-signals";
+import { requestSync } from "../../lib/task-intake";
 import { RepeatTaskSheet, type RepeatFrequency, type RepeatRuleSummary } from "../../components/repeat-task-sheet";
 import {
   cacheRunningTimers,
   cacheTaskView,
   cacheTaskTimeEntries,
-  createTaskOffline,
   deleteTaskOffline,
+  getAllLocalTasks,
   getCachedTaskView,
   getLocalTimers,
   getLocalTaskTimeEntries,
-  removeLocalTimer,
+  moveTaskToTomorrowOffline,
+  onLocalTasksChanged,
+  setTaskDoneOffline,
   startTaskTimerOffline,
   stopTaskTimerOffline,
   syncMobileAccount,
-  updateTaskOffline,
+  type LocalTask,
 } from "../../lib/offline-sync";
 
 const VIEWS = ["today", "upcoming", "backlog", "completed"] as const;
@@ -98,84 +92,6 @@ interface TaskTimeEntry {
   source: string;
 }
 
-function computeDeadlineIso(
-  dateChoice: "today" | "tomorrow" | "next_week" | "custom" | null,
-  customDate: string,
-  timeChoice: string | null,
-  customTime: string
-): string | null {
-  if (!dateChoice) return null;
-  const target = new Date();
-  if (dateChoice === "tomorrow") {
-    target.setDate(target.getDate() + 1);
-  } else if (dateChoice === "next_week") {
-    target.setDate(target.getDate() + 7);
-  } else if (dateChoice === "custom") {
-    if (!customDate.trim()) return null;
-    const parts = customDate.trim().split("-");
-    if (parts.length === 3) {
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const day = parseInt(parts[2], 10);
-      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-        target.setFullYear(year, month, day);
-      } else {
-        return null;
-      }
-    } else {
-      return null;
-    }
-  }
-
-  // Time
-  let hours = 23;
-  let minutes = 59;
-  if (timeChoice === "09:00") {
-    hours = 9;
-    minutes = 0;
-  } else if (timeChoice === "14:00") {
-    hours = 14;
-    minutes = 0;
-  } else if (timeChoice === "18:00") {
-    hours = 18;
-    minutes = 0;
-  } else if (timeChoice === "21:00") {
-    hours = 21;
-    minutes = 0;
-  } else if (timeChoice === "custom" && customTime.trim()) {
-    const tp = customTime.trim().split(":");
-    if (tp.length >= 2) {
-      hours = parseInt(tp[0], 10) || 0;
-      minutes = parseInt(tp[1], 10) || 0;
-    }
-  }
-
-  target.setHours(hours, minutes, 0, 0);
-  return target.toISOString();
-}
-
-function formatDeadlinePreview(
-  dateChoice: "today" | "tomorrow" | "next_week" | "custom" | null,
-  customDate: string,
-  timeChoice: string | null,
-  customTime: string
-): string {
-  if (!dateChoice) return "";
-  let dateLabel = "Today";
-  if (dateChoice === "tomorrow") dateLabel = "Tomorrow";
-  else if (dateChoice === "next_week") dateLabel = "Next Week";
-  else if (dateChoice === "custom") dateLabel = customDate.trim() || "Custom Date";
-
-  let timeLabel = "End of Day (23:59)";
-  if (timeChoice === "09:00") timeLabel = "9:00 AM";
-  else if (timeChoice === "14:00") timeLabel = "2:00 PM";
-  else if (timeChoice === "18:00") timeLabel = "6:00 PM";
-  else if (timeChoice === "21:00") timeLabel = "9:00 PM";
-  else if (timeChoice === "custom") timeLabel = customTime.trim() || "Custom Time";
-
-  return `${dateLabel} at ${timeLabel}`;
-}
-
 export default function TasksScreen() {
   const router = useRouter();
   const { taskId } = useLocalSearchParams<{ taskId?: string }>();
@@ -195,46 +111,6 @@ export default function TasksScreen() {
   const [isLoadingRepeat, setIsLoadingRepeat] = useState(false);
   const [isSavingRepeat, setIsSavingRepeat] = useState(false);
 
-  // Capture modal
-  const [captureVisible, setCaptureVisible] = useState(false);
-  const [captureText, setCaptureText] = useState("");
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [pendingExtraction, setPendingExtraction] = useState<TaskExtractionProposal | null>(null);
-  const [isReviewingExtraction, setIsReviewingExtraction] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [taskStatus, setTaskStatus] = useState<"pending" | "completed">("pending");
-  const [selectedDate, setSelectedDate] = useState<"today" | "tomorrow" | "next_week" | "custom" | null>(null);
-  const [customDateStr, setCustomDateStr] = useState("");
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [customTimeStr, setCustomTimeStr] = useState("");
-  const [learnedRoutines, setLearnedRoutines] = useState<LearnedTaskRoutine[]>([]);
-  const [isLoadingRoutines, setIsLoadingRoutines] = useState(false);
-  const [userEstimateMin, setUserEstimateMin] = useState<number | null>(null);
-  const [customEstimateStr, setCustomEstimateStr] = useState("");
-  const [durationPrediction, setDurationPrediction] = useState<DurationPrediction | null>(null);
-  const [isPredictingDuration, setIsPredictingDuration] = useState(false);
-
-  useEffect(() => {
-    if (!captureVisible || captureText.trim().length < 3) {
-      setDurationPrediction(null);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      setIsPredictingDuration(true);
-      try {
-        const token = await ensureAuthenticated().catch(() => null);
-        const baseUrl = getServerUrl();
-        const pred = await predictTaskDuration(baseUrl, token, captureText, userEstimateMin);
-        setDurationPrediction(pred);
-      } catch {
-        setDurationPrediction(null);
-      } finally {
-        setIsPredictingDuration(false);
-      }
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [captureText, captureVisible, userEstimateMin]);
-
   // Batch selection mode
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -252,32 +128,14 @@ export default function TasksScreen() {
     });
   };
 
-  const runBatch = async (
-    operation: (task: TaskItem, token: string) => Promise<Response>,
-    offlineFallback?: (task: TaskItem, userId: string) => Promise<void>
-  ) => {
+  /** Tags are not part of the sync protocol yet, so bulk tagging needs the server. */
+  const runBatch = async (operation: (task: TaskItem, token: string) => Promise<Response>) => {
     const selectedTasks = tasks.filter((task) => selectedIds.has(task.id));
     if (!selectedTasks.length || batchBusy) return;
     setBatchBusy(true);
     try {
-      const profile = await getUserProfile();
-      const userId = profile?.id ?? "local_user";
       const token = await ensureAuthenticated().catch(() => null);
-      if (!token) {
-        if (offlineFallback) {
-          for (const task of selectedTasks) {
-            await offlineFallback(task, userId);
-          }
-          triggerHaptic("complete");
-          setSelectionMode(false);
-          setSelectedIds(new Set());
-          setTagModalVisible(false);
-          setBatchTagText("");
-          await fetchTasks();
-          return;
-        }
-        throw new Error("Sign in to update selected tasks.");
-      }
+      if (!token) throw new Error("Connect to the internet and sign in to tag tasks.");
       const responses = await Promise.all(selectedTasks.map((task) => operation(task, token)));
       const failures = responses.filter((response) => !response.ok);
       if (failures.length) {
@@ -298,30 +156,37 @@ export default function TasksScreen() {
     }
   };
 
-  const handleBatchComplete = () => runBatch(
-    (task, token) => fetch(`${getServerUrl()}/api/v1/tasks/${task.id}/status`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ status: "completed" }),
-    }),
-    async (task, userId) => {
-      await updateTaskOffline(userId, task.id, { status: "completed" });
+  /**
+   * Bulk Done, Tomorrow and Trash are saved on the phone and uploaded by sync, like single
+   * taps (ADR-034). Online they used to go straight to the server while offline used the
+   * phone, with a different "tomorrow" time and no reschedule count.
+   */
+  const runLocalBatch = async (change: (taskId: string, userId: string) => Promise<unknown>) => {
+    const selectedTasks = tasks.filter((task) => selectedIds.has(task.id));
+    if (!selectedTasks.length || batchBusy) return;
+    setBatchBusy(true);
+    try {
+      const userId = await currentUserId();
+      for (const task of selectedTasks) await change(task.id, userId);
+      triggerHaptic("complete");
+      setSelectionMode(false);
+      setSelectedIds(new Set());
+      requestSync();
+      await fetchTasks();
+    } catch (error) {
+      Alert.alert("Some changes were not saved", error instanceof Error ? error.message : "Try again.");
+      await fetchTasks();
+    } finally {
+      setBatchBusy(false);
     }
-  );
+  };
 
-  const handleBatchRescheduleTomorrow = () => runBatch(
-    (task, token) => fetch(`${getServerUrl()}/api/v1/tasks/${task.id}/end-of-day-action`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ action: "tomorrow" }),
-    }),
-    async (task, userId) => {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(23, 59, 0, 0);
-      await updateTaskOffline(userId, task.id, { deadline_at: tomorrow.toISOString() });
-    }
-  );
+  const handleBatchComplete = () => {
+    if (runningTimers.some((timer) => selectedIds.has(timer.task_id))) void stopFocusNotification();
+    return runLocalBatch((taskId, userId) => setTaskDoneOffline(userId, taskId, true));
+  };
+
+  const handleBatchRescheduleTomorrow = () => runLocalBatch((taskId, userId) => moveTaskToTomorrowOffline(userId, taskId));
 
   const handleBatchDelete = () => Alert.alert(
     `Move ${selectedIds.size} tasks to Trash?`,
@@ -329,15 +194,7 @@ export default function TasksScreen() {
     [
       { text: "Keep tasks", style: "cancel" },
       { text: "Move to Trash", style: "destructive", onPress: () => {
-        void runBatch(
-          (task, token) => fetch(`${getServerUrl()}/api/v1/tasks/${task.id}`, {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          async (task, userId) => {
-            await deleteTaskOffline(userId, task.id);
-          }
-        );
+        void runLocalBatch((taskId, userId) => deleteTaskOffline(userId, taskId));
       } },
     ],
   );
@@ -352,442 +209,124 @@ export default function TasksScreen() {
     }));
   };
 
-  const resetModal = () => {
-    setCaptureText("");
-    setTaskStatus("pending");
-    setSelectedDate(null);
-    setCustomDateStr("");
-    setSelectedTime(null);
-    setCustomTimeStr("");
-    setIsListening(false);
-    setUserEstimateMin(null);
-    setCustomEstimateStr("");
-    setDurationPrediction(null);
-  };
-
-  const handleMicPress = async () => {
-    if (isListening) {
-      await stopSpeechRecognition();
-      setIsListening(false);
-      return;
-    }
-
-    const baseText = captureText.trim();
-    setIsListening(true);
-    const ok = await startSpeechRecognition({
-      onStart: () => setIsListening(true),
-      onResults: (text, isFinal) => {
-        const combined = baseText ? `${baseText} ${text}` : text;
-        setCaptureText(combined);
-        if (isFinal) {
-          setIsListening(false);
-        }
-      },
-      onError: (err) => {
-        setIsListening(false);
-        Alert.alert("Voice Input", err);
-      },
-      onEnd: () => {
-        setIsListening(false);
-      },
-    });
-
-    if (!ok) {
-      setIsListening(false);
-    }
-  };
-
   const fetchTasks = useCallback(async () => {
-    let userIsOffline = false;
-    const profile = await getUserProfile();
-    const effectiveUserId = profile?.id ?? "local_user";
-    if (!profile || profile.id === "local_user") {
-      userIsOffline = true;
-    }
-
+    const userId = await currentUserId();
+    // What the phone already has, at once.
     try {
-      const cached = await getCachedTaskView(effectiveUserId, activeView);
+      const cached = await getCachedTaskView(userId, activeView);
       if (cached) {
         setTasks(cached as TaskItem[]);
         setSelectedTask((current) => current ? (cached.find((item) => item.id === current.id) as TaskItem | undefined) ?? current : current);
         setIsLoading(false);
       }
-      setRunningTimers(await getLocalTimers(effectiveUserId));
+      setRunningTimers(await getLocalTimers(userId));
     } catch {
-      // Continue with the online request if the local database is unavailable.
+      // Continue with the server if the local database is unavailable.
+    }
+    if (userId === "local_user") {
+      setCachedIsOffline(true);
+      setIsLoading(false);
+      return;
     }
 
+    let userIsOffline = false;
     try {
       let token = await ensureAuthenticated().catch(() => null);
       if (!token) {
         userIsOffline = true;
-      } else {
-        const baseUrl = getServerUrl();
-        let res = await fetch(`${baseUrl}/api/v1/tasks?view=${activeView}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.status === 401) {
-          token = await ensureAuthenticated(true).catch(() => null);
-          if (token) {
-            res = await fetch(`${baseUrl}/api/v1/tasks?view=${activeView}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-          }
-        }
-        if (res && res.ok) {
-          const data = await res.json() as TaskItem[];
-          await cacheTaskView(effectiveUserId, activeView, data);
-          setTasks(data);
-          const lead = profile?.settings?.reminder_lead_min;
-          void syncTaskDeadlineReminders(data, typeof lead === "number" ? lead : DEFAULT_DEADLINE_REMINDER_LEAD_MIN);
-          setSelectedTask((current) => current ? data.find((item: TaskItem) => item.id === current.id) ?? current : current);
-          if (token) void syncMobileAccount(effectiveUserId, token, baseUrl).catch(() => undefined);
-          userIsOffline = false;
-        }
-
+        return;
+      }
+      const baseUrl = getServerUrl();
+      // Upload changes made on this phone first, so the list below already has them. The
+      // list used to be fetched first and replaced the cache, hiding new tasks (audit M5).
+      await syncMobileAccount(userId, token, baseUrl).catch(() => undefined);
+      let res = await fetch(`${baseUrl}/api/v1/tasks?view=${activeView}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) {
+        token = await ensureAuthenticated(true).catch(() => null);
         if (token) {
-          const timerRes = await fetch(`${baseUrl}/api/v1/time-entries/running/all`, {
+          res = await fetch(`${baseUrl}/api/v1/tasks?view=${activeView}`, {
             headers: { Authorization: `Bearer ${token}` },
-          }).catch(() => null);
-          if (timerRes && timerRes.ok) {
-            const timerData = await timerRes.json();
-            setRunningTimers(await cacheRunningTimers(effectiveUserId, timerData));
-            void syncTaskTimerReminders(timerData);
-          }
+          });
+        }
+      }
+      if (res.ok) {
+        const data = await res.json() as LocalTask[];
+        const shown = await cacheTaskView(userId, activeView, data) as TaskItem[];
+        setTasks(shown);
+        setSelectedTask((current) => current ? shown.find((item) => item.id === current.id) ?? current : current);
+        const profile = await getUserProfile().catch(() => null);
+        const lead = profile?.settings?.reminder_lead_min;
+        void syncTaskDeadlineReminders(await getAllLocalTasks(userId), typeof lead === "number" ? lead : DEFAULT_DEADLINE_REMINDER_LEAD_MIN);
+      }
+      if (token) {
+        const timerRes = await fetch(`${baseUrl}/api/v1/time-entries/running/all`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => null);
+        if (timerRes && timerRes.ok) {
+          setRunningTimers(await cacheRunningTimers(userId, await timerRes.json()));
+          void syncWorkNotifications();
         }
       }
     } catch {
       userIsOffline = true;
-      const cached = await getCachedTaskView(effectiveUserId, activeView);
-      if (cached) setTasks(cached as TaskItem[]);
-      setRunningTimers(await getLocalTimers(effectiveUserId));
     } finally {
       setCachedIsOffline(userIsOffline);
       setIsLoading(false);
     }
   }, [activeView]);
 
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+  // Refresh whenever the tab is opened, not only when the view changes.
+  useFocusEffect(useCallback(() => { void fetchTasks(); }, [fetchTasks]));
+
+  // A task changed on the phone (Today, a notification button, the widget): show it.
+  useEffect(() => onLocalTasksChanged(() => {
+    void (async () => {
+      const userId = await currentUserId();
+      const cached = await getCachedTaskView(userId, activeView);
+      if (cached) setTasks(cached as TaskItem[]);
+      setRunningTimers(await getLocalTimers(userId));
+    })();
+  }), [activeView]);
 
   useEffect(() => {
     const interval = setInterval(() => setClockNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  const handleCapture = async () => {
-    if (!captureText.trim() || isCapturing) return;
-    setIsCapturing(true);
-    let offlineProfileId: string | null = null;
-    const deadlineIso = computeDeadlineIso(selectedDate, customDateStr, selectedTime, customTimeStr);
-    try {
-      const profile = await getUserProfile();
-      offlineProfileId = profile?.id ?? null;
-      let token = await ensureAuthenticated().catch(() => null);
-      const baseUrl = getServerUrl();
-
-      const payload: Record<string, any> = {
-        raw_input: captureText.trim(),
-        origin: isListening ? "voice" : "manual",
-        status: taskStatus,
-      };
-      if (deadlineIso) {
-        payload.deadline_at = deadlineIso;
-      }
-      if (userEstimateMin != null) {
-        payload.estimate_user_min = userEstimateMin;
-      }
-
-      let res: Response | null = null;
-      if (token) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 6000);
-          res = await fetch(`${baseUrl}/api/v1/tasks/capture`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(payload),
-            signal: controller.signal,
-          });
-          clearTimeout(timeoutId);
-
-          // If token expired, force re-authenticate and retry once
-          if (res.status === 401) {
-            token = await ensureAuthenticated(true).catch(() => null);
-            if (token) {
-              const retryCtrl = new AbortController();
-              const retryTimeout = setTimeout(() => retryCtrl.abort(), 6000);
-              res = await fetch(`${baseUrl}/api/v1/tasks/capture`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(payload),
-                signal: retryCtrl.signal,
-              });
-              clearTimeout(retryTimeout);
-            }
-          }
-        } catch {
-          res = null;
-        }
-      }
-
-      if (res && res.ok) {
-        const result = await res.json();
-        const capturedTask = result.task;
-        if (result.extraction) setPendingExtraction(result.extraction as TaskExtractionProposal);
-        if (capturedTask) {
-          setTasks((prev) => [
-            {
-              id: capturedTask.id,
-              title: capturedTask.title,
-              status: capturedTask.status || "pending",
-              priority: capturedTask.priority,
-              deadline_at: capturedTask.deadline_at,
-              estimate_user_min: capturedTask.estimate_user_min,
-              actual_min: capturedTask.actual_min || 0,
-              reschedule_count: capturedTask.reschedule_count || 0,
-              tags: capturedTask.tags || [],
-              subtasks: capturedTask.subtasks || [],
-            },
-            ...prev,
-          ]);
-          if (offlineProfileId) {
-            void cacheTaskView(offlineProfileId, activeView, [capturedTask, ...tasks.filter((item) => item.id !== capturedTask.id)] as TaskItem[]);
-          }
-        }
-        resetModal();
-        setCaptureVisible(false);
-        fetchTasks();
-        return;
-      }
-
-      // Local-first fallback guarantee: save in offline SQLite and outbox
-      const userId = offlineProfileId ?? profile?.id ?? "local_user";
-      const task = await createTaskOffline(userId, {
-        title: captureText.trim(),
-        status: taskStatus,
-        deadline_at: deadlineIso,
-        origin: isListening ? "voice" : "manual",
-        estimate_user_min: userEstimateMin,
-      });
-      setTasks((previous) => [task as TaskItem, ...previous.filter((item) => item.id !== task.id)]);
-      if (!deadlineIso && taskStatus === "pending") setActiveView("backlog");
-      resetModal();
-      setCaptureVisible(false);
-      Alert.alert("Saved on this device", "Task saved locally. It will sync automatically when ALIBI is online.");
-    } catch (err: unknown) {
-      Alert.alert("Could not capture task", err instanceof Error ? err.message : "Please try again.");
-    } finally {
-      setIsCapturing(false);
-    }
-  };
-
-  const submitExtractionDecision = async (
-    acceptedFields: Record<string, unknown>,
-    rejectedFields: string[],
-  ) => {
-    if (!pendingExtraction || isReviewingExtraction) return;
-    setIsReviewingExtraction(true);
-    try {
-      await decideTaskExtraction({
-        taskId: pendingExtraction.task_id,
-        acceptedFields,
-        rejectedFields,
-      });
-      setPendingExtraction(null);
-      await fetchTasks();
-    } catch (error: unknown) {
-      Alert.alert(
-        "Review not saved",
-        error instanceof Error ? error.message : "Please try reviewing the task again.",
-      );
-    } finally {
-      setIsReviewingExtraction(false);
-    }
-  };
-
+  // Done/not done and the timer change the task on the phone first, the same way as the
+  // Today page; the outbox uploads them. This screen used to call the server directly when
+  // online and the phone otherwise, so the two pages could disagree (logic audit).
   const handleStatusToggle = async (task: TaskItem) => {
-    const nextStatus = task.status === "completed" ? "pending" : "completed";
-    if (nextStatus === "completed") {
-      triggerHaptic("complete");
-    } else {
-      triggerHaptic("tap");
-    }
-    const profile = await getUserProfile();
-    const activeTimer = runningTimers.find((item) => item.task_id === task.id);
-    try {
-      let token = await ensureAuthenticated();
-      const baseUrl = getServerUrl();
-      if (!token || activeTimer?.source === "local") {
-        if (!profile) return;
-        const updated = await updateTaskOffline(profile.id, task.id, { status: nextStatus });
-        if (updated) setTasks((previous) => previous.map((item) => item.id === task.id ? updated as TaskItem : item));
-        if (nextStatus === "completed") {
-          const timer = runningTimers.find((item) => item.task_id === task.id);
-          if (timer) {
-            await stopTaskTimerOffline(profile.id, timer.id);
-            setRunningTimers((previous) => previous.filter((item) => item.id !== timer.id));
-            await cancelTaskTimerReminder(timer.id);
-            void stopFocusNotification();
-          }
-        }
-        return;
-      }
-
-      let res = await fetch(`${baseUrl}/api/v1/tasks/${task.id}/status`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: nextStatus }),
-      });
-
-      if (res.status === 401) {
-        token = await ensureAuthenticated(true);
-        if (token) {
-          res = await fetch(`${baseUrl}/api/v1/tasks/${task.id}/status`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ status: nextStatus }),
-          });
-        }
-      }
-
-      if (res.ok) {
-        if (nextStatus === "completed") {
-          const timer = runningTimers.find((item) => item.task_id === task.id);
-          if (timer) {
-            await fetch(`${baseUrl}/api/v1/time-entries/${timer.id}/stop`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-              body: JSON.stringify({}),
-            });
-            await cancelTaskTimerReminder(timer.id);
-            void stopFocusNotification();
-            if (profile) await removeLocalTimer(profile.id, timer.id);
-          }
-        }
-        fetchTasks();
-      }
-    } catch {
-      if (profile) {
-        const updated = await updateTaskOffline(profile.id, task.id, { status: nextStatus });
-        if (updated) setTasks((previous) => previous.map((item) => item.id === task.id ? updated as TaskItem : item));
-      }
-    }
+    const done = task.status !== "completed";
+    triggerHaptic(done ? "complete" : "tap");
+    const userId = await currentUserId();
+    if (done && runningTimers.some((item) => item.task_id === task.id)) void stopFocusNotification();
+    const updated = await setTaskDoneOffline(userId, task.id, done);
+    if (updated) setTasks((previous) => previous.map((item) => item.id === task.id ? { ...item, ...updated } as TaskItem : item));
+    setRunningTimers(await getLocalTimers(userId));
+    void syncWorkNotifications();
+    requestSync();
   };
 
   const handleTimerAction = async (task: TaskItem) => {
     triggerHaptic("tap");
-    const profile = await getUserProfile();
+    const userId = await currentUserId();
     const activeTimer = runningTimers.find((timer) => timer.task_id === task.id);
-    if (activeTimer) {
-      void stopFocusNotification();
-    }
-    const useOfflineTimer = async () => {
-      if (!profile) return false;
-      if (activeTimer) {
-        await stopTaskTimerOffline(profile.id, activeTimer.id);
-        setRunningTimers((previous) => previous.filter((timer) => timer.id !== activeTimer.id));
-        await cancelTaskTimerReminder(activeTimer.id);
-      } else {
-        const timer = await startTaskTimerOffline(profile.id, task.id);
-        setRunningTimers((previous) => [...previous.filter((item) => item.task_id !== task.id), timer]);
-        void scheduleTaskTimerReminder({ timerId: timer.id, taskId: timer.task_id, startedAt: timer.started_at });
-      }
-      void fetchTasks();
-      return true;
-    };
     try {
-      let token = await ensureAuthenticated();
-      const baseUrl = getServerUrl();
-      if (!token || activeTimer?.source === "local") {
-        await useOfflineTimer();
-        return;
-      }
-
       if (activeTimer) {
-        // Stop timer
-        let res = await fetch(`${baseUrl}/api/v1/time-entries/${activeTimer.id}/stop`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({}),
-        });
-        if (res.status === 401) {
-          token = await ensureAuthenticated(true);
-          if (token) {
-            res = await fetch(`${baseUrl}/api/v1/time-entries/${activeTimer.id}/stop`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({}),
-            });
-          }
-        }
-        if (res.ok) {
-          setRunningTimers((previous) => previous.filter((timer) => timer.id !== activeTimer.id));
-          await cancelTaskTimerReminder(activeTimer.id);
-          if (profile) await removeLocalTimer(profile.id, activeTimer.id);
-          fetchTasks();
-        }
+        void stopFocusNotification();
+        await stopTaskTimerOffline(userId, activeTimer.id);
       } else {
-        // Start timer
-        let res = await fetch(`${baseUrl}/api/v1/time-entries/start`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ task_id: task.id }),
-        });
-        if (res.status === 401) {
-          token = await ensureAuthenticated(true);
-          if (token) {
-            res = await fetch(`${baseUrl}/api/v1/time-entries/start`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ task_id: task.id }),
-            });
-          }
-        }
-        if (res.ok) {
-          const entry = await res.json();
-          setRunningTimers((previous) => [...previous.filter((timer) => timer.task_id !== task.id), entry]);
-          if (profile) await cacheRunningTimers(profile.id, [...runningTimers.filter((timer) => timer.task_id !== task.id), entry]);
-          void scheduleTaskTimerReminder({ timerId: entry.id, taskId: entry.task_id, startedAt: entry.started_at });
-          fetchTasks();
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          Alert.alert("Timer Error", errData.detail || "Failed to start timer.");
-        }
+        await startTaskTimerOffline(userId, task.id); // other running tasks keep going
       }
-    } catch (err: unknown) {
-      try {
-        if (!(await useOfflineTimer())) {
-          Alert.alert("Error", err instanceof Error ? err.message : "Timer action failed.");
-        }
-      } catch (offlineError) {
-        Alert.alert("Error", offlineError instanceof Error ? offlineError.message : "Timer action failed.");
-      }
+      setRunningTimers(await getLocalTimers(userId));
+      void syncWorkNotifications();
+      requestSync();
+      void fetchTasks();
+    } catch (error: unknown) {
+      Alert.alert("Timer not changed", error instanceof Error ? error.message : "Try again.");
     }
   };
 
@@ -917,17 +456,6 @@ export default function TasksScreen() {
       void loadTaskHistory(task);
     }
   }, [taskId, isLoading, tasks, loadTaskHistory]);
-
-  const openCapture = () => {
-    setCaptureVisible(true);
-    setIsLoadingRoutines(true);
-    void (async () => {
-      const token = await ensureAuthenticated().catch(() => null);
-      const routines = token ? await loadLearnedTaskRoutines(getServerUrl(), token) : [];
-      setLearnedRoutines(routines);
-      setIsLoadingRoutines(false);
-    })();
-  };
 
   const focusSessionFromTask = async (task: TaskItem) => {
     await handleTimerAction(task);
@@ -1153,399 +681,14 @@ export default function TasksScreen() {
         </View>
       )}
 
-      {/* Floating Action Button for Quick Capture */}
+      {/* Every way of adding a task opens the one Add screen (ADR-034). */}
       <Pressable
         style={styles.fab}
-        accessibilityLabel="Quick capture task"
-        onPress={openCapture}
+        accessibilityLabel="Add a task"
+        onPress={() => router.push("/capture")}
       >
         <Plus size={24} color="#090D16" />
       </Pressable>
-
-      {/* Quick Capture Modal */}
-      <Modal visible={captureVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setCaptureVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Sparkles size={18} color={theme.colors.accent.amber} />
-                <Text style={styles.modalTitle}>Quick Capture</Text>
-              </View>
-              <Pressable onPress={() => { stopSpeechRecognition(); setCaptureVisible(false); setIsListening(false); }}>
-                <X size={20} color={theme.colors.text.secondary} />
-              </Pressable>
-            </View>
-
-            {isListening && (
-              <View style={styles.listeningHintRow}>
-                <Mic size={14} color={theme.colors.accent.amber} />
-                <Text style={styles.listeningHintText}>
-                  Listening in real-time: Speak now... 🎙️
-                </Text>
-              </View>
-            )}
-
-            <ScrollView
-              style={{ maxHeight: 420 }}
-              contentContainerStyle={{ gap: 14, paddingBottom: 6 }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.captureInput}
-                  value={captureText}
-                  onChangeText={setCaptureText}
-                  placeholder="Type or dictate task... e.g. Finish report #work"
-                  placeholderTextColor={theme.colors.text.secondary}
-                  multiline
-                  autoFocus
-                />
-                <Pressable
-                  style={[styles.inputMicBtn, isListening && styles.inputMicBtnActive]}
-                  onPress={handleMicPress}
-                  accessibilityLabel="Activate speech dictation"
-                >
-                  <Mic size={18} color={isListening ? "#090D16" : theme.colors.accent.amber} />
-                </Pressable>
-              </View>
-
-              {/* Status Selection (Optional, Pending / Completed) */}
-              <View style={styles.optionSection}>
-                <Text style={styles.optionSectionHeader}>Status (Optional):</Text>
-                <View style={styles.optionRow}>
-                  <Pressable
-                    style={[
-                      styles.statusOptionPill,
-                      taskStatus === "pending" && styles.statusOptionPillActivePending,
-                    ]}
-                    onPress={() => setTaskStatus("pending")}
-                  >
-                    <Circle
-                      size={13}
-                      color={taskStatus === "pending" ? "#F59E0B" : theme.colors.text.secondary}
-                    />
-                    <Text
-                      style={[
-                        styles.statusOptionText,
-                        taskStatus === "pending" && { color: "#F59E0B", fontWeight: "600" },
-                      ]}
-                    >
-                      Pending
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.statusOptionPill,
-                      taskStatus === "completed" && styles.statusOptionPillActiveCompleted,
-                    ]}
-                    onPress={() => setTaskStatus("completed")}
-                  >
-                    <CheckCircle2
-                      size={13}
-                      color={taskStatus === "completed" ? "#10B981" : theme.colors.text.secondary}
-                    />
-                    <Text
-                      style={[
-                        styles.statusOptionText,
-                        taskStatus === "completed" && { color: "#10B981", fontWeight: "600" },
-                      ]}
-                    >
-                      Completed
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Date Selection (Optional) */}
-              <View style={styles.optionSection}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={styles.optionSectionHeader}>Due Date (Optional):</Text>
-                  {selectedDate && (
-                    <Pressable
-                      onPress={() => {
-                        setSelectedDate(null);
-                        setSelectedTime(null);
-                        setCustomDateStr("");
-                        setCustomTimeStr("");
-                      }}
-                    >
-                      <Text style={styles.clearOptionText}>Clear Date</Text>
-                    </Pressable>
-                  )}
-                </View>
-                <View style={styles.optionRow}>
-                  {[
-                    { id: "today", label: "Today" },
-                    { id: "tomorrow", label: "Tomorrow" },
-                    { id: "next_week", label: "Next Week" },
-                    { id: "custom", label: "Custom Date..." },
-                  ].map((opt) => (
-                    <Pressable
-                      key={opt.id}
-                      style={[styles.datePill, selectedDate === opt.id && styles.datePillActive]}
-                      onPress={() =>
-                        setSelectedDate(selectedDate === opt.id ? null : (opt.id as any))
-                      }
-                    >
-                      <Calendar
-                        size={12}
-                        color={selectedDate === opt.id ? "#F59E0B" : theme.colors.text.secondary}
-                      />
-                      <Text
-                        style={[
-                          styles.datePillText,
-                          selectedDate === opt.id && styles.datePillTextActive,
-                        ]}
-                      >
-                        {opt.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-                {selectedDate === "custom" && (
-                  <TextInput
-                    style={styles.customInputSmall}
-                    value={customDateStr}
-                    onChangeText={setCustomDateStr}
-                    placeholder="YYYY-MM-DD (e.g. 2026-11-20)"
-                    placeholderTextColor={theme.colors.text.secondary}
-                  />
-                )}
-              </View>
-
-              {/* Time Selection (Optional, Appears when Date is Chosen) */}
-              {selectedDate && (
-                <View style={styles.optionSection}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={styles.optionSectionHeader}>Due Time (Optional):</Text>
-                    {selectedTime && (
-                      <Pressable
-                        onPress={() => {
-                          setSelectedTime(null);
-                          setCustomTimeStr("");
-                        }}
-                      >
-                        <Text style={styles.clearOptionText}>Clear Time</Text>
-                      </Pressable>
-                    )}
-                  </View>
-                  <View style={styles.optionRow}>
-                    {[
-                      { id: "09:00", label: "Morning 9 AM" },
-                      { id: "14:00", label: "Afternoon 2 PM" },
-                      { id: "18:00", label: "Evening 6 PM" },
-                      { id: "21:00", label: "Night 9 PM" },
-                      { id: "custom", label: "Custom Time..." },
-                    ].map((tOpt) => (
-                      <Pressable
-                        key={tOpt.id}
-                        style={[styles.timePill, selectedTime === tOpt.id && styles.timePillActive]}
-                        onPress={() =>
-                          setSelectedTime(selectedTime === tOpt.id ? null : tOpt.id)
-                        }
-                      >
-                        <Clock
-                          size={12}
-                          color={selectedTime === tOpt.id ? "#38BDF8" : theme.colors.text.secondary}
-                        />
-                        <Text
-                          style={[
-                            styles.timePillText,
-                            selectedTime === tOpt.id && styles.timePillTextActive,
-                          ]}
-                        >
-                          {tOpt.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  {selectedTime === "custom" && (
-                    <TextInput
-                      style={styles.customInputSmall}
-                      value={customTimeStr}
-                      onChangeText={setCustomTimeStr}
-                      placeholder="HH:MM (24h, e.g. 17:30)"
-                      placeholderTextColor={theme.colors.text.secondary}
-                    />
-                  )}
-                </View>
-              )}
-
-              {/* Aligned Deadline Preview */}
-              {selectedDate && (
-                <View style={styles.alignedDeadlineBadge}>
-                  <Calendar size={13} color="#38BDF8" />
-                  <Text style={styles.alignedDeadlineText}>
-                    Target Deadline:{" "}
-                    {formatDeadlinePreview(
-                      selectedDate,
-                      customDateStr,
-                      selectedTime,
-                      customTimeStr
-                    )}
-                  </Text>
-                </View>
-              )}
-
-              {/* Estimated Duration (Optional & PLE Duration Prediction) */}
-              <View style={styles.optionSection}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={styles.optionSectionHeader}>Estimated Duration (Optional):</Text>
-                  {userEstimateMin != null && (
-                    <Pressable
-                      onPress={() => {
-                        setUserEstimateMin(null);
-                        setCustomEstimateStr("");
-                      }}
-                    >
-                      <Text style={styles.clearOptionText}>Clear Estimate</Text>
-                    </Pressable>
-                  )}
-                </View>
-                <View style={styles.optionRow}>
-                  {[
-                    { val: 15, label: "15m" },
-                    { val: 30, label: "30m" },
-                    { val: 45, label: "45m" },
-                    { val: 60, label: "60m" },
-                  ].map((opt) => (
-                    <Pressable
-                      key={opt.val}
-                      style={[styles.timePill, userEstimateMin === opt.val && styles.timePillActive]}
-                      onPress={() => {
-                        const next = userEstimateMin === opt.val ? null : opt.val;
-                        setUserEstimateMin(next);
-                        setCustomEstimateStr(next ? String(next) : "");
-                      }}
-                    >
-                      <Clock
-                        size={12}
-                        color={userEstimateMin === opt.val ? "#38BDF8" : theme.colors.text.secondary}
-                      />
-                      <Text
-                        style={[
-                          styles.timePillText,
-                          userEstimateMin === opt.val && styles.timePillTextActive,
-                        ]}
-                      >
-                        {opt.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-                <TextInput
-                  style={styles.customInputSmall}
-                  value={customEstimateStr}
-                  onChangeText={(val) => {
-                    setCustomEstimateStr(val);
-                    const parsed = parseInt(val, 10);
-                    setUserEstimateMin(isNaN(parsed) || parsed <= 0 ? null : parsed);
-                  }}
-                  keyboardType="numeric"
-                  placeholder="Custom minutes (e.g. 25, 90)"
-                  placeholderTextColor={theme.colors.text.secondary}
-                />
-              </View>
-
-              {/* PLE Calibrated Prediction Card */}
-              {isPredictingDuration && (
-                <Text style={styles.routineLoading}>Analyzing historical completion patterns...</Text>
-              )}
-              {durationPrediction && (
-                durationPrediction.confidence > 0 && durationPrediction.maturity_level > 0 ? (
-                  <View style={styles.predictionCard}>
-                    <View style={styles.predictionTitleRow}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <Sparkles size={14} color={theme.colors.brand.orange} />
-                        <Text style={styles.predictionTitle}>
-                          ALIBI Predicted: ~{durationPrediction.p50_min}m
-                        </Text>
-                      </View>
-                      <Pressable
-                        style={styles.predictionApplyBtn}
-                        onPress={() => {
-                          setUserEstimateMin(durationPrediction.p50_min);
-                          setCustomEstimateStr(String(durationPrediction.p50_min));
-                        }}
-                      >
-                        <Text style={styles.predictionApplyText}>Use {durationPrediction.p50_min}m</Text>
-                      </Pressable>
-                    </View>
-                    <Text style={styles.predictionSubtext}>
-                      {durationPrediction.p10_min ? `Range: ${durationPrediction.p10_min}m–${durationPrediction.p90_min}m • ` : ""}
-                      {Math.round(durationPrediction.confidence * 100)}% calibrated confidence
-                    </Text>
-                    {durationPrediction.explanation && (
-                      <Text style={[styles.predictionSubtext, { fontStyle: "italic" }]}>
-                        {durationPrediction.explanation}
-                      </Text>
-                    )}
-                  </View>
-                ) : (
-                  <View style={styles.coldStartCard}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                      <Brain size={14} color={theme.colors.text.secondary} />
-                      <Text style={[styles.predictionTitle, { color: theme.colors.text.secondary }]}>
-                        Learning Engine: Cold Start
-                      </Text>
-                    </View>
-                    <Text style={styles.predictionSubtext}>
-                      Not enough finished tasks to predict yet. Estimates appear once ALIBI has learned from your completed work.
-                    </Text>
-                  </View>
-                )
-              )}
-
-              {learnedRoutines.length > 0 && (
-                <View style={styles.suggestionSection}>
-                  <Text style={styles.suggestionHeader}>From your learned routines</Text>
-                  <Text style={styles.routineHint}>Based on recurring tasks in your own history</Text>
-                  <View style={styles.chipsRow}>
-                    {learnedRoutines.map((routine) => (
-                      <Pressable
-                        key={routine.label}
-                        style={styles.chip}
-                        onPress={() => setCaptureText(routine.label)}
-                      >
-                        <Text style={styles.chipText}>{routine.label}</Text>
-                        <Text style={styles.routineSamples}>{routine.sample_count} recorded occurrences</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              )}
-              {isLoadingRoutines && <Text style={styles.routineLoading}>Checking your learned routines…</Text>}
-            </ScrollView>
-
-            <View style={styles.modalActions}>
-              <Pressable
-                style={styles.cancelBtn}
-                onPress={() => { stopSpeechRecognition(); resetModal(); setCaptureVisible(false); }}
-              >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.confirmBtn, !captureText.trim() && { opacity: 0.5 }]}
-                disabled={!captureText.trim() || isCapturing}
-                onPress={() => { stopSpeechRecognition(); setIsListening(false); handleCapture(); }}
-              >
-                <Text style={styles.confirmBtnText}>
-                  {isCapturing ? "Saving..." : taskStatus === "completed" ? "Save Completed Task" : "Save Task"}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <CaptureReviewSheet
-        extraction={pendingExtraction}
-        visible={Boolean(pendingExtraction)}
-        busy={isReviewingExtraction}
-        onApply={(fields, rejectedFields) => { void submitExtractionDecision(fields, rejectedFields); }}
-        onKeepOriginal={(rejectedFields) => { void submitExtractionDecision({}, rejectedFields); }}
-      />
 
       <Modal visible={Boolean(selectedTask)} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setSelectedTask(null)}>
         <View style={styles.modalOverlay}>

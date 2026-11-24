@@ -14,6 +14,7 @@ import {
   XCircle,
   Lock,
 } from "lucide-react";
+import { useAuth } from "../../lib/auth-context";
 
 interface ProviderSetting {
   provider: string;
@@ -43,6 +44,14 @@ interface UsageSummary {
 }
 
 export default function AIIntelligencePage() {
+  // Every call here needs the signed-in user's token; without it each request got 401
+  // and the page showed nothing (logic audit B8).
+  const { accessToken } = useAuth();
+  const authHeaders = (json = false): Record<string, string> => ({
+    ...(json ? { "Content-Type": "application/json" } : {}),
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+  });
+  const [providerErrors, setProviderErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<"settings" | "usage">("settings");
   const [masterEnabled, setMasterEnabled] = useState(false);
   const [serverExternalEnabled, setServerExternalEnabled] = useState(false);
@@ -55,16 +64,18 @@ export default function AIIntelligencePage() {
   const [testResults, setTestResults] = useState<Record<string, { status: string; error?: string }>>({});
 
   useEffect(() => {
+    if (!accessToken) return;
     fetchConfigAndProviders();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken]);
 
   const fetchConfigAndProviders = async () => {
     setLoading(true);
     try {
       const [cfgRes, provRes, usageRes] = await Promise.all([
-        fetch("/api/v1/ai/config"),
-        fetch("/api/v1/ai/providers"),
-        fetch("/api/v1/ai/usage"),
+        fetch("/api/v1/ai/config", { headers: authHeaders() }),
+        fetch("/api/v1/ai/providers", { headers: authHeaders() }),
+        fetch("/api/v1/ai/usage", { headers: authHeaders() }),
       ]);
 
       if (cfgRes.ok) {
@@ -93,7 +104,7 @@ export default function AIIntelligencePage() {
     try {
       const res = await fetch("/api/v1/ai/config", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(true),
         body: JSON.stringify({ ai_external_enabled: nextVal }),
       });
       if (res.ok) {
@@ -108,13 +119,18 @@ export default function AIIntelligencePage() {
     try {
       const res = await fetch(`/api/v1/ai/providers/${provider}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(true),
         body: JSON.stringify(updates),
       });
       if (res.ok) {
         const updated = await res.json();
         setProviders((prev) => prev.map((p) => (p.provider === provider ? updated : p)));
         setKeyInputs((prev) => ({ ...prev, [provider]: "" }));
+        setProviderErrors((prev) => ({ ...prev, [provider]: "" }));
+      } else {
+        const problem = await res.json().catch(() => null);
+        const detail = typeof problem?.detail === "string" ? problem.detail : "Could not save this setting.";
+        setProviderErrors((prev) => ({ ...prev, [provider]: detail }));
       }
     } catch (e) {
       console.error("Failed to update provider", e);
@@ -124,7 +140,7 @@ export default function AIIntelligencePage() {
   const handleTestConnection = async (provider: string) => {
     setTestingProvider(provider);
     try {
-      const res = await fetch(`/api/v1/ai/providers/${provider}/test`, { method: "POST" });
+      const res = await fetch(`/api/v1/ai/providers/${provider}/test`, { method: "POST", headers: authHeaders() });
       const data = await res.json();
       setTestResults((prev) => ({ ...prev, [provider]: data }));
     } catch (e: any) {
@@ -139,7 +155,7 @@ export default function AIIntelligencePage() {
 
   const handleClearKey = async (provider: string) => {
     try {
-      const res = await fetch(`/api/v1/ai/providers/${provider}/key`, { method: "DELETE" });
+      const res = await fetch(`/api/v1/ai/providers/${provider}/key`, { method: "DELETE", headers: authHeaders() });
       if (res.ok) {
         setProviders((prev) =>
           prev.map((p) => (p.provider === provider ? { ...p, key_last4: null } : p))
@@ -322,6 +338,9 @@ export default function AIIntelligencePage() {
                         onBlur={() => handleUpdateProvider(p.provider, { base_url: p.base_url })}
                         className="w-full mt-1 px-3 py-1.5 rounded-control bg-surface2 border border-border text-xs text-text font-mono placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-primary"
                       />
+                      {providerErrors[p.provider] && (
+                        <p className="mt-1 text-[11px] text-accent-amber">{providerErrors[p.provider]}</p>
+                      )}
                     </div>
                   </div>
                 </div>

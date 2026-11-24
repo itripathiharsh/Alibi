@@ -21,7 +21,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-ORG-004 | Role-protected owner/team-lead access to organization members | M | M13 | 02§8, 04§4.18, 12§5 | backend/tests/security/organizations/ | ☐ |
 | FR-ORG-005 | SQL-derived organization metrics and activity expose only consented professional records after consent | M | M13 | 10, 12§5,6 | backend/tests/integration/organizations/ + web/e2e | ☐ |
 | FR-ORG-006 | Leave/revoke immediately ends organization access and writes an audit event | M | M13 | 03§3.1, 04§4.18, 12§7 | backend/tests/security/organizations/ | ☐ |
-| FR-TASK-001 | Create task from free text; task is persisted **immediately** with raw input even befor… | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
+| FR-TASK-001 | Create task from free text; task is persisted **immediately** with raw input even befor… | M | M2 | 03§3.3, 04§4.4, ADR-034 | backend/tests/integration/tasks/ + backend/tests/integration/test_logic_audit_fixes.py + tests/e2e/web/tasks + tests/e2e/mobile/tasks; phone add path apps/mobile/src/lib/task-intake.ts (Android device QA, KI-055) | ☑ |
 | FR-TASK-002 | Create task from voice: audio → transcript → same pipeline as text; audio retained only… | M | M4 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-003 | Extraction returns: title, category, project, deadline, priority, estimate, subtasks — … | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-004 | Fields without grounding stay `null` or produce a clarification question; deadlines/pro… | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
@@ -33,7 +33,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-TASK-010 | Fields: priority, deadline, estimate (user/AI/final), actual time, started/completed ti… | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-011 | Reschedule (change deadline or planned block) with reason; increments reschedule count;… | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-012 | Subtasks: add, reorder, complete; parent progress shown | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
-| FR-TASK-013 | Attachments/evidence: file upload, link, text; hosted limits 2 MB / 250 MB (ADR-020) | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
+| FR-TASK-013 | Attachments/evidence: file upload, link, text; hosted limits 2 MB / 250 MB (ADR-020) | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + backend/tests/integration/test_logic_audit_fixes.py (storage folder) + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-014 | Task origin recorded: manual, voice, ai_recommendation, meeting, external_assignment, r… | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-015 | Activity history: every state change is an append-only `task_events` row, viewable per … | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
 | FR-TASK-016 | Time tracking: start/stop timer and manual time entries; actual time = sum of entries | M | M2 | 03§3.3, 04§4.4 | backend/tests/integration/tasks/ + tests/e2e/web/tasks + tests/e2e/mobile/tasks | ☑ |
@@ -77,7 +77,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-SCHED-005 | Infeasibility reported with the reason (e.g. "needs 6h, only 3.5h free before deadline") | M | M6 | 09 | backend/tests/unit/scheduling/ + scheduling_bench/ | ☑ |
 | FR-SCHED-006 | Auto-classification only when confidence ≥ threshold (configurable, default 0.85) | M | M6 | 09 | backend/tests/unit/scheduling/ + scheduling_bench/ | ☑ |
 | FR-SCHED-007 | Configurable auto-scheduling for low-risk recurring tasks (off by default) | C | M6 | 09 | backend/tests/unit/scheduling/ + scheduling_bench/ | ☑ |
-| FR-AI-001 | Providers: Ollama, NVIDIA NIM, Gemini, Groq via adapters behind one interface | M | M4 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☑ |
+| FR-AI-001 | Providers: Ollama, NVIDIA NIM, Gemini, Groq via adapters behind one interface | M | M4 | 06 | backend/tests/unit/ai/ + backend/tests/unit/test_endpoint_policy.py + backend/tests/integration/test_logic_audit_fixes.py + ai_eval/ | ☑ |
 | FR-AI-002 | Configurable routing per operation + fallback order | M | M4 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☑ |
 | FR-AI-003 | Structured output validation (Pydantic) with one repair retry | M | M4 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☑ |
 | FR-AI-004 | Timeouts, retries with backoff, circuit breaker, health status | M | M4 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☑ |
@@ -88,7 +88,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-AI-009 | Core features work with all AI disabled | M | M4 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☑ |
 | FR-AI-010 | STT: on-device Android primary; Groq Whisper opt-in; faster-whisper local mode (ADR-020) | M | M4 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☑ |
 | FR-AI-011 | Embeddings in-process, never external; hosted per M7 memory check (ADR-020) | M | M4/M7 | 06 | backend/tests/unit/ai/ + ai_eval/ | ☑ |
-| FR-RAG-001 | Chat assistant in AI Intelligence section | M | M7 | 08 | backend/tests/rag_eval/ + integration/rag/ | ☑ |
+| FR-RAG-001 | Chat assistant in AI Intelligence section | M | M7 | 08 | backend/tests/rag_eval/ + integration/rag/ + backend/tests/unit/test_assistant_breakdown.py | ☑ |
 | FR-RAG-002 | Hybrid retrieval: SQL (structured intents) + pgvector + metadata filters (date/category… | M | M7 | 08 | backend/tests/rag_eval/ + integration/rag/ | ☑ |
 | FR-RAG-003 | Answers cite sources (task/note/log IDs, clickable) | M | M7 | 08 | backend/tests/rag_eval/ + integration/rag/ | ☑ |
 | FR-RAG-004 | Numbers in answers come from SQL tool results only | M | M7 | 08 | backend/tests/rag_eval/ + integration/rag/ | ☑ |
@@ -110,7 +110,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-SHARE-004 | Shared scope = professional only by default; including other classes requires explicit … | M | M9 | 10, 12 | backend/tests/security/sharing/ | ☑ |
 | FR-SHARE-005 | Scope enforced in backend when building the shared snapshot | M | M9 | 10, 12 | backend/tests/security/sharing/ | ☑ |
 | FR-SHARE-006 | In-app share (Android share sheet / Web Share API / copy link) | M | M9 | 10, 12 | backend/tests/security/sharing/ | ☑ |
-| FR-SYNC-001 | Android offline: create tasks, view synced tasks, change status, completion notes, time… | M | M10 | 11 | tests/sync/ + packages/sync-core/test | ☑ |
+| FR-SYNC-001 | Android offline: create tasks, view synced tasks, change status, completion notes, time… | M | M10 | 11 | tests/sync/ + packages/sync-core/test + backend/tests/integration/test_logic_audit_fixes.py | ☑ |
 | FR-SYNC-002 | Web offline (IndexedDB) — deferred, web online-only in v1 (ADR-020) | C | later | 11 | tests/sync/ + packages/sync-core/test | ☑ |
 | FR-SYNC-003 | Pending operation queue with idempotent replay | M | M10 | 11 | tests/sync/ + packages/sync-core/test | ☑ |
 | FR-SYNC-004 | Pull by server sequence cursor; push by operation batch | M | M10 | 11 | tests/sync/ + packages/sync-core/test | ☑ |
@@ -138,7 +138,7 @@ Status values: ☐ not started · ◐ in progress · ☑ passing (link evidence 
 | FR-PROD-009 | Optional offline ambient audio generated on device | M | M13 | 01§2.13, ADR-027 | Android focus audio; device QA | ◐ |
 | FR-PROD-010 | Round "Today" home-screen widget (done/total today) with a user-configurable quick-action menu | M | M13 | ADR-028 | apps/mobile/src/lib/home-widget.ts; Android widget; device QA | ◐ |
 | FR-PROD-011 | Diary-style Today page (time-ordered, strike-through, carried-over tasks, inline write line); dashboard moved to Insights; Profile reached from the header avatar | M | M13 | ADR-029 | apps/mobile/src/lib/diary-page.ts; Android device QA | ◐ |
-| FR-PROD-012 | "Say a task" from the widget: spoken task saved in the background without opening the app; several tasks go to review | M | M13 | ADR-030 | apps/mobile/src/lib/quick-add.ts; QuickAddTaskService; Android device QA | ◐ |
+| FR-PROD-012 | "Say a task" from the widget: spoken task saved in the background without opening the app; several tasks go to review | M | M13 | ADR-030, ADR-034 | apps/mobile/src/lib/quick-add.ts (adds through task-intake.ts); QuickAddTaskService; Android device QA | ◐ |
 | FR-PROD-013 | In-app update prompt for the sideloaded APK: version check against apk/latest.json, SHA-256 verified download, Android installer; Settings toggle and manual check | M | M13 | ADR-031, RUNBOOK §9 | apps/mobile/src/lib/app-update.ts; AppUpdateModule; Android device QA | ◐ |
 | FR-PROD-014 | Start / pause / complete a task on Today with timestamp-based sessions (time entries), one running task at a time on Today, persisted across restarts | M | M13 | ADR-032 | apps/mobile/src/app/(tabs)/index.tsx; time entry sync tests; Android device QA | ◐ |
 | FR-PROD-015 | Start Day / End Day per user; brain-dump suggested times stay inside them | M | M13 | ADR-032 | backend/tests/unit/test_brain_dump_service.py (day window); Android Settings | ◐ |

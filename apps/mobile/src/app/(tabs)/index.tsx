@@ -17,6 +17,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
   Platform,
@@ -39,13 +40,12 @@ import { getServerUrl } from "../../lib/config";
 import {
   cacheRunningTimers,
   cacheTasks,
-  createTaskOffline,
+  endTaskSession,
   getAllLocalTasks,
   getLocalTimers,
   onLocalTasksChanged,
-  removeLocalTimer,
+  setTaskDoneOffline,
   startTaskTimerOffline,
-  stopTaskTimerOffline,
   syncMobileAccount,
   updateTaskOffline,
   type LocalTask,
@@ -53,10 +53,10 @@ import {
 import { formatDayMonthYear, formatElapsed, formatMinutes } from "../../lib/time-format";
 import { DateChooser, FieldLabel, Sheet, TimeChooser } from "../../components/time-pickers";
 import { currentUserId } from "../../lib/learning-signals";
-import { addDays, buildDiaryPage, looksLikeManyTasks, startOfDay, timeLabel, type DiaryEntry } from "../../lib/diary-page";
+import { addDays, buildDiaryPage, startOfDay, timeLabel, type DiaryEntry } from "../../lib/diary-page";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../../lib/task-deadline-reminders";
 import { triggerHaptic } from "../../lib/focus-session-notification";
-import { splitBrainDump } from "../../lib/brain-dump";
+import { addTaskFromText, requestSync } from "../../lib/task-intake";
 
 const PAPER = "#F8F4EE";
 const RULE = "#EDE3D6";
@@ -65,7 +65,6 @@ const PEN = "#E0612A";
 const SERIF = Platform.select({ android: "serif", ios: "Georgia", default: undefined });
 
 type Timer = { id: string; task_id: string; started_at: string; source: string };
-const MIN_SESSION_MS = 30_000; // a start/pause shorter than this is a mis-tap, not work
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -85,7 +84,6 @@ export default function TodayDiaryScreen() {
   const [moving, setMoving] = useState<DiaryEntry | null>(null);
   const [moveDate, setMoveDate] = useState<Date | null>(null);
   const [moveMinutes, setMoveMinutes] = useState(18 * 60);
-  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const day = useMemo(() => addDays(startOfDay(new Date()), dayOffset), [dayOffset]);
   const page = useMemo(() => buildDiaryPage(tasks, day), [tasks, day]);
@@ -158,17 +156,6 @@ export default function TodayDiaryScreen() {
 
   useEffect(() => onLocalTasksChanged(() => { void readLocal(); }), [readLocal]);
 
-  const scheduleSync = useCallback(() => {
-    if (syncTimer.current) clearTimeout(syncTimer.current);
-    syncTimer.current = setTimeout(() => {
-      void (async () => {
-        const userId = await currentUserId();
-        const token = await ensureAuthenticated().catch(() => null);
-        if (token && userId !== "local_user") await syncMobileAccount(userId, token, getServerUrl()).catch(() => undefined);
-      })();
-    }, 1500);
-  }, []);
-
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await refreshFromServer();
@@ -178,25 +165,13 @@ export default function TodayDiaryScreen() {
 
   const timerFor = useCallback((taskId: string) => timers.find((t) => t.task_id === taskId) ?? null, [timers]);
 
-  /** End a running session: saved as a time entry, or dropped if it was a mis-tap. */
-  const endSession = useCallback(async (userId: string, timer: Timer) => {
-    const elapsed = Date.now() - Date.parse(timer.started_at);
-    if (timer.source === "local" && elapsed < MIN_SESSION_MS) {
-      await removeLocalTimer(userId, timer.id);
-    } else {
-      await stopTaskTimerOffline(userId, timer.id);
-    }
-  }, []);
-
   const toggle = useCallback(async (entry: DiaryEntry) => {
     triggerHaptic(entry.done ? "tap" : "complete");
-    const userId = await currentUserId();
-    const running = timerFor(entry.task.id);
-    if (!entry.done && running) await endSession(userId, running); // completing stops the clock
-    await updateTaskOffline(userId, entry.task.id, { status: entry.done ? "pending" : "completed" });
+    // Completing a task also ends its running clock (lib/offline-sync).
+    await setTaskDoneOffline(await currentUserId(), entry.task.id, !entry.done);
     await readLocal();
-    scheduleSync();
-  }, [endSession, readLocal, scheduleSync, timerFor]);
+    requestSync();
+  }, [readLocal]);
 
   const startWork = useCallback(async (entry: DiaryEntry) => {
     const userId = await currentUserId();
@@ -204,18 +179,17 @@ export default function TodayDiaryScreen() {
     await startTaskTimerOffline(userId, entry.task.id); // other running tasks keep going
     triggerHaptic("tap");
     await readLocal();
-    scheduleSync();
-  }, [readLocal, scheduleSync, timerFor]);
+    requestSync();
+  }, [readLocal, timerFor]);
 
   const pauseWork = useCallback(async (entry: DiaryEntry) => {
-    const userId = await currentUserId();
     const running = timerFor(entry.task.id);
     if (!running) return;
-    await endSession(userId, running);
+    await endTaskSession(await currentUserId(), running);
     triggerHaptic("tap");
     await readLocal();
-    scheduleSync();
-  }, [endSession, readLocal, scheduleSync, timerFor]);
+    requestSync();
+  }, [readLocal, timerFor]);
 
   const openReschedule = useCallback((entry: DiaryEntry) => {
     const today = startOfDay(new Date());
@@ -236,8 +210,8 @@ export default function TodayDiaryScreen() {
     });
     setMoving(null);
     await readLocal();
-    scheduleSync();
-  }, [moveDate, moveMinutes, moving, readLocal, scheduleSync]);
+    requestSync();
+  }, [moveDate, moveMinutes, moving, readLocal]);
 
   const rowProps = {
     timerFor,
@@ -248,48 +222,35 @@ export default function TodayDiaryScreen() {
     onReschedule: openReschedule,
   };
 
+  /** The write line uses the same save path as the Add screen (lib/task-intake, ADR-034). */
   const addLine = useCallback(async () => {
     const text = draft.trim();
     if (!text || adding) return;
-    if (looksLikeManyTasks(text)) {
-      setDraft("");
-      router.push({ pathname: "/capture", params: { mode: "dump", prefill: text } });
-      return;
-    }
     setAdding(true);
     try {
-      // A page other than today gives the task that day (18:00, the usual "by end of day").
-      let deadline: string | null = null;
+      // A page other than today gives the task that day (18:00, the usual "by end of day")
+      // unless the line names its own time ("kal 5 baje", "shaam ko").
+      let pageDeadline: string | null = null;
       if (dayOffset !== 0) {
         const due = new Date(day);
         due.setHours(18, 0, 0, 0);
-        deadline = due.toISOString();
+        pageDeadline = due.toISOString();
       }
-      let title = text;
-      // Times written on the line ("shaam ko", "kal 5 baje") are read by the server's rules
-      // parser. A sleeping or unreachable server never blocks writing the line.
-      try {
-        const parsed = await Promise.race([
-          splitBrainDump(text),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
-        ]);
-        const item = parsed?.items.length === 1 ? parsed.items[0] : null;
-        if (item) {
-          title = item.title || text;
-          if (item.deadline_at) deadline = item.deadline_at;
-        }
-      } catch {
-        // Offline: keep the words exactly as written.
-      }
-      const userId = await currentUserId();
-      await createTaskOffline(userId, { title, status: "pending", origin: "manual", deadline_at: deadline });
-      triggerHaptic("tap");
+      const outcome = await addTaskFromText(text, { defaultDeadlineAt: pageDeadline });
       setDraft("");
-      scheduleSync();
+      if (outcome.kind === "review") {
+        // Several tasks on one line: the Add screen shows them for review first.
+        router.push({ pathname: "/capture", params: { mode: "dump", prefill: text } });
+        return;
+      }
+      triggerHaptic("tap");
+      await readLocal();
+    } catch (error) {
+      Alert.alert("Could not add the task", error instanceof Error ? error.message : "Try again.");
     } finally {
       setAdding(false);
     }
-  }, [adding, day, dayOffset, draft, router, scheduleSync]);
+  }, [adding, day, dayOffset, draft, readLocal, router]);
 
   const isToday = dayOffset === 0;
   const topInset = Platform.OS === "android" ? Math.max(insets.top, StatusBar.currentHeight ?? 0) : insets.top;

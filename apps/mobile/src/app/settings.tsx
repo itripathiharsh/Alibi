@@ -227,7 +227,7 @@ export default function SettingsScreen() {
     try {
       const ok = await triggerTestNotification();
       if (ok) {
-        Alert.alert("Notification scheduled! 🚀", "Look at the top of your screen in 2 seconds. A heads-up pop-culture alert should appear.");
+        Alert.alert("Test sent", "It should appear at the top of your screen in 2 seconds.");
       } else {
         Alert.alert("Notifications not allowed", "Please enable notifications for ALIBI in Android App Settings.", [
           { text: "Cancel", style: "cancel" },

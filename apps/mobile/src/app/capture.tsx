@@ -1,37 +1,74 @@
+/**
+ * The Add screen: the one place to add tasks and notes (ADR-034).
+ *
+ * The Tasks button, the Insights shortcuts, the Today mic and a "several tasks" line from
+ * Today all open this screen; the Today write line and the widget use the same save path
+ * (lib/task-intake.ts). One task is saved at once. Several tasks go to the review list
+ * first, because a split is a proposal until the user accepts it.
+ */
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, ToastAndroid, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, BookOpen, CheckSquare, ListChecks, Mic, Save, Square } from "lucide-react-native";
+import { ArrowLeft, BookOpen, CalendarClock, Check, CheckSquare, Mic, Square } from "lucide-react-native";
 import { BrandHeader } from "../components/brand-ui";
 import BrainDumpReview from "../components/brain-dump-review";
-import { saveBrainDumpItems, setCloudAiOptIn, splitBrainDump, type BrainDumpResult, type ReviewedItem } from "../lib/brain-dump";
-import { ensureAuthenticated, getUserProfile } from "../lib/auth";
+import { DateChooser, FieldLabel, Sheet, TimeChooser } from "../components/time-pickers";
+import { setCloudAiOptIn, splitBrainDump, type BrainDumpResult, type ReviewedItem } from "../lib/brain-dump";
+import { ensureAuthenticated } from "../lib/auth";
 import { getServerUrl } from "../lib/config";
-import { createTaskOffline, saveLocalNote } from "../lib/offline-sync";
+import { looksLikeManyTasks } from "../lib/diary-page";
+import { currentUserId } from "../lib/learning-signals";
+import { loadLearnedTaskRoutines, type LearnedTaskRoutine } from "../lib/learned-routines";
+import { saveLocalNote } from "../lib/offline-sync";
+import { predictTaskDuration } from "../lib/personal-learning-engine";
 import { startSpeechRecognition, stopSpeechRecognition } from "../lib/speech";
+import { addReviewedTasks, addTaskFromText, requestSync, splitForReview } from "../lib/task-intake";
+import { formatMinutes, formatShortDay, formatClock } from "../lib/time-format";
 import { triggerHaptic } from "../lib/focus-session-notification";
 import theme from "../lib/theme";
 
-export default function QuickCaptureScreen() {
+const ESTIMATES = [15, 30, 60, 120];
+
+function toast(message: string): void {
+  if (Platform.OS === "android") ToastAndroid.show(message, ToastAndroid.SHORT);
+}
+
+export default function AddScreen() {
   const router = useRouter();
-  const { mode, voice, prefill } = useLocalSearchParams<{ mode?: "task" | "idea" | "voice" | "dump"; voice?: string; prefill?: string }>();
-  const [captureType, setCaptureType] = useState<"task" | "dump" | "idea">(
-    mode === "idea" ? "idea" : mode === "dump" ? "dump" : "task",
-  );
-  const [dumpResult, setDumpResult] = useState<BrainDumpResult | null>(null);
-  const [enablingAi, setEnablingAi] = useState(false);
+  const { mode, voice, prefill } = useLocalSearchParams<{ mode?: string; voice?: string; prefill?: string }>();
+  const [kind, setKind] = useState<"task" | "note">(mode === "idea" || mode === "note" ? "note" : "task");
   const [text, setText] = useState(typeof prefill === "string" ? prefill : "");
-  const [saving, setSaving] = useState(false);
+  const [review, setReview] = useState<BrainDumpResult | null>(null);
+  const [busy, setBusy] = useState<"saving" | "sorting" | null>(null);
+  const [enablingAi, setEnablingAi] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
-  const voiceStarted = useRef(false);
-  // Text that was already in the box when this listening session began. Android sends the
-  // whole sentence again with every update ("hello", "hello nahin", …), so each update must
-  // replace the spoken part, not be added to it (that caused repeated words).
+  const usedVoice = useRef(false);
+  // Text already in the box when listening began. Android repeats the whole sentence with
+  // every update, so each update replaces the spoken part instead of adding to it (KI-041).
   const voiceBase = useRef("");
+
+  // Optional details for a single task. What the user picks beats what is read from text.
+  const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [dueMinutes, setDueMinutes] = useState(18 * 60);
+  const [whenOpen, setWhenOpen] = useState(false);
+  const [draftDate, setDraftDate] = useState<Date | null>(null);
+  const [draftMinutes, setDraftMinutes] = useState(18 * 60);
+  const [estimate, setEstimate] = useState<number | null>(null);
+  const [done, setDone] = useState(false);
+  const [suggested, setSuggested] = useState<number | null>(null);
+  const [routines, setRoutines] = useState<LearnedTaskRoutine[]>([]);
+
+  const many = looksLikeManyTasks(text);
+
+  const close = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)");
+  };
 
   const startVoice = async () => {
     setVoiceError(null);
+    usedVoice.current = true;
     setText((current) => { voiceBase.current = current.trim(); return current; });
     const started = await startSpeechRecognition({
       onStart: () => setListening(true),
@@ -46,37 +83,58 @@ export default function QuickCaptureScreen() {
   };
 
   useEffect(() => {
-    if ((voice === "1" || mode === "voice") && !voiceStarted.current) {
-      voiceStarted.current = true;
+    if (voice === "1" || mode === "voice") {
       const timer = setTimeout(() => { void startVoice(); }, 400);
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [voice, mode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => () => { void stopSpeechRecognition(); }, []);
 
-  const handleSave = async () => {
-    const raw = text.trim();
-    if (!raw || saving) return;
-    setSaving(true);
-    triggerHaptic("complete");
-
-    if (captureType === "idea") {
-      await saveIdea(raw);
-    } else if (captureType === "dump") {
-      await sortDump(raw);
-    } else {
-      await saveTask(raw);
+  // Opened with several tasks already written (Today's write line, the widget's review
+  // notification): go straight to the review list.
+  useEffect(() => {
+    if (typeof prefill === "string" && prefill.trim() && (mode === "dump" || looksLikeManyTasks(prefill))) {
+      void sortForReview(prefill.trim());
     }
-    setSaving(false);
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const sortDump = async (content: string) => {
+  // Routines learned from the user's own history, offered as one-tap titles.
+  useEffect(() => {
+    void (async () => {
+      const token = await ensureAuthenticated().catch(() => null);
+      if (token) setRoutines((await loadLearnedTaskRoutines(getServerUrl(), token)).slice(0, 4));
+    })();
+  }, []);
+
+  // How long similar tasks took this user, from the server's records. Shown only once
+  // the learning engine has data (maturity above 0); never a guess.
+  useEffect(() => {
+    const title = text.trim();
+    if (kind !== "task" || many || title.length < 3) {
+      setSuggested(null);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      void (async () => {
+        const token = await ensureAuthenticated().catch(() => null);
+        if (!token) return;
+        const prediction = await predictTaskDuration(getServerUrl(), token, title).catch(() => null);
+        setSuggested(prediction && prediction.maturity_level > 0 && prediction.p50_min > 0 ? Math.round(prediction.p50_min) : null);
+      })();
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [text, kind, many]);
+
+  const sortForReview = async (content: string) => {
+    setBusy("sorting");
     try {
-      setDumpResult(await splitBrainDump(content));
-    } catch (error) {
-      Alert.alert("Could not sort your list", error instanceof Error ? error.message : "Try again.");
+      setReview(await splitForReview(content));
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -84,7 +142,7 @@ export default function QuickCaptureScreen() {
     setEnablingAi(true);
     try {
       await setCloudAiOptIn(true);
-      setDumpResult(await splitBrainDump(text.trim()));
+      setReview(await splitBrainDump(text.trim()));
     } catch (error) {
       Alert.alert("Smart sorting", error instanceof Error ? error.message : "Try again.");
     } finally {
@@ -92,215 +150,221 @@ export default function QuickCaptureScreen() {
     }
   };
 
-  const saveDumpItems = async (items: ReviewedItem[]) => {
-    if (!dumpResult) return;
-    setSaving(true);
-    try {
-      const saved = await saveBrainDumpItems(items, { proposed: dumpResult.items.length, mode: dumpResult.mode });
-      triggerHaptic("complete");
-      Alert.alert("Added", `${saved} ${saved === 1 ? "task" : "tasks"} added to your list.`);
-      router.replace("/(tabs)");
-    } catch (error) {
-      Alert.alert("Could not save tasks", error instanceof Error ? error.message : "Try again.");
-    } finally {
-      setSaving(false);
-    }
+  const pickedDeadline = (): string | null => {
+    if (!dueDate) return null;
+    const due = new Date(dueDate);
+    due.setHours(Math.floor(dueMinutes / 60), dueMinutes % 60, 0, 0);
+    return due.toISOString();
   };
 
-  const saveIdea = async (content: string) => {
-    try {
-      const profile = await getUserProfile().catch(() => null);
-      const userId = profile?.id ?? "local_user";
-      const lines = content.split("\n");
-      const title = lines[0].trim();
-      const body = lines.length > 1 ? lines.slice(1).join("\n").trim() : title;
-      const today = new Date();
-      const occurredOn = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-
-      const notePayload = {
-        title: title || "Captured Idea",
-        body: body || content,
-        source_type: listening ? "voice" : "manual",
-        privacy_class: "personal",
-        occurred_on: occurredOn,
-      };
-
-      // 1. Local SQLite save guarantee (offline-first)
-      await saveLocalNote(userId, notePayload);
-
-      // 2. Best-effort online push if authenticated
-      const token = await ensureAuthenticated().catch(() => null);
-      if (token) {
-        try {
-          await fetch(`${getServerUrl()}/api/v1/vault/notes`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            body: JSON.stringify(notePayload),
-          });
-        } catch {
-          // Sync outbox / local note handles offline
-        }
-      }
-
-      Alert.alert(
-        "Idea Captured",
-        "Saved to your personal Knowledge Vault. You can convert it into an actionable task anytime from the Vault."
-      );
-      router.replace("/(tabs)");
-    } catch (error) {
-      Alert.alert("Could not save idea", error instanceof Error ? error.message : "Try again.");
+  const saveTask = async () => {
+    const content = text.trim();
+    if (!content || busy) return;
+    if (listening) { await stopSpeechRecognition(); setListening(false); }
+    if (many) {
+      await sortForReview(content);
+      return;
     }
-  };
-
-  const saveTask = async (title: string) => {
+    setBusy("saving");
     try {
-      const profile = await getUserProfile().catch(() => null);
-      let savedOnline = false;
-
-      // 1. Try online first if authenticated
-      const token = await ensureAuthenticated().catch(() => null);
-      if (token) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 6000);
-          const response = await fetch(`${getServerUrl()}/api/v1/tasks/capture`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ raw_input: title, origin: listening ? "voice" : "manual", status: "pending" }),
-            signal: controller.signal,
-          });
-          clearTimeout(timeoutId);
-          if (response.ok) {
-            savedOnline = true;
-          }
-        } catch {
-          // Fall back to offline
-        }
-      }
-
-      // 2. If online save succeeded, navigate back
-      if (savedOnline) {
-        router.replace("/(tabs)");
+      const outcome = await addTaskFromText(content, {
+        deadlineAt: pickedDeadline(),
+        estimateMin: estimate,
+        done,
+        origin: usedVoice.current ? "voice" : "manual",
+      });
+      if (outcome.kind === "review") {
+        setReview(outcome.result ?? await splitForReview(content));
         return;
       }
-
-      // 3. Local-first offline save guarantee (never drop user tasks)
-      const userId = profile?.id ?? "local_user";
-      await createTaskOffline(userId, {
-        title,
-        status: "pending",
-        origin: listening ? "voice" : "manual",
-      });
-      Alert.alert("Saved on this device", "This task is saved locally and will sync when ALIBI is online.");
-      router.replace("/(tabs)");
+      triggerHaptic("complete");
+      const due = outcome.task.deadline_at ? ` · ${formatShortDay(new Date(outcome.task.deadline_at))} ${formatClock(outcome.task.deadline_at)}` : "";
+      toast(`Added: ${outcome.task.title}${due}`);
+      close();
     } catch (error) {
-      Alert.alert("Could not save task", error instanceof Error ? error.message : "Try again.");
+      Alert.alert("Could not add the task", error instanceof Error ? error.message : "Try again.");
+    } finally {
+      setBusy(null);
     }
   };
+
+  const saveReviewed = async (items: ReviewedItem[]) => {
+    if (!review) return;
+    setBusy("saving");
+    try {
+      const saved = await addReviewedTasks(items, {
+        proposed: review.items.length,
+        mode: review.mode,
+        origin: usedVoice.current || voice === "1" ? "voice" : "manual",
+      });
+      triggerHaptic("complete");
+      toast(`${saved} ${saved === 1 ? "task" : "tasks"} added`);
+      close();
+    } catch (error) {
+      Alert.alert("Could not add the tasks", error instanceof Error ? error.message : "Try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveNote = async () => {
+    const content = text.trim();
+    if (!content || busy) return;
+    if (listening) { await stopSpeechRecognition(); setListening(false); }
+    setBusy("saving");
+    try {
+      const [first, ...rest] = content.split("\n");
+      const today = new Date();
+      const occurredOn = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      // Saved on the phone; the outbox uploads it. A second, direct upload here used to
+      // create the same note twice on the server (logic audit).
+      await saveLocalNote(await currentUserId(), {
+        title: first.trim() || "Note",
+        body: rest.join("\n").trim() || first.trim(),
+        source_type: usedVoice.current ? "voice" : "manual",
+        privacy_class: "personal",
+        occurred_on: occurredOn,
+      });
+      requestSync();
+      triggerHaptic("complete");
+      toast("Note saved to your Vault");
+      close();
+    } catch (error) {
+      Alert.alert("Could not save the note", error instanceof Error ? error.message : "Try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const whenLabel = dueDate ? `${formatShortDay(dueDate)}, ${formatClock(new Date(dueDate).setHours(Math.floor(dueMinutes / 60), dueMinutes % 60, 0, 0))}` : "No date";
+  const canSave = Boolean(text.trim()) && !busy;
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <BrandHeader right={<Pressable onPress={() => router.back()} style={styles.back} accessibilityRole="button" accessibilityLabel="Close quick capture"><ArrowLeft size={19} color={theme.colors.text.primary} /></Pressable>} />
+      <BrandHeader right={<Pressable onPress={close} style={styles.back} accessibilityRole="button" accessibilityLabel="Close"><ArrowLeft size={19} color={theme.colors.text.primary} /></Pressable>} />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={styles.segmentContainer}>
-          <Pressable
-            onPress={() => setCaptureType("task")}
-            style={[styles.segmentButton, captureType === "task" && styles.segmentButtonActive]}
-            accessibilityRole="button"
-            accessibilityLabel="Capture task"
-          >
-            <CheckSquare size={16} color={captureType === "task" ? "#FFFFFF" : theme.colors.text.secondary} />
-            <Text style={[styles.segmentLabel, captureType === "task" && styles.segmentLabelActive]}>Task</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => { setCaptureType("dump"); setDumpResult(null); }}
-            style={[styles.segmentButton, captureType === "dump" && styles.segmentButtonActive]}
-            accessibilityRole="button"
-            accessibilityLabel="Brain dump: add many tasks at once"
-          >
-            <ListChecks size={16} color={captureType === "dump" ? "#FFFFFF" : theme.colors.text.secondary} />
-            <Text style={[styles.segmentLabel, captureType === "dump" && styles.segmentLabelActive]}>Brain dump</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setCaptureType("idea")}
-            style={[styles.segmentButton, captureType === "idea" && styles.segmentButtonActive]}
-            accessibilityRole="button"
-            accessibilityLabel="Capture idea note"
-          >
-            <BookOpen size={16} color={captureType === "idea" ? "#FFFFFF" : theme.colors.text.secondary} />
-            <Text style={[styles.segmentLabel, captureType === "idea" && styles.segmentLabelActive]}>Note</Text>
-          </Pressable>
-        </View>
-
-        {captureType === "dump" && dumpResult ? (
+        {review ? (
           <BrainDumpReview
-            result={dumpResult}
-            saving={saving}
-            onSave={(items) => { void saveDumpItems(items); }}
-            onBack={() => setDumpResult(null)}
+            result={review}
+            saving={busy === "saving"}
+            onSave={(items) => { void saveReviewed(items); }}
+            onBack={() => setReview(null)}
             onEnableAi={() => { void enableSmartSorting(); }}
             enablingAi={enablingAi}
           />
         ) : (
-        <>
-        <Text style={styles.eyebrow}>{captureType === "task" ? "QUICK TASK CAPTURE" : captureType === "dump" ? "BRAIN DUMP" : "QUICK IDEA CAPTURE"}</Text>
-        <Text style={styles.title}>{captureType === "task" ? "Get it out of your head." : captureType === "dump" ? "Empty your head." : "Capture the thought."}</Text>
-        <Text style={styles.subtitle}>
-          {captureType === "task"
-            ? "A short phrase is enough. You can add deadlines or tags later."
-            : captureType === "dump"
-              ? "Type or say everything on your mind, in any language. ALIBI splits it into tasks and sorts them by day. You review before anything is saved."
-              : "Save notes, raw thoughts and ideas directly to your private Vault."}
-        </Text>
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          placeholder={captureType === "task" ? "What do you need to do?" : captureType === "dump" ? "mandir jana hai shaam ko, sabzi lena, assignment kal tak dena hai…" : "Write or dictate your idea..."}
-          placeholderTextColor={theme.colors.text.muted}
-          style={styles.input}
-          multiline
-          autoFocus
-          returnKeyType="done"
-          accessibilityLabel="Content to capture"
-        />
-        {voiceError ? <Text style={styles.error}>{voiceError}</Text> : null}
-        <Pressable
-          onPress={() => { if (listening) { void stopSpeechRecognition(); setListening(false); } else { void startVoice(); } }}
-          style={[styles.voiceButton, listening && styles.voiceActive]}
-          accessibilityRole="button"
-          accessibilityLabel={listening ? "Stop voice capture" : "Start voice capture"}
-        >
-          {listening ? <Square size={17} color="#FFFFFF" fill="#FFFFFF" /> : <Mic size={18} color={theme.colors.accent.amber} />}
-          <Text style={[styles.voiceLabel, listening && styles.voiceLabelActive]}>{listening ? "Listening · tap to finish" : "Dictate in real time"}</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => { void handleSave(); }}
-          disabled={!text.trim() || saving || listening}
-          style={[styles.saveButton, (!text.trim() || saving || listening) && styles.disabled]}
-          accessibilityRole="button"
-        >
-          {saving ? <ActivityIndicator color="#FFFFFF" /> : <Save size={18} color="#FFFFFF" />}
-          <Text style={styles.saveLabel}>
-            {saving
-              ? captureType === "dump" ? "Sorting…" : "Saving…"
-              : captureType === "task"
-                ? "Save Task"
-                : captureType === "dump"
-                  ? "Sort into tasks"
-                  : "Save to Vault"}
-          </Text>
-        </Pressable>
-        <Text style={styles.privateHint}>
-          {captureType === "task"
-            ? "Captured to your private ALIBI task list."
-            : captureType === "dump"
-              ? "Needs internet. Nothing is saved until you tap Add."
-              : "Saved locally in SQLite. Convert to a task anytime in Vault."}
-        </Text>
-        </>
+          <>
+            <View style={styles.segments}>
+              <Segment label="Task" icon={<CheckSquare size={16} color={kind === "task" ? "#FFFFFF" : theme.colors.text.secondary} />} active={kind === "task"} onPress={() => setKind("task")} />
+              <Segment label="Note" icon={<BookOpen size={16} color={kind === "note" ? "#FFFFFF" : theme.colors.text.secondary} />} active={kind === "note"} onPress={() => setKind("note")} />
+            </View>
+
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              placeholder={kind === "task" ? "What needs doing? One per line for several" : "Write or say your note"}
+              placeholderTextColor={theme.colors.text.muted}
+              style={styles.input}
+              multiline
+              autoFocus={voice !== "1"}
+              accessibilityLabel={kind === "task" ? "Task" : "Note"}
+            />
+            {voiceError ? <Text style={styles.error}>{voiceError}</Text> : null}
+            <Pressable
+              onPress={() => { if (listening) { void stopSpeechRecognition(); setListening(false); } else { void startVoice(); } }}
+              style={[styles.voiceButton, listening && styles.voiceActive]}
+              accessibilityRole="button"
+              accessibilityLabel={listening ? "Stop listening" : "Speak"}
+            >
+              {listening ? <Square size={17} color="#FFFFFF" fill="#FFFFFF" /> : <Mic size={18} color={theme.colors.accent.amber} />}
+              <Text style={[styles.voiceLabel, listening && styles.voiceLabelActive]}>{listening ? "Listening · tap to stop" : "Speak"}</Text>
+            </Pressable>
+
+            {kind === "task" && !text.trim() && routines.length ? (
+              <View style={styles.chips}>
+                {routines.map((routine) => (
+                  <Chip key={routine.label} label={routine.label} active={false} onPress={() => setText(routine.label)} />
+                ))}
+              </View>
+            ) : null}
+
+            {kind === "task" && !many ? (
+              <View style={styles.details}>
+                <Pressable
+                  onPress={() => { setDraftDate(dueDate ?? new Date()); setDraftMinutes(dueMinutes); setWhenOpen(true); }}
+                  style={styles.whenRow}
+                  accessibilityRole="button"
+                  accessibilityLabel={`When: ${whenLabel}`}
+                >
+                  <CalendarClock size={18} color={theme.colors.text.secondary} />
+                  <Text style={styles.whenText}>{whenLabel}</Text>
+                  {dueDate ? (
+                    <Pressable onPress={() => setDueDate(null)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Remove the date">
+                      <Text style={styles.clear}>Clear</Text>
+                    </Pressable>
+                  ) : null}
+                </Pressable>
+
+                <FieldLabel>How long</FieldLabel>
+                <View style={styles.chips}>
+                  {ESTIMATES.map((minutes) => (
+                    <Chip key={minutes} label={formatMinutes(minutes)} active={estimate === minutes} onPress={() => setEstimate(estimate === minutes ? null : minutes)} />
+                  ))}
+                  {suggested && !ESTIMATES.includes(suggested) ? (
+                    <Chip label={`${formatMinutes(suggested)} · like before`} active={estimate === suggested} onPress={() => setEstimate(estimate === suggested ? null : suggested)} />
+                  ) : null}
+                </View>
+
+                <Pressable onPress={() => setDone(!done)} style={styles.doneRow} accessibilityRole="checkbox" accessibilityState={{ checked: done }}>
+                  <View style={[styles.box, done && styles.boxOn]}>{done ? <Check size={14} color="#FFFFFF" /> : null}</View>
+                  <Text style={styles.doneText}>Already done</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            <Pressable
+              onPress={() => { void (kind === "note" ? saveNote() : saveTask()); }}
+              disabled={!canSave}
+              style={[styles.saveButton, !canSave && styles.disabled]}
+              accessibilityRole="button"
+            >
+              {busy ? <ActivityIndicator color="#FFFFFF" /> : null}
+              <Text style={styles.saveLabel}>
+                {busy === "sorting" ? "Reading your list…" : busy === "saving" ? "Saving…" : kind === "note" ? "Save note" : many ? "Review tasks" : "Add task"}
+              </Text>
+            </Pressable>
+          </>
         )}
       </ScrollView>
+
+      <Sheet
+        visible={whenOpen}
+        title="When"
+        primaryLabel="Set"
+        onClose={() => setWhenOpen(false)}
+        onPrimary={() => { setDueDate(draftDate); setDueMinutes(draftMinutes); setWhenOpen(false); }}
+      >
+        <DateChooser value={draftDate} onChange={setDraftDate} allowNone />
+        {draftDate ? <TimeChooser minutes={draftMinutes} onChange={setDraftMinutes} /> : null}
+      </Sheet>
     </KeyboardAvoidingView>
+  );
+}
+
+function Segment({ label, icon, active, onPress }: { label: string; icon: React.ReactNode; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.segment, active && styles.segmentActive]} accessibilityRole="button" accessibilityState={{ selected: active }}>
+      {icon}
+      <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]} accessibilityRole="button" accessibilityState={{ selected: active }}>
+      <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -308,38 +372,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background.base },
   back: { width: 44, height: 44, borderRadius: theme.radius.control, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: theme.colors.border.subtle },
   content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32, gap: 13 },
-  segmentContainer: {
-    flexDirection: "row",
-    backgroundColor: "#F1F3F5",
-    borderRadius: theme.radius.control,
-    padding: 3,
-    minHeight: 46,
-  },
-  segmentButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    borderRadius: 6,
-    paddingVertical: 9,
-  },
-  segmentButtonActive: {
-    backgroundColor: theme.colors.brand.navy,
-  },
-  segmentLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: theme.colors.text.secondary,
-  },
-  segmentLabelActive: {
-    color: "#FFFFFF",
-  },
-  eyebrow: { color: theme.colors.accent.amber, fontSize: 11, fontWeight: "800", letterSpacing: 1.4 },
-  title: { color: theme.colors.text.primary, fontSize: 27, fontWeight: "800", letterSpacing: -0.7 },
-  subtitle: { color: theme.colors.text.secondary, fontSize: 13, lineHeight: 19 },
+  segments: { flexDirection: "row", backgroundColor: "#F1F3F5", borderRadius: theme.radius.control, padding: 3, minHeight: 46 },
+  segment: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 6, paddingVertical: 9 },
+  segmentActive: { backgroundColor: theme.colors.brand.navy },
+  segmentLabel: { fontSize: 13, fontWeight: "700", color: theme.colors.text.secondary },
+  segmentLabelActive: { color: "#FFFFFF" },
   input: {
-    minHeight: 150,
+    minHeight: 130,
     maxHeight: 230,
     padding: 15,
     borderRadius: theme.radius.cardSecondary,
@@ -352,31 +391,24 @@ const styles = StyleSheet.create({
     lineHeight: 23,
   },
   error: { color: "#B42318", fontSize: 12 },
-  voiceButton: {
-    minHeight: 48,
-    borderRadius: theme.radius.control,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 9,
-    borderWidth: 1,
-    borderColor: "#F4C7A8",
-    backgroundColor: "#FFF7F1",
-  },
+  voiceButton: { minHeight: 46, borderRadius: theme.radius.control, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, borderWidth: 1, borderColor: "#F4C7A8", backgroundColor: "#FFF7F1" },
   voiceActive: { backgroundColor: theme.colors.brand.navy, borderColor: theme.colors.brand.navy },
   voiceLabel: { color: "#B84E0B", fontSize: 14, fontWeight: "700" },
   voiceLabelActive: { color: "#FFFFFF" },
-  saveButton: {
-    minHeight: 50,
-    borderRadius: theme.radius.control,
-    backgroundColor: theme.colors.accent.primary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 9,
-  },
+  details: { gap: 10 },
+  whenRow: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 48, paddingHorizontal: 14, borderRadius: theme.radius.control, borderWidth: 1, borderColor: theme.colors.border.subtle, backgroundColor: "#FFFFFF" },
+  whenText: { flex: 1, fontSize: 15, fontWeight: "600", color: theme.colors.text.primary },
+  clear: { fontSize: 13, fontWeight: "700", color: theme.colors.text.secondary },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: "#F1F3F5", maxWidth: "100%" },
+  chipActive: { backgroundColor: theme.colors.brand.navy },
+  chipText: { fontSize: 13, fontWeight: "700", color: theme.colors.text.secondary },
+  chipTextActive: { color: "#FFFFFF" },
+  doneRow: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 44 },
+  box: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: theme.colors.border.subtle, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF" },
+  boxOn: { backgroundColor: theme.colors.brand.navy, borderColor: theme.colors.brand.navy },
+  doneText: { fontSize: 15, fontWeight: "600", color: theme.colors.text.primary },
+  saveButton: { minHeight: 50, borderRadius: theme.radius.control, backgroundColor: theme.colors.accent.primary, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, marginTop: 4 },
   disabled: { opacity: 0.52 },
   saveLabel: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
-  privateHint: { textAlign: "center", color: theme.colors.text.muted, fontSize: 12, marginTop: 2 },
 });
-

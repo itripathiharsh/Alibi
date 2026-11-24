@@ -12,13 +12,9 @@ import { areWorkNotificationsEnabled, setWorkNotificationsEnabled, syncWorkNotif
 
 const LEGACY_KIND = "active_task_check_in";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+// No notification handler here: the app registers one in _layout.tsx. This module used to
+// set a second, silent one on import, so opening Settings muted in-app notification
+// sounds (logic audit 2026-11-24).
 
 async function cancelLegacyReminders(): Promise<void> {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);

@@ -12,6 +12,7 @@ from app.ai.adapters.groq import GroqProviderAdapter
 from app.ai.adapters.nvidia import NvidiaProviderAdapter
 from app.ai.adapters.ollama import OllamaProviderAdapter
 from app.ai.adapters.openrouter import OpenRouterProviderAdapter
+from app.ai.endpoint_policy import UnsafeProviderURLError, ensure_public_provider_url
 from app.ai.gateway import CLOUD_AI_OPT_IN_KEY, server_provider_key, user_cloud_ai_opt_in
 from app.api.deps import AuthContext, get_auth_context, get_db
 from app.core.config import settings
@@ -128,6 +129,19 @@ async def update_provider(
             detail=f"Unsupported provider '{provider}'. Must be one of {SUPPORTED_PROVIDERS}",
         )
 
+    if provider == "ollama" and settings.alibi_mode == "hosted" and body.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ollama works only when ALIBI runs on your own computer.",
+        )
+    new_base_url: str | None = None
+    if body.base_url is not None and body.base_url.strip():
+        # Logic audit B1: in hosted mode only public https addresses are saved.
+        try:
+            new_base_url = await ensure_public_provider_url(body.base_url)
+        except UnsafeProviderURLError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
     stmt = select(AIProviderSetting).where(
         AIProviderSetting.user_id == auth.user.id,
         AIProviderSetting.provider == provider,
@@ -148,7 +162,7 @@ async def update_provider(
     if body.enabled is not None:
         setting.enabled = body.enabled
     if body.base_url is not None:
-        setting.base_url = body.base_url
+        setting.base_url = new_base_url  # an empty value clears it
     if body.models is not None:
         setting.models = body.models
     if body.fallback_rank is not None:
@@ -228,8 +242,20 @@ async def test_provider_connection(
             return AITestConnectionResponse(
                 provider=provider, status="error", error=f"Key decryption failed: {e}"
             )
-    if setting:
+    if setting and setting.base_url:
         base_url = setting.base_url
+    if provider == "ollama" and settings.alibi_mode == "hosted":
+        return AITestConnectionResponse(
+            provider=provider,
+            status="error",
+            error="Ollama works only when ALIBI runs on your own computer.",
+        )
+    if base_url:
+        # Logic audit B1: the test call must not reach the server's own network.
+        try:
+            base_url = await ensure_public_provider_url(base_url)
+        except UnsafeProviderURLError as exc:
+            return AITestConnectionResponse(provider=provider, status="error", error=str(exc))
 
     # Instantiate adapter
     adapter: Any

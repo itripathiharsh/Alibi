@@ -29,6 +29,9 @@ interface Row {
 
 function statusLine(result: BrainDumpResult): { text: string; tone: "good" | "warn" } {
   if (result.mode === "ai") return { text: "AI fixed the spelling and grammar. Check the tasks, then add them.", tone: "good" };
+  if (result.ai_status === "offline") {
+    return { text: "ALIBI couldn't reach the server, so no dates were read. These are your own words, split at new lines and commas.", tone: "warn" };
+  }
   if (result.ai_status === "server_disabled") {
     return { text: "AI spelling and grammar correction is off on the ALIBI server. These titles are your own words, split by basic rules.", tone: "warn" };
   }
