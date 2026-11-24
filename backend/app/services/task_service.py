@@ -67,6 +67,22 @@ class TaskService:
         self.rules_parser = RulesParser()
         self.grounding_validator = GroundingValidator(self.rules_parser)
 
+    async def _existing_by_client_id(self, task_id: uuid.UUID | None) -> Task | None:
+        """The task already saved under a client-made id, so a retried create is harmless.
+
+        Phones give up after a few seconds and retry, or queue the same task offline with
+        the same id. The second insert used to hit the primary key and return a 500
+        (logic audit B6). An id that belongs to another account is refused.
+        """
+        if task_id is None:
+            return None
+        existing = await self.session.get(Task, task_id)
+        if existing is None:
+            return None
+        if existing.user_id != self.user_id:
+            raise ConflictError("That task id is already in use.")
+        return existing
+
     async def capture_task(
         self,
         raw_input: str,
@@ -76,10 +92,14 @@ class TaskService:
         task_id: uuid.UUID | None = None,
         status: str | None = None,
         deadline_at: datetime | None = None,
+        estimate_user_min: int | None = None,
     ) -> tuple[Task, AIExtraction | None]:
         """Capture task from natural language text.
         AC-M2-1: Persists task with raw input before parsing; parsing failure leaves task intact.
         """
+        existing = await self._existing_by_client_id(task_id)
+        if existing is not None:
+            return existing, None
         now = captured_at or utc_now()
         workspace = await self.workspace_repo.get_default(self.user_id)
         if not workspace:
@@ -105,6 +125,8 @@ class TaskService:
             deadline_at=deadline_at,
             deadline_kind="hard" if deadline_at else None,
             deadline_source="user" if deadline_at else None,
+            estimate_user_min=estimate_user_min,
+            estimate_final_min=estimate_user_min,
             origin=origin,
             parse_status="pending",
             created_at=now,
@@ -184,6 +206,9 @@ class TaskService:
         task_id: uuid.UUID | None = None,
     ) -> Task:
         """Create a new task with full fields."""
+        existing = await self._existing_by_client_id(task_id)
+        if existing is not None:
+            return existing
         await self._assert_owned_references(category_id, project_id)
         workspace = await self.workspace_repo.get_default(self.user_id)
         if not workspace:

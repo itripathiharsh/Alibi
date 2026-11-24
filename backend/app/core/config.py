@@ -41,6 +41,11 @@ class Settings(BaseSettings):
         alias="DATABASE_URL",
     )
 
+    # Uploaded evidence files. Documented in .env.example but never read before the
+    # 2026-11-24 logic audit: uploads went to a hard-coded Windows path ("D:/alibi/...")
+    # that became a stray relative folder on Linux hosts.
+    alibi_storage_dir: str = Field(default="./data/storage", alias="ALIBI_STORAGE_DIR")
+
     # AI & Privacy Gating (Privacy by default: False)
     ai_external_enabled: bool = Field(default=False, alias="AI_EXTERNAL_ENABLED")
 

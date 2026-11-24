@@ -11893,6 +11893,19 @@
               }
             ],
             "title": "Deadline At"
+          },
+          "estimate_user_min": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10080.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate User Min"
           }
         },
         "type": "object",

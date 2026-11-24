@@ -33,7 +33,7 @@ class AIProviderSetting(Base):
     __tablename__ = "ai_provider_settings"
     __table_args__ = (
         CheckConstraint(
-            "provider IN ('ollama', 'nvidia', 'gemini', 'groq')",
+            "provider IN ('ollama', 'nvidia', 'gemini', 'groq', 'openrouter')",
             name="chk_ai_provider_name",
         ),
         UniqueConstraint("user_id", "provider", name="uq_ai_provider_user"),

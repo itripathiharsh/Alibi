@@ -15,8 +15,9 @@
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import { getAllLocalTasks, getLocalTimers, startTaskTimerOffline, stopTaskTimerOffline, updateTaskOffline } from "./offline-sync";
+import { endTaskSession, getAllLocalTasks, getLocalTimers, setTaskDoneOffline, startTaskTimerOffline } from "./offline-sync";
 import { currentUserId, recordLearningSignal } from "./learning-signals";
+import { requestSync } from "./task-intake";
 import { formatClock, formatMinutes } from "./time-format";
 
 export const RUNNING_KIND = "running_task";
@@ -164,7 +165,7 @@ async function doSync(): Promise<void> {
           identifier: `running-${timer.id}`,
           content: {
             title: `Working on: ${title}`,
-            body: `Started ${formatClock(startedAt)}. Pause it or mark it done from here.`,
+            body: `Started ${formatClock(startedAt)}`,
             data: { kind: RUNNING_KIND, taskId: timer.task_id, timerId: timer.id },
             categoryIdentifier: RUNNING_CATEGORY,
             sticky: true,
@@ -211,18 +212,21 @@ export async function handleWorkNotification(
   const timer = timers.find((t) => t.task_id === taskId) ?? null;
   await Notifications.dismissNotificationAsync(response.notification.request.identifier).catch(() => undefined);
 
+  // Buttons change tasks the same way taps in the app do (lib/offline-sync), then upload.
   if (action === "pause") {
-    if (timer) await stopTaskTimerOffline(userId, timer.id);
+    if (timer) await endTaskSession(userId, timer);
+    requestSync();
     void recordLearningSignal("checkin_snoozed", { taskId, data: { via: kind, action: "pause" } });
   } else if (action === "done") {
-    if (timer) await stopTaskTimerOffline(userId, timer.id);
-    await updateTaskOffline(userId, taskId, { status: "completed" });
+    await setTaskDoneOffline(userId, taskId, true); // also ends its running clock
+    requestSync();
     void recordLearningSignal("checkin_done", { taskId, data: { via: kind } });
   } else if (action === "extend" && timer) {
     const title = typeof data.title === "string" ? data.title : "Task";
     await scheduleTimeCheck(taskId, timer.id, title, new Date(Date.now() + EXTEND_MIN * 60_000), `${title}: ${EXTEND_MIN} more minutes are up. Done?`);
   } else if (action === "start_now") {
     await startTaskTimerOffline(userId, taskId);
+    requestSync();
     void recordLearningSignal("checkin_opened", { taskId, data: { via: "up_next", action: "start" } });
   } else if (action === "snooze") {
     const content = response.notification.request.content;

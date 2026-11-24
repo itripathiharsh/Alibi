@@ -13,7 +13,8 @@ import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { ensureNotificationChannels } from "./notification-witty-engine";
-import { getAllLocalTasks, updateTaskOffline, type LocalTask } from "./offline-sync";
+import { getAllLocalTasks, moveTaskToTomorrowOffline, setTaskDoneOffline, type LocalTask } from "./offline-sync";
+import { requestSync } from "./task-intake";
 import { currentUserId, recordLearningSignal } from "./learning-signals";
 import { getDayWindow, intoDay } from "./day-window";
 import { handleWorkNotification } from "./work-notifications";
@@ -195,7 +196,9 @@ export async function handleNotificationResponse(
     const userId = await currentUserId();
 
     if (response.actionIdentifier === "done") {
-      await updateTaskOffline(userId, taskId, { status: "completed" });
+      // Same as ticking it in the app: a clock still running on it stops too.
+      await setTaskDoneOffline(userId, taskId, true);
+      requestSync();
       void recordLearningSignal("checkin_done", { taskId, data: { hour: new Date().getHours() } });
       navigate("/(tabs)");
       return true;
@@ -207,16 +210,10 @@ export async function handleNotificationResponse(
       return true;
     }
     if (response.actionIdentifier === "tomorrow") {
-      const tasks = await getAllLocalTasks(userId);
-      const task = tasks.find((item) => item.id === taskId);
-      const base = task?.deadline_at ? new Date(task.deadline_at) : new Date();
-      const next = new Date(Math.max(base.getTime(), Date.now()));
-      next.setDate(next.getDate() + 1);
-      if (!task?.deadline_at) next.setHours(18, 0, 0, 0);
-      await updateTaskOffline(userId, taskId, {
-        deadline_at: next.toISOString(),
-        reschedule_count: (task?.reschedule_count ?? 0) + 1,
-      });
+      // The day after the tap, at the time the task was due. Counting from the tap time
+      // moved "due 18:00" to "18:20 tomorrow" (logic audit M8).
+      await moveTaskToTomorrowOffline(userId, taskId);
+      requestSync();
       void recordLearningSignal("checkin_moved", { taskId, data: { days: 1 } });
       navigate("/(tabs)");
       return true;

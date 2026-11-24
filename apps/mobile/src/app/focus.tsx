@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ensureAuthenticated, getUserProfile } from "../lib/auth";
-import { getServerUrl } from "../lib/config";
 import { stopAmbientAudio, stopFocusNotification } from "../lib/focus-session-notification";
-import { getLocalTimers, stopTaskTimerOffline, updateTaskOffline } from "../lib/offline-sync";
+import { currentUserId } from "../lib/learning-signals";
+import { endTaskSession, getLocalTimers, setTaskDoneOffline } from "../lib/offline-sync";
+import { requestSync } from "../lib/task-intake";
 import theme from "../lib/theme";
 
-type RunningEntry = { id: string; task_id: string };
-
+/**
+ * Done and Pause from the focus-timer notification. Saved on the phone and uploaded by
+ * sync, the same as tapping in the app (ADR-034). It used to call the server and change
+ * the phone as well, so one tap was sent twice and the second copy could conflict.
+ */
 export default function FocusActionScreen() {
   const router = useRouter();
   const { action, task_id: taskId } = useLocalSearchParams<{ action?: string; task_id?: string }>();
@@ -18,54 +21,16 @@ export default function FocusActionScreen() {
     let active = true;
     void (async () => {
       try {
-        let token: string | null = null;
-        let profile: Awaited<ReturnType<typeof getUserProfile>> = null;
-        try {
-          token = await ensureAuthenticated();
-          profile = await getUserProfile();
-        } catch {
-          // offline
-        }
-        const userId = profile?.id ?? "local_user";
-
-        if (token) {
-          try {
-            const baseUrl = getServerUrl();
-            const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-            const runningResponse = await fetch(`${baseUrl}/api/v1/time-entries/running/all`, { headers });
-            if (runningResponse.ok) {
-              const running = (await runningResponse.json()) as RunningEntry[];
-              const entry = running.find((item) => item.task_id === taskId);
-
-              if (action === "done" && taskId) {
-                await fetch(`${baseUrl}/api/v1/tasks/${taskId}/status`, {
-                  method: "POST",
-                  headers,
-                  body: JSON.stringify({ status: "completed" }),
-                }).catch(() => undefined);
-              }
-
-              if (entry) {
-                await fetch(`${baseUrl}/api/v1/time-entries/${entry.id}/stop`, {
-                  method: "POST",
-                  headers,
-                  body: JSON.stringify({}),
-                }).catch(() => undefined);
-              }
+        const userId = await currentUserId();
+        if (taskId) {
+          if (action === "done") {
+            await setTaskDoneOffline(userId, taskId, true); // also ends its running clock
+          } else {
+            for (const timer of await getLocalTimers(userId)) {
+              if (timer.task_id === taskId) await endTaskSession(userId, timer);
             }
-          } catch {
-            // Fall through to offline local timer stop
           }
-        }
-
-        // Always update local SQLite state as well
-        if (action === "done" && taskId) {
-          await updateTaskOffline(userId, taskId, { status: "completed" }).catch(() => undefined);
-        }
-        const localTimers = await getLocalTimers(userId).catch(() => []);
-        const matchingTimer = localTimers.find((t) => t.task_id === taskId);
-        if (matchingTimer) {
-          await stopTaskTimerOffline(userId, matchingTimer.id).catch(() => undefined);
+          requestSync();
         }
 
         stopAmbientAudio();

@@ -359,3 +359,14 @@ No migration, no new dependency, no new hosted service. OpenAPI and the TS clien
   4. **Separate switches.** The "Tasks in progress" setting has its own stored key; it used to share one with "Did it get done?" check-ins, so turning one off turned off both.
   5. The plain Tasks-tab timer no longer starts the single-task focus foreground notice (the per-task notice replaces it). The Insights focus timer keeps its focus notice.
 - Consequences: no migration, no new dependency, no API change. Device QA pending (KI-048).
+
+## ADR-034 — One way to add a task; every phone change is saved on the phone first
+- Status: Accepted by the owner on 2026-11-24 (owner request: "there are multiple ways with which we can create tasks … lets route them to one place with a logic and make things a little bit clean")
+- Date: 2026-11-24
+- Requirement IDs affected: FR-TASK-001, FR-TASK-002, FR-TASK-022, FR-PROD-012, FR-SYNC-001, FR-NOTIF-004, FR-NOTIF-005
+- Decisions:
+  1. **One add path.** `apps/mobile/src/lib/task-intake.ts` is the only code that creates tasks on the phone. The Today write line, the Add screen, the widget's "Say a task" and an Ask ALIBI suggestion the user approves all call it. The Tasks "+" button, the Insights shortcuts and the Today mic open the one Add screen (`/capture`); the add modals inside Tasks and Insights are removed.
+  2. **Saved on the phone first, uploaded by sync.** A new task is written to the on-device store and queued; nothing posts to `/tasks/capture` from the phone any more. The same holds for Done, Tomorrow, Trash (single and bulk), the focus-notice buttons and the notification buttons: no screen writes to the server and to the phone for the same tap.
+  3. **Date words are read, never guessed.** One line goes through the server's rules parser (`/tasks/brain-dump`) when it answers within 4 s; slow, offline or signed-out keeps the words as written. A date or estimate the user picked always wins. Text with several tasks always goes to the review list first, offline too (split at new lines and commas, no dates read, and the review says so).
+  4. **One "Tomorrow".** Check-ins, the evening sweep and the Tasks bulk action move a task to the day after today at its own time of day (18:00 when it had none), counted as a reschedule. Finishing a task anywhere also ends its running clock.
+- Consequences: no migration, no new dependency. `/tasks/capture` gains an optional `estimate_user_min` and stays for the web and API clients; its parsed-field proposal still has no web review screen (KI-050). The phone app has no unit-test runner, so this is covered by typecheck and device QA (KI-055). Full findings: `docs/audits/2026-11-24-logic-audit.md`.

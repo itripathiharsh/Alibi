@@ -2,12 +2,10 @@
  * Brain dump client (FR-TASK-022, ADR-028).
  *
  * The server splits the text and resolves dates; it saves nothing. Accepted items are
- * saved on the device with createTaskOffline so they work offline and sync later.
+ * saved through lib/task-intake.ts (ADR-034), on the device first, so they sync later.
  */
 import { ensureAuthenticated } from "./auth";
 import { getServerUrl } from "./config";
-import { createTaskOffline } from "./offline-sync";
-import { currentUserId, recordLearningSignal } from "./learning-signals";
 
 export type BrainDumpBucket = "today" | "this_week" | "later" | "anytime";
 
@@ -29,7 +27,8 @@ export interface BrainDumpItem {
 export interface BrainDumpResult {
   items: BrainDumpItem[];
   mode: "ai" | "rules";
-  ai_status: "used" | "not_opted_in" | "server_disabled" | "unavailable";
+  /** "offline": split on the phone at new lines and commas; no dates were read. */
+  ai_status: "used" | "not_opted_in" | "server_disabled" | "unavailable" | "offline";
   provider: string | null;
 }
 
@@ -96,41 +95,10 @@ export async function setCloudAiOptIn(enabled: boolean): Promise<CloudAiConfig> 
   return await response.json() as CloudAiConfig;
 }
 
+/** A task the user kept on the review list; saved by addReviewedTasks (task-intake). */
 export interface ReviewedItem {
   title: string;
   deadline_at: string | null;
   estimate_minutes: number | null;
   edited: boolean;
-}
-
-/** Save the items the user kept, then record review counts for learning. */
-export async function saveBrainDumpItems(
-  items: ReviewedItem[],
-  context: { proposed: number; mode: BrainDumpResult["mode"] },
-): Promise<number> {
-  const userId = await currentUserId();
-  let saved = 0;
-  for (const item of items) {
-    const title = item.title.trim();
-    if (!title) continue;
-    await createTaskOffline(userId, {
-      title,
-      status: "pending",
-      origin: "manual",
-      deadline_at: item.deadline_at,
-      estimate_user_min: item.estimate_minutes,
-      estimate_final_min: item.estimate_minutes,
-    });
-    saved += 1;
-  }
-  void recordLearningSignal("brain_dump_review", {
-    data: {
-      proposed: context.proposed,
-      accepted: saved,
-      edited: items.filter((item) => item.edited).length,
-      removed: Math.max(0, context.proposed - items.length),
-      mode: context.mode,
-    },
-  });
-  return saved;
 }

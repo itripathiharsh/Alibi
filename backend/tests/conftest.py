@@ -2,6 +2,7 @@
 Configures NullPool async database session and FastAPI test client.
 """
 
+import tempfile
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -14,6 +15,8 @@ from app.database.session import get_db
 from app.main import app
 
 settings.alibi_env = "test"
+# Uploaded test files go to a throwaway folder, never into the project tree.
+settings.alibi_storage_dir = tempfile.mkdtemp(prefix="alibi-test-storage-")
 
 test_engine = create_async_engine(settings.database_url, poolclass=pool.NullPool)
 TestSessionLocal = async_sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)

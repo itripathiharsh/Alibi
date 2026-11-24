@@ -5,12 +5,9 @@ import {
   Text,
   View,
   Pressable,
-  ActivityIndicator,
   RefreshControl,
-  TextInput,
   Modal,
   Alert,
-  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -24,7 +21,6 @@ import {
   ChevronRight,
   ChevronLeft,
   CheckCircle2,
-  Circle,
   Clock,
   Flag,
   Play,
@@ -32,10 +28,7 @@ import {
   BarChart2,
   TrendingUp,
   Brain,
-  Sparkles,
-  CloudOff,
   X,
-  Tag as TagIcon,
   Sun,
   Sunset,
   Shield,
@@ -45,15 +38,13 @@ import {
 import * as SecureStore from "expo-secure-store";
 import theme from "../lib/theme";
 import { BrandHeader, OfflineNoticeCard, SunriseArt } from "./brand-ui";
-import { getAccessToken, ensureAuthenticated, getUserProfile, saveUserProfile, setCachedIsOffline, useOfflineStatus } from "../lib/auth";
+import { ensureAuthenticated, getUserProfile, saveUserProfile, setCachedIsOffline, useOfflineStatus } from "../lib/auth";
 import { getServerUrl } from "../lib/config";
-import { startSpeechRecognition, stopSpeechRecognition } from "../lib/speech";
-import { cancelTaskTimerReminder, scheduleTaskTimerReminder } from "../lib/timer-reminders";
+import { syncWorkNotifications } from "../lib/work-notifications";
+import { requestSync } from "../lib/task-intake";
+import { currentUserId } from "../lib/learning-signals";
 import { DEFAULT_DEADLINE_REMINDER_LEAD_MIN, syncTaskDeadlineReminders } from "../lib/task-deadline-reminders";
 import { triggerHaptic, startFocusNotification, stopFocusNotification } from "../lib/focus-session-notification";
-import { filterLearnedTaskRoutines, type LearnedTaskRoutine } from "../lib/learned-routines";
-import { CaptureReviewSheet } from "./capture-review-sheet";
-import { decideTaskExtraction, type TaskExtractionProposal } from "../lib/task-extraction";
 import { ChiefOfStaffCard } from "./chief-of-staff-card";
 import { RecommendationsCard } from "./recommendations-card";
 import { formatClock } from "../lib/time-format";
@@ -62,20 +53,21 @@ import { ProjectManagerSheet } from "./project-manager-sheet";
 import {
   cacheRunningTimers,
   cacheTaskView,
-  createTaskOffline,
   getCachedTaskView,
   getLocalAnalyticsSummary,
+  getLocalCalendarData,
   getLocalProjects,
   getLocalTimers,
   getLocalUserPreferences,
   LocalProjectRecord,
   LocalUserPreferences,
-  makeOfflineId,
-  removeLocalTimer,
+  moveTaskToTomorrowOffline,
+  setTaskDoneOffline,
   startTaskTimerOffline,
   stopTaskTimerOffline,
   syncMobileAccount,
   updateTaskOffline,
+  type LocalTask,
 } from "../lib/offline-sync";
 
 interface TaskItem {
@@ -86,6 +78,7 @@ interface TaskItem {
   deadline_at: string | null;
   estimate_user_min: number | null;
   actual_min: number;
+  reschedule_count?: number;
   tags: string[];
 }
 
@@ -122,62 +115,6 @@ interface RunningTimer {
   source?: string;
 }
 
-function computeDeadlineIso(
-  dateChoice: "today" | "tomorrow" | "next_week" | "custom" | null,
-  customDate: string,
-  timeChoice: string | null,
-  customTime: string
-): string | null {
-  if (!dateChoice) return null;
-  const target = new Date();
-  if (dateChoice === "tomorrow") {
-    target.setDate(target.getDate() + 1);
-  } else if (dateChoice === "next_week") {
-    target.setDate(target.getDate() + 7);
-  } else if (dateChoice === "custom") {
-    if (!customDate.trim()) return null;
-    const parts = customDate.trim().split("-");
-    if (parts.length === 3) {
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const day = parseInt(parts[2], 10);
-      if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
-      target.setFullYear(year, month, day);
-    } else {
-      return null;
-    }
-  }
-
-  let hours = 23;
-  let mins = 59;
-  if (timeChoice === "09:00") {
-    hours = 9;
-    mins = 0;
-  } else if (timeChoice === "14:00") {
-    hours = 14;
-    mins = 0;
-  } else if (timeChoice === "18:00") {
-    hours = 18;
-    mins = 0;
-  } else if (timeChoice === "21:00") {
-    hours = 21;
-    mins = 0;
-  } else if (timeChoice === "custom" && customTime.trim()) {
-    const parts = customTime.trim().split(":");
-    if (parts.length >= 2) {
-      const h = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10);
-      if (!isNaN(h) && !isNaN(m)) {
-        hours = h;
-        mins = m;
-      }
-    }
-  }
-
-  target.setHours(hours, mins, 0, 0);
-  return target.toISOString();
-}
-
 /**
  * The former Home dashboard (focus score, Chief of Staff, kickoff, focus timer, plan).
  * Since the diary-style Today page (2026-11-22, owner request) it lives inside Insights;
@@ -202,20 +139,6 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { isOffline } = useOfflineStatus();
-
-  // Quick Capture Modal State
-  const [captureVisible, setCaptureVisible] = useState(false);
-  const [captureText, setCaptureText] = useState("");
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [pendingExtraction, setPendingExtraction] = useState<TaskExtractionProposal | null>(null);
-  const [isReviewingExtraction, setIsReviewingExtraction] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [taskStatus, setTaskStatus] = useState<"pending" | "completed">("pending");
-  const [selectedDate, setSelectedDate] = useState<"today" | "tomorrow" | "next_week" | "custom" | null>(null);
-  const [customDateStr, setCustomDateStr] = useState("");
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [customTimeStr, setCustomTimeStr] = useState("");
-  const [learnedRoutines, setLearnedRoutines] = useState<LearnedTaskRoutine[]>([]);
 
   // Top 3 Daily Kickoff & Evening Sunset Sweep State
   const [top3TaskIds, setTop3TaskIds] = useState<string[]>([]);
@@ -275,31 +198,16 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
   const handleSweepAllTomorrow = async () => {
     triggerHaptic("alert");
     const uncompleted = todayTasks.filter((t) => t.status !== "completed");
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(23, 59, 0, 0);
-    const deadlineIso = tomorrow.toISOString();
-
-    setTodayTasks((prev) => prev.filter((t) => t.status === "completed"));
     setSweepVisible(false);
-
-    try {
-      const baseUrl = getServerUrl();
-      const token = await ensureAuthenticated();
-      if (token) {
-        await Promise.all(
-          uncompleted.map((t) =>
-            fetch(`${baseUrl}/api/v1/tasks/${t.id}/reschedule`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ new_deadline_at: deadlineIso, reason: "Evening sunset sweep" }),
-            }).catch(() => undefined)
-          )
-        );
-      }
-    } finally {
-      fetchDashboardData();
+    // Saved on the phone and counted as a move, like every other reschedule. It used to
+    // call the server only, so offline nothing moved while the list looked emptied. Each
+    // task keeps its time of day (the same "Tomorrow" as check-ins and the Tasks list).
+    const userId = await currentUserId();
+    for (const task of uncompleted) {
+      await moveTaskToTomorrowOffline(userId, task.id);
     }
+    requestSync();
+    void fetchDashboardData();
   };
 
   const overdueTasks = useMemo(() => {
@@ -307,24 +215,63 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
     return todayTasks.filter((t) => t.status !== "completed" && t.deadline_at && Date.parse(t.deadline_at) < now);
   }, [todayTasks]);
 
-  const calendarBusyMinutes = useMemo(() => {
-    return runningTimers.reduce((acc, _) => acc + 30, 0);
-  }, [runningTimers]);
+  // Minutes of today's working window taken by calendar events on this phone. This used
+  // to be 30 minutes per running timer, a made-up number (logic audit M6).
+  const [calendarBusyMinutes, setCalendarBusyMinutes] = useState(0);
+  useEffect(() => {
+    void (async () => {
+      try {
+        const userId = await currentUserId();
+        const dayStart = new Date();
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+        const { events } = await getLocalCalendarData(userId, dayStart.toISOString(), dayEnd.toISOString());
+        const [sh, sm] = (preferences.work_start_time || "09:00").split(":").map(Number);
+        const [eh, em] = (preferences.work_end_time || "18:00").split(":").map(Number);
+        const windowStart = new Date(dayStart).setHours(sh || 0, sm || 0, 0, 0);
+        const windowEnd = new Date(dayStart).setHours(eh || 0, em || 0, 0, 0);
+        const spans = events
+          .filter((event) => !event.is_all_day)
+          .map((event) => [Math.max(Date.parse(event.start_at), windowStart), Math.min(Date.parse(event.end_at), windowEnd)] as const)
+          .filter(([start, end]) => Number.isFinite(start) && Number.isFinite(end) && end > start)
+          .sort((a, b) => a[0] - b[0]);
+        let busyMs = 0;
+        let coveredUntil = windowStart;
+        for (const [start, end] of spans) {
+          const from = Math.max(start, coveredUntil);
+          if (end > from) busyMs += end - from;
+          coveredUntil = Math.max(coveredUntil, end);
+        }
+        setCalendarBusyMinutes(Math.round(busyMs / 60_000));
+      } catch {
+        setCalendarBusyMinutes(0);
+      }
+    })();
+  }, [preferences.work_start_time, preferences.work_end_time, todayTasks]);
 
   const handleRescheduleOverdue = async (taskIds: string[]) => {
     triggerHaptic("tap");
-    const today = new Date();
-    today.setHours(18, 0, 0, 0);
-    const deadlineIso = today.toISOString();
+    // Due by the end of the working day while that is still ahead, else by the end of
+    // today. It was always 18:00, so after 6 PM the tasks were overdue again at once.
+    const [eh, em] = (preferences.work_end_time || "18:00").split(":").map(Number);
+    const due = new Date();
+    due.setHours(eh || 18, em || 0, 0, 0);
+    if (due.getTime() < Date.now() + 15 * 60_000) due.setHours(23, 59, 0, 0);
+    const deadlineIso = due.toISOString();
     setTodayTasks((prev) =>
       prev.map((t) => (taskIds.includes(t.id) ? { ...t, deadline_at: deadlineIso } : t)),
     );
-    const profile = await getUserProfile();
-    const userId = profile?.id ?? "local_user";
+    const userId = await currentUserId();
     for (const id of taskIds) {
-      await updateTaskOffline(userId, id, { deadline_at: deadlineIso });
+      const task = todayTasks.find((t) => t.id === id);
+      await updateTaskOffline(userId, id, {
+        deadline_at: deadlineIso,
+        reschedule_count: (task?.reschedule_count ?? 0) + 1,
+      });
     }
-    Alert.alert("Tasks Rescheduled", `${taskIds.length} ${taskIds.length === 1 ? "task" : "tasks"} scheduled for completion today by 6:00 PM.`);
+    requestSync();
+    Alert.alert("Moved to today", `${taskIds.length} ${taskIds.length === 1 ? "task is" : "tasks are"} now due by ${formatClock(due)}.`);
   };
 
   const sortedTodayTasks = useMemo(() => {
@@ -352,8 +299,8 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
   const displayName = user?.display_name || (user?.email ? user.email.split("@")[0] : "") || "there";
   const userInitial = (user?.display_name?.[0] || (user?.email ? user.email[0] : "") || "A").toUpperCase();
 
-  const openCapture = () => {
-    setCaptureVisible(true);
+  const openCapture = (voice = false) => {
+    router.push(voice ? { pathname: "/capture", params: { voice: "1" } } : "/capture");
   };
 
   // Calculate today's tasks stats
@@ -416,6 +363,8 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
       } else {
         const baseUrl = getServerUrl();
         const headers: Record<string, string> = { Accept: "application/json", Authorization: `Bearer ${token}` };
+        // Upload changes made on this phone first, so the lists below already have them.
+        await syncMobileAccount(effectiveUserId, token, baseUrl).catch(() => undefined);
 
         const [userRes, tasksRes, upcomingRes, sumRes, scoreRes, timerRes, learnRes, notifsRes] = await Promise.all([
           fetch(`${baseUrl}/api/v1/auth/me`, { headers }).catch(() => null),
@@ -447,10 +396,10 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
         }
         const reminderTasks: TaskItem[] = [];
         if (tasksRes && tasksRes.ok) {
-          const taskData = await tasksRes.json() as TaskItem[];
-          setTodayTasks(taskData);
-          reminderTasks.push(...taskData);
-          await cacheTaskView(effectiveUserId, "today", taskData);
+          const taskData = await tasksRes.json() as LocalTask[];
+          const shown = await cacheTaskView(effectiveUserId, "today", taskData) as TaskItem[];
+          setTodayTasks(shown);
+          reminderTasks.push(...shown);
         }
         if (upcomingRes && upcomingRes.ok) {
           const upData = await upcomingRes.json() as TaskItem[];
@@ -471,15 +420,14 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
         if (timerRes && timerRes.ok) {
           const timerData = await timerRes.json();
           setRunningTimers(await cacheRunningTimers(effectiveUserId, timerData));
+          void syncWorkNotifications();
         }
         if (learnRes && learnRes.ok) {
           const profileData = await learnRes.json();
-          setLearnedRoutines(filterLearnedTaskRoutines(profileData?.routines));
           if (profileData?.peak_window) {
             setLearningTip(`You tend to be most productive between ${profileData.peak_window}.`);
           }
         }
-        if (token) void syncMobileAccount(effectiveUserId, token, baseUrl).catch(() => undefined);
       }
     } catch {
       offlineMode = true;
@@ -521,76 +469,20 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
     fetchDashboardData();
   };
 
-  // Toggle task status
+  // Done / not done and the focus timer change the task on the phone first, the same way
+  // as Today and Tasks; the outbox uploads them (logic audit).
   const handleToggleTask = async (taskId: string, currentStatus: string) => {
-    const newStatus = currentStatus === "completed" ? "pending" : "completed";
-    if (newStatus === "completed") {
-      triggerHaptic("complete");
-    } else {
-      triggerHaptic("tap");
-    }
-    const profile = await getUserProfile();
-    const activeTimer = runningTimers.find((item) => item.task_id === taskId);
-    setTodayTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
-    );
-
-    try {
-      const baseUrl = getServerUrl();
-      const token = await ensureAuthenticated();
-      if (!token || activeTimer?.source === "local") {
-        if (profile) {
-          await updateTaskOffline(profile.id, taskId, { status: newStatus as TaskItem["status"] });
-          if (newStatus === "completed" && activeTimer) {
-            await stopTaskTimerOffline(profile.id, activeTimer.id);
-            await removeLocalTimer(profile.id, activeTimer.id);
-            setRunningTimers((current) => current.filter((item) => item.id !== activeTimer.id));
-            await cancelTaskTimerReminder(activeTimer.id);
-            void stopFocusNotification();
-          }
-        }
-        return;
-      }
-      const res = await fetch(`${baseUrl}/api/v1/tasks/${taskId}/status`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!res.ok) throw new Error("Task status could not be updated.");
-      if (newStatus === "completed") {
-        if (activeTimer) {
-          const stopResponse = await fetch(`${baseUrl}/api/v1/time-entries/${activeTimer.id}/stop`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!stopResponse.ok) throw new Error("Timer could not be stopped.");
-          await cancelTaskTimerReminder(activeTimer.id);
-          void stopFocusNotification();
-          if (profile) await removeLocalTimer(profile.id, activeTimer.id);
-          setRunningTimers((current) => current.filter((item) => item.id !== activeTimer.id));
-        }
-      }
-      fetchDashboardData();
-    } catch {
-      if (profile) {
-        await updateTaskOffline(profile.id, taskId, { status: newStatus as TaskItem["status"] });
-        if (newStatus === "completed" && activeTimer) {
-          await stopTaskTimerOffline(profile.id, activeTimer.id);
-          await removeLocalTimer(profile.id, activeTimer.id);
-          setRunningTimers((current) => current.filter((item) => item.id !== activeTimer.id));
-          await cancelTaskTimerReminder(activeTimer.id);
-          void stopFocusNotification();
-        }
-      } else {
-        setTodayTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: currentStatus as TaskItem["status"] } : t)));
-      }
-    }
+    const done = currentStatus !== "completed";
+    triggerHaptic(done ? "complete" : "tap");
+    setTodayTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: done ? "completed" : "pending" } : t)));
+    const userId = await currentUserId();
+    if (done && runningTimers.some((item) => item.task_id === taskId)) void stopFocusNotification();
+    await setTaskDoneOffline(userId, taskId, done);
+    setRunningTimers(await getLocalTimers(userId));
+    void syncWorkNotifications();
+    requestSync();
   };
 
-  // Live database-backed focus timer actions
   const handleStartFocusTimer = async (taskId?: string) => {
     triggerHaptic("tap");
     const targetTaskId = taskId || todayTasks.find((t) => t.status !== "completed")?.id;
@@ -599,249 +491,29 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
       return;
     }
     const targetTask = todayTasks.find((t) => t.id === targetTaskId);
+    const userId = await currentUserId();
+    const timer = await startTaskTimerOffline(userId, targetTaskId);
     void startFocusNotification(
       targetTaskId,
       targetTask?.title || "Focus Session",
-      new Date().toISOString(),
+      timer.started_at,
       targetTask?.estimate_user_min || 25,
       true
     );
-    const profile = await getUserProfile();
-    try {
-      const baseUrl = getServerUrl();
-      const token = await ensureAuthenticated();
-      if (!token) {
-        if (profile) {
-          const localTimer = await startTaskTimerOffline(profile.id, targetTaskId);
-          setRunningTimers((prev) => [localTimer, ...prev]);
-          await scheduleTaskTimerReminder({
-            timerId: localTimer.id,
-            taskId: targetTaskId,
-            startedAt: localTimer.started_at,
-          });
-        }
-        return;
-      }
-
-      const res = await fetch(`${baseUrl}/api/v1/time-entries/start`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          task_id: targetTaskId,
-          started_at: new Date().toISOString(),
-        }),
-      });
-
-      if (res.ok) {
-        const timerData = await res.json();
-        setRunningTimers((prev) => [timerData, ...prev]);
-        if (profile) await cacheRunningTimers(profile.id, [timerData, ...runningTimers]);
-        await scheduleTaskTimerReminder({
-          timerId: timerData.id,
-          taskId: targetTaskId,
-          startedAt: timerData.started_at,
-        });
-        setTodayTasks((prev) =>
-          prev.map((t) => (t.id === targetTaskId ? { ...t, status: "in_progress" } : t))
-        );
-      } else {
-        const errJson = await res.json().catch(() => ({}));
-        Alert.alert("Timer Error", errJson.detail || "Failed to start focus timer.");
-      }
-    } catch {
-      if (profile) {
-        const localTimer = await startTaskTimerOffline(profile.id, targetTaskId);
-        setRunningTimers((prev) => [localTimer, ...prev]);
-        await scheduleTaskTimerReminder({
-          timerId: localTimer.id,
-          taskId: targetTaskId,
-          startedAt: localTimer.started_at,
-        });
-      }
-    }
+    setRunningTimers(await getLocalTimers(userId));
+    setTodayTasks((prev) => prev.map((t) => (t.id === targetTaskId ? { ...t, status: "in_progress" } : t)));
+    void syncWorkNotifications();
+    requestSync();
   };
 
   const handleStopActiveTimer = async (timer: RunningTimer) => {
     triggerHaptic("tap");
     void stopFocusNotification();
-    const profile = await getUserProfile();
-    try {
-      const baseUrl = getServerUrl();
-      const token = await ensureAuthenticated();
-      if (!token || timer.source === "local") {
-        if (profile) {
-          await stopTaskTimerOffline(profile.id, timer.id);
-          await removeLocalTimer(profile.id, timer.id);
-          setRunningTimers((prev) => prev.filter((t) => t.id !== timer.id));
-          await cancelTaskTimerReminder(timer.id);
-        }
-        return;
-      }
-
-      const res = await fetch(`${baseUrl}/api/v1/time-entries/${timer.id}/stop`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ended_at: new Date().toISOString(),
-        }),
-      });
-
-      if (res.ok) {
-        if (profile) await removeLocalTimer(profile.id, timer.id);
-        setRunningTimers((prev) => prev.filter((t) => t.id !== timer.id));
-        await cancelTaskTimerReminder(timer.id);
-        fetchDashboardData();
-      } else {
-        const errJson = await res.json().catch(() => ({}));
-        Alert.alert("Timer Error", errJson.detail || "Failed to stop timer.");
-      }
-    } catch {
-      if (profile) {
-        await stopTaskTimerOffline(profile.id, timer.id);
-        await removeLocalTimer(profile.id, timer.id);
-        setRunningTimers((prev) => prev.filter((t) => t.id !== timer.id));
-        await cancelTaskTimerReminder(timer.id);
-      }
-    }
-  };
-
-  // Speech Recognition for Quick Capture
-  const handleMicPress = async () => {
-    if (isListening) {
-      await stopSpeechRecognition();
-      setIsListening(false);
-      return;
-    }
-    const baseText = captureText.trim();
-    setIsListening(true);
-    const ok = await startSpeechRecognition({
-      onStart: () => setIsListening(true),
-      onResults: (text, isFinal) => {
-        const combined = baseText ? `${baseText} ${text}` : text;
-        setCaptureText(combined);
-        if (isFinal) setIsListening(false);
-      },
-      onError: (err) => {
-        setIsListening(false);
-        Alert.alert("Voice Input", err);
-      },
-      onEnd: () => setIsListening(false),
-    });
-    if (!ok) setIsListening(false);
-  };
-
-  const resetModal = () => {
-    setCaptureText("");
-    setTaskStatus("pending");
-    setSelectedDate(null);
-    setCustomDateStr("");
-    setSelectedTime(null);
-    setCustomTimeStr("");
-    setIsListening(false);
-  };
-
-  const handleCaptureSubmit = async () => {
-    if (!captureText.trim() || isCapturing) return;
-    setIsCapturing(true);
-    let profile: Awaited<ReturnType<typeof getUserProfile>> = null;
-    let taskId: string | null = null;
-    let deadlineIso: string | null = null;
-    try {
-      profile = await getUserProfile();
-      taskId = makeOfflineId();
-      deadlineIso = computeDeadlineIso(selectedDate, customDateStr, selectedTime, customTimeStr);
-      const baseUrl = getServerUrl();
-      const token = await ensureAuthenticated();
-      if (!token) {
-        const userId = profile?.id ?? "local_user";
-        const task = await createTaskOffline(userId, {
-          id: taskId,
-          title: captureText.trim(),
-          deadline_at: deadlineIso,
-          origin: isListening ? "voice" : "manual",
-        });
-        setTodayTasks((previous) => [task as TaskItem, ...previous]);
-        resetModal();
-        setCaptureVisible(false);
-        return;
-      }
-
-      const payload: Record<string, any> = {
-        raw_input: captureText.trim(),
-        origin: isListening ? "voice" : "manual",
-        status: taskStatus || "pending",
-      };
-      if (taskId) payload.id = taskId;
-      if (deadlineIso) payload.deadline_at = deadlineIso;
-
-      const res = await fetch(`${baseUrl}/api/v1/tasks/capture`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        const result = await res.json() as { extraction?: TaskExtractionProposal | null };
-        if (result.extraction) setPendingExtraction(result.extraction);
-        resetModal();
-        setCaptureVisible(false);
-        fetchDashboardData();
-      } else {
-        const errJson = await res.json().catch(() => ({})) as any;
-        const paramErrors = errJson.invalid_params?.map((p: any) => `${p.name}: ${p.reason}`).join("\n");
-        Alert.alert("Capture Error", paramErrors || errJson.detail || "Failed to parse task.");
-      }
-    } catch (err: any) {
-      const userId = profile?.id ?? "local_user";
-      try {
-        const task = await createTaskOffline(userId, {
-          id: taskId || makeOfflineId(),
-          title: captureText.trim(),
-          deadline_at: deadlineIso,
-          origin: "manual",
-        });
-        setTodayTasks((previous) => [task as TaskItem, ...previous]);
-        resetModal();
-        setCaptureVisible(false);
-      } catch (offlineErr: any) {
-        Alert.alert("Network Error", err?.message || "Failed to capture task.");
-      }
-    } finally {
-      setIsCapturing(false);
-    }
-  };
-
-  const submitExtractionDecision = async (
-    acceptedFields: Record<string, unknown>,
-    rejectedFields: string[],
-  ) => {
-    if (!pendingExtraction || isReviewingExtraction) return;
-    setIsReviewingExtraction(true);
-    try {
-      await decideTaskExtraction({
-        taskId: pendingExtraction.task_id,
-        acceptedFields,
-        rejectedFields,
-      });
-      setPendingExtraction(null);
-      await fetchDashboardData();
-    } catch (error: unknown) {
-      Alert.alert(
-        "Review not saved",
-        error instanceof Error ? error.message : "Please try reviewing the task again.",
-      );
-    } finally {
-      setIsReviewingExtraction(false);
-    }
+    const userId = await currentUserId();
+    await stopTaskTimerOffline(userId, timer.id);
+    setRunningTimers(await getLocalTimers(userId));
+    void syncWorkNotifications();
+    requestSync();
   };
 
   // Helper for category badge styling
@@ -1029,8 +701,8 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
         {/* Elevated Quick Capture Pill */}
         <Pressable
           style={styles.quickCapturePill}
-          onPress={openCapture}
-          accessibilityLabel="Open quick capture"
+          onPress={() => openCapture()}
+          accessibilityLabel="Add a task"
         >
           <PlusCircle size={20} color={theme.colors.text.secondary} />
           <Text style={styles.quickCapturePlaceholder} numberOfLines={1}>
@@ -1038,10 +710,8 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
           </Text>
           <Pressable
             style={styles.pillMicBtn}
-            onPress={() => {
-              openCapture();
-              handleMicPress();
-            }}
+            onPress={() => openCapture(true)}
+            accessibilityLabel="Say a task"
           >
             <Mic size={18} color={theme.colors.accent.amber} />
           </Pressable>
@@ -1051,7 +721,7 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
         <View style={styles.actionGrid}>
           <Pressable
             style={styles.actionTile}
-            onPress={openCapture}
+            onPress={() => openCapture()}
           >
             <View style={[styles.actionIconBox, { backgroundColor: "#FFF7ED" }]}>
               <CheckSquare size={20} color="#F97316" />
@@ -1464,262 +1134,6 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
         </Pressable>
       </ScrollView>
 
-      {/* Quick Capture Modal (with Real-time Voice, Status & Aligned Date/Time) */}
-      <Modal visible={captureVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setCaptureVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Sparkles size={18} color="#F97316" />
-                <Text style={styles.modalTitle}>Quick Capture</Text>
-              </View>
-              <Pressable
-                onPress={() => {
-                  stopSpeechRecognition();
-                  resetModal();
-                  setCaptureVisible(false);
-                }}
-              >
-                <X size={20} color={theme.colors.text.secondary} />
-              </Pressable>
-            </View>
-
-            {isListening && (
-              <View style={styles.listeningHintRow}>
-                <Mic size={14} color="#F97316" />
-                <Text style={styles.listeningHintText}>
-                  Listening in real-time: Speak now... 🎙️
-                </Text>
-              </View>
-            )}
-
-            <ScrollView
-              style={{ maxHeight: 420 }}
-              contentContainerStyle={{ gap: 14, paddingBottom: 6 }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.captureInput}
-                  value={captureText}
-                  onChangeText={setCaptureText}
-                  placeholder="Type or dictate task... e.g. Finish report by 6 PM #work"
-                  placeholderTextColor={theme.colors.text.secondary}
-                  multiline
-                  autoFocus
-                />
-                <Pressable
-                  style={[styles.inputMicBtn, isListening && styles.inputMicBtnActive]}
-                  onPress={handleMicPress}
-                  accessibilityLabel="Activate speech dictation"
-                >
-                  <Mic size={18} color={isListening ? "#090D16" : "#F97316"} />
-                </Pressable>
-              </View>
-
-              {/* Status Option */}
-              <View style={styles.optionSection}>
-                <Text style={styles.optionSectionHeader}>Status (Optional):</Text>
-                <View style={styles.optionRow}>
-                  <Pressable
-                    style={[
-                      styles.statusOptionPill,
-                      taskStatus === "pending" && styles.statusOptionPillActivePending,
-                    ]}
-                    onPress={() => setTaskStatus("pending")}
-                  >
-                    <Circle
-                      size={13}
-                      color={taskStatus === "pending" ? "#F97316" : theme.colors.text.secondary}
-                    />
-                    <Text
-                      style={[
-                        styles.statusOptionText,
-                        taskStatus === "pending" && { color: "#F97316", fontWeight: "600" },
-                      ]}
-                    >
-                      Pending
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.statusOptionPill,
-                      taskStatus === "completed" && styles.statusOptionPillActiveCompleted,
-                    ]}
-                    onPress={() => setTaskStatus("completed")}
-                  >
-                    <CheckCircle2
-                      size={13}
-                      color={taskStatus === "completed" ? "#10B981" : theme.colors.text.secondary}
-                    />
-                    <Text
-                      style={[
-                        styles.statusOptionText,
-                        taskStatus === "completed" && { color: "#10B981", fontWeight: "600" },
-                      ]}
-                    >
-                      Completed
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Date Option */}
-              <View style={styles.optionSection}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={styles.optionSectionHeader}>Due Date (Optional):</Text>
-                  {selectedDate && (
-                    <Pressable
-                      onPress={() => {
-                        setSelectedDate(null);
-                        setSelectedTime(null);
-                        setCustomDateStr("");
-                        setCustomTimeStr("");
-                      }}
-                    >
-                      <Text style={styles.clearOptionText}>Clear Date</Text>
-                    </Pressable>
-                  )}
-                </View>
-                <View style={styles.optionRow}>
-                  {[
-                    { id: "today", label: "Today" },
-                    { id: "tomorrow", label: "Tomorrow" },
-                    { id: "next_week", label: "Next Week" },
-                    { id: "custom", label: "Custom Date..." },
-                  ].map((opt) => (
-                    <Pressable
-                      key={opt.id}
-                      style={[styles.datePill, selectedDate === opt.id && styles.datePillActive]}
-                      onPress={() =>
-                        setSelectedDate(selectedDate === opt.id ? null : (opt.id as any))
-                      }
-                    >
-                      <CalendarIcon
-                        size={12}
-                        color={selectedDate === opt.id ? "#F97316" : theme.colors.text.secondary}
-                      />
-                      <Text
-                        style={[
-                          styles.datePillText,
-                          selectedDate === opt.id && styles.datePillTextActive,
-                        ]}
-                      >
-                        {opt.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-                {selectedDate === "custom" && (
-                  <TextInput
-                    style={styles.customInputSmall}
-                    value={customDateStr}
-                    onChangeText={setCustomDateStr}
-                    placeholder="YYYY-MM-DD (e.g. 2026-11-20)"
-                    placeholderTextColor={theme.colors.text.secondary}
-                  />
-                )}
-              </View>
-
-              {/* Time Option (Appears when Date is Chosen) */}
-              {selectedDate && (
-                <View style={styles.optionSection}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={styles.optionSectionHeader}>Due Time (Optional):</Text>
-                    {selectedTime && (
-                      <Pressable
-                        onPress={() => {
-                          setSelectedTime(null);
-                          setCustomTimeStr("");
-                        }}
-                      >
-                        <Text style={styles.clearOptionText}>Clear Time</Text>
-                      </Pressable>
-                    )}
-                  </View>
-                  <View style={styles.optionRow}>
-                    {[
-                      { id: "09:00", label: "Morning 9 AM" },
-                      { id: "14:00", label: "Afternoon 2 PM" },
-                      { id: "18:00", label: "Evening 6 PM" },
-                      { id: "21:00", label: "Night 9 PM" },
-                      { id: "custom", label: "Custom Time..." },
-                    ].map((tOpt) => (
-                      <Pressable
-                        key={tOpt.id}
-                        style={[styles.timePill, selectedTime === tOpt.id && styles.timePillActive]}
-                        onPress={() =>
-                          setSelectedTime(selectedTime === tOpt.id ? null : tOpt.id)
-                        }
-                      >
-                        <Clock
-                          size={12}
-                          color={selectedTime === tOpt.id ? "#0EA5E9" : theme.colors.text.secondary}
-                        />
-                        <Text
-                          style={[
-                            styles.timePillText,
-                            selectedTime === tOpt.id && styles.timePillTextActive,
-                          ]}
-                        >
-                          {tOpt.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  {selectedTime === "custom" && (
-                    <TextInput
-                      style={styles.customInputSmall}
-                      value={customTimeStr}
-                      onChangeText={setCustomTimeStr}
-                      placeholder="HH:MM (24h, e.g. 17:30)"
-                      placeholderTextColor={theme.colors.text.secondary}
-                    />
-                  )}
-                </View>
-              )}
-
-              {learnedRoutines.length > 0 && (
-                <View style={styles.suggestionSection}>
-                  <Text style={styles.suggestionHeader}>From your learned routines</Text>
-                  <Text style={styles.routineHint}>Based on recurring tasks in your own history</Text>
-                  <View style={styles.chipsRow}>
-                    {learnedRoutines.map((routine) => (
-                      <Pressable key={routine.label} style={styles.chip} onPress={() => setCaptureText(routine.label)}>
-                        <Text style={styles.chipText}>{routine.label}</Text>
-                        <Text style={styles.routineSamples}>{routine.sample_count} recorded occurrences</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              )}
-            </ScrollView>
-
-            <View style={styles.modalActions}>
-              <Pressable
-                style={styles.cancelBtn}
-                onPress={() => {
-                  stopSpeechRecognition();
-                  resetModal();
-                  setCaptureVisible(false);
-                }}
-              >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.confirmBtn, !captureText.trim() && { opacity: 0.5 }]}
-                disabled={!captureText.trim() || isCapturing}
-                onPress={handleCaptureSubmit}
-              >
-                <Text style={styles.confirmBtnText}>
-                  {isCapturing ? "Saving..." : taskStatus === "completed" ? "Save Completed Task" : "Save Task"}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Morning Kickoff Modal */}
       <Modal visible={kickoffVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setKickoffVisible(false)}>
@@ -1817,13 +1231,6 @@ export function TodayDashboard({ embedded = false, header }: { embedded?: boolea
           </View>
         </View>
       </Modal>
-      <CaptureReviewSheet
-        extraction={pendingExtraction}
-        visible={Boolean(pendingExtraction)}
-        busy={isReviewingExtraction}
-        onApply={(fields, rejectedFields) => { void submitExtractionDecision(fields, rejectedFields); }}
-        onKeepOriginal={(rejectedFields) => { void submitExtractionDecision({}, rejectedFields); }}
-      />
       <OnboardingModal
         visible={onboardingVisible}
         userId={user?.id || "local_user"}

@@ -363,13 +363,24 @@ export async function getOfflineTaskView(userId: string, view: string): Promise<
     });
 }
 
+/** Outbox states that still hold a change the server has not taken yet. */
+const LIVE_OUTBOX_STATES = "('pending', 'retry', 'inflight')";
+
+async function liveTaskIds(db: SQLite.SQLiteDatabase, userId: string): Promise<Set<string>> {
+  const rows = await db.getAllAsync<{ entity_id: string }>(
+    `SELECT DISTINCT entity_id FROM sync_outbox WHERE user_id = ? AND entity_type = 'task' AND state IN ${LIVE_OUTBOX_STATES}`,
+    userId,
+  );
+  return new Set(rows.map((row) => row.entity_id));
+}
+
 /** Store server tasks in the device cache without touching any cached list views. */
 export async function cacheTasks(userId: string, tasks: Record<string, unknown>[]): Promise<void> {
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     for (const raw of tasks) {
       const pending = await db.getFirstAsync<{ n: number }>(
-        "SELECT COUNT(*) AS n FROM sync_outbox WHERE user_id = ? AND entity_id = ? AND state IN ('pending', 'retry')",
+        `SELECT COUNT(*) AS n FROM sync_outbox WHERE user_id = ? AND entity_id = ? AND state IN ${LIVE_OUTBOX_STATES}`,
         userId,
         String(raw.id ?? ""),
       );
@@ -380,19 +391,51 @@ export async function cacheTasks(userId: string, tasks: Record<string, unknown>[
   });
 }
 
-export async function cacheTaskView(userId: string, view: string, tasks: LocalTask[]): Promise<void> {
+/**
+ * Cache a server list view and return what the screen should show. A task whose change
+ * is still waiting to upload keeps its phone copy, and a task added on the phone but not
+ * uploaded yet stays in the list. This used to overwrite both with the server's older
+ * copy, so a new task vanished from Tasks until the next sync (logic audit M1).
+ */
+export async function cacheTaskView(userId: string, view: string, tasks: LocalTask[]): Promise<LocalTask[]> {
   const db = await getDatabase();
+  let shown: LocalTask[] = tasks;
   await db.withTransactionAsync(async () => {
-    for (const task of tasks) await saveTask(db, userId, task);
+    const live = await liveTaskIds(db, userId);
+    const mine = new Map<string, LocalTask>();
+    for (const id of live) {
+      const row = await db.getFirstAsync<{ data_json: string }>(
+        "SELECT data_json FROM local_tasks WHERE user_id = ? AND id = ?",
+        userId,
+        id,
+      );
+      const task = row ? normalizeTask(JSON.parse(row.data_json) as Record<string, unknown>) : null;
+      if (task) mine.set(id, task);
+    }
+    shown = [];
+    for (const task of tasks) {
+      if (live.has(task.id)) {
+        const local = mine.get(task.id);
+        if (local && taskMatchesView(local, view)) shown.push(local); // else deleted or moved here
+        continue;
+      }
+      shown.push(task);
+      await saveTask(db, userId, task);
+    }
+    const listed = new Set(tasks.map((task) => task.id));
+    for (const [id, local] of mine) {
+      if (!listed.has(id) && taskMatchesView(local, view)) shown.unshift(local);
+    }
     await db.runAsync(
       `INSERT INTO task_views(user_id, view_key, data_json, cached_at) VALUES (?, ?, ?, ?)
        ON CONFLICT(user_id, view_key) DO UPDATE SET data_json=excluded.data_json, cached_at=excluded.cached_at`,
       userId,
       view,
-      JSON.stringify(tasks),
+      JSON.stringify(shown),
       new Date().toISOString(),
     );
   });
+  return shown;
 }
 
 export async function createTaskOffline(userId: string, input: {
@@ -406,10 +449,12 @@ export async function createTaskOffline(userId: string, input: {
   category_id?: string | null;
 }): Promise<LocalTask> {
   const db = await getDatabase();
+  const now = new Date().toISOString();
+  const status = input.status ?? "pending";
   const task: LocalTask = {
     id: input.id ?? makeOfflineId(),
     title: input.title.trim(),
-    status: input.status ?? "pending",
+    status,
     priority: null,
     deadline_at: input.deadline_at ?? null,
     estimate_user_min: input.estimate_user_min ?? null,
@@ -420,7 +465,8 @@ export async function createTaskOffline(userId: string, input: {
     tags: [],
     subtasks: [],
     origin: input.origin ?? "manual",
-    created_at: new Date().toISOString(),
+    created_at: now,
+    completed_at: status === "completed" ? now : null,
     version: 1,
   };
   await db.withTransactionAsync(async () => {
@@ -430,9 +476,15 @@ export async function createTaskOffline(userId: string, input: {
       status: task.status,
       deadline_at: task.deadline_at,
       origin: task.origin,
+      // The server read only estimate_min here and dropped the estimate (logic audit B2);
+      // it now reads all three, and estimate_min keeps older servers working.
+      estimate_min: task.estimate_final_min ?? task.estimate_user_min,
       estimate_user_min: task.estimate_user_min,
       estimate_final_min: task.estimate_final_min,
       category_id: task.category_id,
+      // Written offline, the task keeps the time it was really added and finished.
+      created_at: task.created_at,
+      completed_at: task.completed_at,
     }, null);
     await updateTaskViews(db, userId, task.id, task, true);
   });
@@ -476,6 +528,10 @@ export async function updateTaskOffline(
     if (patch.priority !== undefined) payload.priority = patch.priority;
     if (patch.deadline_at !== undefined) payload.deadline_at = patch.deadline_at;
     if (patch.estimate_user_min !== undefined) payload.estimate_min = patch.estimate_user_min;
+    // Moves of a due date are counted on the phone; the count used to stay here (B3).
+    if (patch.reschedule_count !== undefined) payload.reschedule_count = patch.reschedule_count;
+    // Finished offline: the server keeps the real finish time, not the upload time.
+    if (patch.status === "completed" && updated.completed_at) payload.completed_at = updated.completed_at;
     if (Object.keys(payload).length) await enqueue(db, userId, taskId, "update", payload, row.version);
     await updateTaskViews(db, userId, taskId, updated, false);
   });
@@ -639,6 +695,63 @@ export async function stopTaskTimerOffline(userId: string, timerId: string): Pro
   notifyLocalTasksChanged(userId);
 }
 
+/** A start/pause shorter than this is a mis-tap, not work (ADR-032). */
+export const MIN_SESSION_MS = 30_000;
+
+/** End a running session: saved as a time entry, or dropped when it was a mis-tap. */
+export async function endTaskSession(
+  userId: string,
+  timer: { id: string; started_at: string; source: string },
+): Promise<void> {
+  const elapsed = Date.now() - Date.parse(timer.started_at);
+  if (timer.source === "local" && elapsed < MIN_SESSION_MS) await removeLocalTimer(userId, timer.id);
+  else await stopTaskTimerOffline(userId, timer.id);
+}
+
+/**
+ * Mark a task done or not done. Finishing a task stops its clock first, wherever it is
+ * finished from: Today, Tasks, a check-in or a notification (logic audit M8: a check-in
+ * "Done" used to leave the timer running).
+ */
+export async function setTaskDoneOffline(userId: string, taskId: string, done: boolean): Promise<LocalTask | null> {
+  if (done) {
+    for (const timer of await getLocalTimers(userId)) {
+      if (timer.task_id === taskId) await endTaskSession(userId, timer);
+    }
+  }
+  return updateTaskOffline(userId, taskId, { status: done ? "completed" : "pending" });
+}
+
+/** The day after `now`, at the time the task was due (18:00 when it had no time). */
+export function tomorrowAtSameTime(deadlineAt: string | null, now: Date = new Date()): Date {
+  const next = new Date(now);
+  next.setDate(next.getDate() + 1);
+  const was = deadlineAt ? new Date(deadlineAt) : null;
+  if (was && Number.isFinite(was.getTime())) next.setHours(was.getHours(), was.getMinutes(), 0, 0);
+  else next.setHours(18, 0, 0, 0);
+  return next;
+}
+
+/**
+ * "Tomorrow" from a check-in, the evening sweep or the Tasks list, counted as a move.
+ * One rule everywhere: before the logic audit the check-in counted from the tap time
+ * ("due 18:00" became "18:20 tomorrow") and the sweep and list used 23:59.
+ */
+export async function moveTaskToTomorrowOffline(userId: string, taskId: string): Promise<LocalTask | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ data_json: string }>(
+    "SELECT data_json FROM local_tasks WHERE user_id = ? AND id = ?",
+    userId,
+    taskId,
+  );
+  const task = row ? normalizeTask(JSON.parse(row.data_json) as Record<string, unknown>) : null;
+  if (!task) return null;
+  return updateTaskOffline(userId, taskId, {
+    deadline_at: tomorrowAtSameTime(task.deadline_at).toISOString(),
+    reschedule_count: (task.reschedule_count ?? 0) + 1,
+  });
+}
+
 class ExpoSyncAdapter implements SyncStorageAdapter {
   constructor(private readonly userId: string) {}
 
@@ -778,8 +891,11 @@ class ExpoSyncAdapter implements SyncStorageAdapter {
         if (value.entity_type && value.entity_type !== "task") continue;
         const task = normalizeTask(value);
         if (!task) continue;
+        // Only a change still waiting to upload keeps the phone copy. A change the server
+        // refused ('failed') or kept its own value for ('conflict') used to freeze the task
+        // on this phone for good (logic audit M2).
         const pending = await db.getFirstAsync<{ present: number }>(
-          "SELECT 1 AS present FROM sync_outbox WHERE user_id=? AND entity_id=? AND state != 'done' LIMIT 1",
+          `SELECT 1 AS present FROM sync_outbox WHERE user_id=? AND entity_id=? AND state IN ${LIVE_OUTBOX_STATES} LIMIT 1`,
           this.userId,
           task.id,
         );
@@ -800,7 +916,24 @@ class ExpoSyncAdapter implements SyncStorageAdapter {
   }
 }
 
-export async function syncMobileAccount(userId: string, token: string, baseUrl: string): Promise<void> {
+let syncChain: Promise<void> = Promise.resolve();
+
+/**
+ * Push the outbox, then pull. Cycles run one after another: screens, the widget and
+ * notification buttons all ask for syncs, and two cycles at once used to send the same
+ * queue twice.
+ */
+export function syncMobileAccount(userId: string, token: string, baseUrl: string): Promise<void> {
+  const run = syncChain.then(() => runSyncCycle(userId, token, baseUrl));
+  syncChain = run.catch(() => undefined);
+  return run;
+}
+
+async function runSyncCycle(userId: string, token: string, baseUrl: string): Promise<void> {
+  // Changes left "inflight" by an app closed mid-upload were never sent again. No other
+  // cycle runs now, and the server answers "duplicate" for an op it already applied.
+  const db = await getDatabase();
+  await db.runAsync("UPDATE sync_outbox SET state='retry' WHERE user_id=? AND state='inflight'", userId);
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
   const api: SyncApiClient = {
     async push(operations) {

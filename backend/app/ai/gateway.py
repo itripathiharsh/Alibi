@@ -23,6 +23,7 @@ from app.ai.adapters.groq import GroqProviderAdapter
 from app.ai.adapters.nvidia import NvidiaProviderAdapter
 from app.ai.adapters.ollama import OllamaProviderAdapter
 from app.ai.adapters.openrouter import OpenRouterProviderAdapter
+from app.ai.endpoint_policy import UnsafeProviderURLError, ensure_public_provider_url
 from app.ai.types import GatewayResult, LLMRequest, Message, Operation
 from app.core.config import settings
 from app.core.crypto import decrypt_api_key
@@ -239,18 +240,29 @@ class AIGateway:
                 models_dict = p_set.models or {}
                 default_model = models_dict.get("default")
 
+        if provider_name == "ollama" and settings.alibi_mode == "hosted":
+            return []  # Ollama runs only on the user's own computer (ADR-020)
         if user_key or provider_name == "ollama":
-            made = self._make_adapter(provider_name, user_key, base_url, default_model)
+            if base_url:
+                # Saved before addresses were checked, or now resolving somewhere private.
+                try:
+                    base_url = await ensure_public_provider_url(base_url)
+                except UnsafeProviderURLError:
+                    logger.warning("Skipping %s: its saved base URL is not allowed", provider_name)
+                    return []
+            made = self._make_adapter(provider_name, user_key, base_url or None, default_model)
             return [_Candidate(made[0], made[1], provider_name)] if made else []
 
         pool = server_provider_keys(provider_name)
         if not pool:
             return []
-        if provider_name == "openrouter" and not default_model:
-            default_model = settings.openrouter_model
+        # The owner's keys only ever go to the provider's own endpoint with the default
+        # model. A user's saved base URL or model applies to that user's own key alone;
+        # otherwise anyone could point the server's keys at a host they control.
+        server_model = settings.openrouter_model if provider_name == "openrouter" else None
         candidates: list[_Candidate] = []
         for index in _rotate(provider_name, len(pool)):
-            made = self._make_adapter(provider_name, pool[index], base_url, default_model)
+            made = self._make_adapter(provider_name, pool[index], None, server_model)
             if made:
                 slot = provider_name if len(pool) == 1 else f"{provider_name}#{index + 1}"
                 candidates.append(_Candidate(made[0], made[1], slot))

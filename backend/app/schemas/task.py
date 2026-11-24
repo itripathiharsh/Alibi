@@ -43,6 +43,8 @@ class TaskCaptureRequest(BaseModel):
     id: uuid.UUID | None = None
     status: str | None = Field(None, pattern="^(pending|in_progress|completed|cancelled)$")
     deadline_at: datetime | None = None
+    # The phone has sent this since 0.2.x; it was silently dropped (logic audit B5).
+    estimate_user_min: int | None = Field(None, ge=1, le=10080)
 
     @field_validator("id", mode="before")
     @classmethod
